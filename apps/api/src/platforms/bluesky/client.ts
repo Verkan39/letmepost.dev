@@ -1,6 +1,8 @@
-import { LetmepostError } from "../../errors.js";
+import { platformFetch } from "../_shared/http.js";
+import { authFailed, extractUpstreamMessage, rejected } from "../_shared/errors.js";
 
 const DEFAULT_PDS = "https://bsky.social";
+const PLATFORM = "bluesky";
 
 export interface BlueskySession {
   accessJwt: string;
@@ -14,14 +16,6 @@ export interface BlueskyPostResult {
   cid: string;
 }
 
-async function safeJson(res: Response): Promise<unknown> {
-  try {
-    return (await res.json()) as unknown;
-  } catch {
-    return undefined;
-  }
-}
-
 export class BlueskyClient {
   constructor(
     private readonly identifier: string,
@@ -30,61 +24,52 @@ export class BlueskyClient {
   ) {}
 
   async createSession(): Promise<BlueskySession> {
-    const res = await fetch(`${this.pdsUrl}/xrpc/com.atproto.server.createSession`, {
+    const res = await platformFetch<BlueskySession>({
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ identifier: this.identifier, password: this.password }),
+      url: `${this.pdsUrl}/xrpc/com.atproto.server.createSession`,
+      body: { identifier: this.identifier, password: this.password },
+      platform: PLATFORM,
     });
-    if (!res.ok) {
-      const body = await safeJson(res);
-      throw new LetmepostError({
-        code: "platform_auth_failed",
-        status: 401,
-        message: "Bluesky authentication failed.",
-        platform: "bluesky",
-        platformResponse: body,
+    if (!res.ok || !res.body) {
+      throw authFailed({
+        platform: PLATFORM,
+        platformResponse: res.body ?? res.raw ?? undefined,
         remediation:
           "Verify the identifier (handle or email) and use a Bluesky app password, not the account password. Generate one at https://bsky.app/settings/app-passwords.",
       });
     }
-    return (await res.json()) as BlueskySession;
+    return res.body;
   }
 
-  async createPost(session: BlueskySession, text: string): Promise<BlueskyPostResult> {
+  async createPost(
+    session: BlueskySession,
+    text: string,
+  ): Promise<BlueskyPostResult> {
     const record = {
       $type: "app.bsky.feed.post",
       text,
       createdAt: new Date().toISOString(),
     };
-    const res = await fetch(`${this.pdsUrl}/xrpc/com.atproto.repo.createRecord`, {
+    const res = await platformFetch<BlueskyPostResult>({
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.accessJwt}`,
-      },
-      body: JSON.stringify({
+      url: `${this.pdsUrl}/xrpc/com.atproto.repo.createRecord`,
+      headers: { Authorization: `Bearer ${session.accessJwt}` },
+      body: {
         repo: session.did,
         collection: "app.bsky.feed.post",
         record,
-      }),
+      },
+      platform: PLATFORM,
     });
-    if (!res.ok) {
-      const body = await safeJson(res);
-      const upstreamMessage =
-        body && typeof body === "object" && "message" in body && typeof body.message === "string"
-          ? body.message
-          : undefined;
-      throw new LetmepostError({
-        code: "platform_rejected",
-        status: 502,
-        message: upstreamMessage
-          ? `Bluesky rejected the post: ${upstreamMessage}`
-          : "Bluesky rejected the post.",
-        platform: "bluesky",
-        platformResponse: body,
-        remediation: "Inspect platformResponse for the upstream error detail.",
+    if (!res.ok || !res.body) {
+      throw rejected({
+        platform: PLATFORM,
+        platformResponse: res.body ?? res.raw ?? undefined,
+        ...(extractUpstreamMessage(res.body) !== undefined
+          ? { upstreamMessage: extractUpstreamMessage(res.body)! }
+          : {}),
       });
     }
-    return (await res.json()) as BlueskyPostResult;
+    return res.body;
   }
 }

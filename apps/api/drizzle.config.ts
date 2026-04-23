@@ -1,12 +1,9 @@
 import { defineConfig } from "drizzle-kit";
 
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error(
-    "DATABASE_URL env var is not set. Add a Postgres connection string to apps/api/.env (see apps/api/.env.example).",
-  );
-}
+// drizzle-kit generate works offline; migrate/push/studio need a real URL.
+// The app itself (apps/api/src/db/index.ts) throws with a clear message if
+// DATABASE_URL is missing at runtime.
+const databaseUrl = process.env.DATABASE_URL ?? "postgres://localhost/placeholder";
 
 export default defineConfig({
   schema: "./src/db/schema/index.ts",

@@ -1,0 +1,57 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Contact"
+  description="How to get in touch with letmepost.dev."
+>
+  <section class="doc">
+    <div class="container prose">
+      <h1>Contact</h1>
+
+      <p>
+        letmepost.dev is operated by Rose Kamal Love (trading as letmepost.dev),
+        based in India. Solo-dev shop — messages come to a real inbox and get
+        real replies.
+      </p>
+
+      <h2>Email</h2>
+      <p>
+        <a href="mailto:support@letmepost.dev">support@letmepost.dev</a> — for
+        anything: product questions, privacy, security, bug reports.
+      </p>
+
+      <h2>Security disclosures</h2>
+      <p>
+        Found a vulnerability? Please email the address above with
+        <code>[security]</code> in the subject line. Please don't file a public
+        GitHub issue for security reports.
+      </p>
+
+      <h2>Open source</h2>
+      <p>
+        <a
+          href="https://github.com/rosekamallove/letmepost.dev"
+          rel="noopener"
+          target="_blank">github.com/rosekamallove/letmepost.dev</a
+        > — file issues, send PRs, read the roadmap.
+      </p>
+
+      <h2>Business address</h2>
+      <p class="muted">
+        Registered address is disclosed on request for billing / platform
+        verification purposes. Email us.
+      </p>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .doc {
+    padding: 3.5rem 0 4rem;
+  }
+  .doc h2 {
+    margin-top: 2.25rem;
+  }
+</style>

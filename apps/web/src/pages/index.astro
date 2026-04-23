@@ -1,0 +1,514 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { Code } from "astro:components";
+import { Icon } from "astro-icon/components";
+import PlatformIcon from "../components/PlatformIcon.astro";
+
+const platforms = [
+  { name: "Bluesky", slug: "bluesky", status: "live" },
+  { name: "LinkedIn", slug: "linkedin", status: "next" },
+  { name: "Twitter / X", slug: "x", status: "soon" },
+  { name: "Instagram", slug: "instagram", status: "soon" },
+  { name: "Facebook", slug: "facebook", status: "soon" },
+  { name: "Threads", slug: "threads", status: "soon" },
+  { name: "TikTok", slug: "tiktok", status: "later" },
+  { name: "Pinterest", slug: "pinterest", status: "later" },
+] as const;
+
+const statusLabel: Record<string, string> = {
+  live: "live",
+  next: "next",
+  soon: "soon",
+  later: "later",
+};
+
+const codeSample = `// Idempotency keys make retries safe.
+// Preflight rules run before we hit the platform.
+
+await fetch("https://api.letmepost.dev/v1/posts", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer lmp_live_…",
+    "Idempotency-Key": crypto.randomUUID(),
+  },
+  body: JSON.stringify({
+    account: { platform: "bluesky", id: "acc_…" },
+    text: "Shipping letmepost.dev",
+  }),
+});`;
+
+const errorSample = `{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "bluesky.text.max_graphemes",
+    "platform": "bluesky",
+    "platform_version": "atproto-2026-04",
+    "message": "Post text is 312 graphemes; Bluesky allows at most 300.",
+    "remediation": "Shorten the post to 300 graphemes or fewer.",
+    "request_id": "req_01HY6X4AWBJM2K9F2PTQMRD9JQ"
+  }
+}`;
+
+const endpoints = [
+  {
+    method: "POST",
+    path: "/v1/posts",
+    desc: "One call. Seven platforms at v1. Text, media, carousels — scheduled or now.",
+  },
+  {
+    method: "POST",
+    path: "/v1/posts/validate",
+    desc: "Run preflight without publishing. Test rules in CI. Get every violation back at once.",
+  },
+  {
+    method: "POST",
+    path: "/v1/accounts/connect/:platform",
+    desc: "One OAuth flow, scoped narrowly. Tokens encrypted at rest. Refresh handled for you.",
+  },
+  {
+    method: "GET",
+    path: "/v1/platform-versions",
+    desc: "Public. See which upstream API version we pin per platform and what's deprecating.",
+  },
+  {
+    method: "POST",
+    path: "/v1/webhook-endpoints",
+    desc: "HMAC-signed deliveries for queued, published, failed, token.expiring, version.deprecated.",
+  },
+  {
+    method: "GET",
+    path: "/v1/posts/:id",
+    desc: "Full post record with every attempt, every upstream response, every status transition.",
+  },
+];
+
+const faqs = [
+  {
+    q: "Is it really open source?",
+    a: "Apache 2.0 from day one. Same code runs the hosted SaaS and the self-host Docker Compose. No feature gate.",
+  },
+  {
+    q: "Why another social media API?",
+    a: "Because every existing one fails silently and charges per-profile. We fix both. See PRODUCT.md in the repo for the long version.",
+  },
+  {
+    q: "When do LinkedIn, Meta, and TikTok land?",
+    a: "LinkedIn is next, ~3 weeks of build. Meta and TikTok are review-gated by the platforms themselves (6–12 weeks). Bluesky works today. See plan.md.",
+  },
+  {
+    q: "How much does it cost?",
+    a: "TBD on the hosted tier. The OSS self-host is always free. Hosted pricing will be flat-rate with a real free tier. No per-profile tax.",
+  },
+  {
+    q: "Postiz, Zernio, Ayrshare — what's the difference?",
+    a: "Postiz is OSS but known for silent-failure bugs. Zernio is closed-source. Ayrshare charges per-profile and returns opaque errors. We ship OSS + transparent errors + flat pricing.",
+  },
+  {
+    q: "Can I self-host it?",
+    a: "Yes, first-class. Docker Compose, BYO Postgres and Redis. Same API, same behavior as hosted.",
+  },
+];
+---
+
+<BaseLayout title="letmepost.dev">
+  <section class="hero">
+    <div class="container">
+      <div class="eyebrow">
+        <span class="dot"></span>
+        open source · <span class="eyebrow-tag">[alpha]</span>
+      </div>
+      <h1>
+        Social media publishing<br />
+        that <span class="accent-text">fails loudly.</span>
+      </h1>
+      <p class="lede">
+        An open-source API for developers and AI agents. Preflight validation,
+        transparent errors, stable platform versions, and idempotency keys on
+        every write. No per-profile tax.
+      </p>
+      <div class="cta-row">
+        <a
+          class="btn btn-primary"
+          href="https://github.com/rosekamallove/letmepost.dev"
+          target="_blank"
+          rel="noopener">Star on GitHub <Icon name="ph:arrow-up-right" width={13} height={13} /></a
+        >
+        <a class="btn btn-secondary" href="#how-it-works">
+          See how it works
+          <Icon name="ph:arrow-down" width={13} height={13} />
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-divider">
+    <div class="container">
+      <h2>One endpoint. Any platform.</h2>
+      <p class="muted">
+        <code>POST /v1/posts</code> routes to the right platform, runs every documented
+        rule locally before the upstream call, and returns a real error with the
+        rule id and raw upstream body when it doesn&apos;t.
+      </p>
+
+      <div class="code-window">
+        <div class="code-titlebar">
+          <span class="tl tl-red" aria-hidden="true"></span>
+          <span class="tl tl-yellow" aria-hidden="true"></span>
+          <span class="tl tl-green" aria-hidden="true"></span>
+          <span class="code-title">schedule-post.ts</span>
+        </div>
+        <Code code={codeSample} lang="ts" theme="github-dark-dimmed" />
+      </div>
+    </div>
+  </section>
+
+  <section class="section-divider">
+    <div class="container">
+      <h2>When it fails, you get something you can act on.</h2>
+      <p class="muted">
+        Every failure response is the same shape. Stable code, the rule that
+        fired, the upstream platform version we tried, a remediation hint, a
+        request id you can grep.
+      </p>
+
+      <div class="code-window">
+        <div class="code-titlebar">
+          <span class="tl tl-red" aria-hidden="true"></span>
+          <span class="tl tl-yellow" aria-hidden="true"></span>
+          <span class="tl tl-green" aria-hidden="true"></span>
+          <span class="code-title">error-response.json</span>
+        </div>
+        <Code code={errorSample} lang="json" theme="github-dark-dimmed" />
+      </div>
+    </div>
+  </section>
+
+  <section class="section-divider" id="how-it-works">
+    <div class="container">
+      <h2>How it works.</h2>
+      <p class="muted">Three steps. Minutes, not days.</p>
+
+      <ol class="steps">
+        <li class="step">
+          <div class="step-num">01</div>
+          <div>
+            <h3>Connect an account</h3>
+            <p>
+              One OAuth flow per platform, or an app-password submit for
+              Bluesky. Tokens get AES-256-GCM encrypted at rest. We refresh on
+              the right schedule per platform.
+            </p>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-num">02</div>
+          <div>
+            <h3>Send a post</h3>
+            <p>
+              <code>POST /v1/posts</code> with an Idempotency-Key. Preflight rules
+              run locally before the upstream call. If anything fails, you get
+              a rule id and a remediation hint — not a <code>body:&nbsp;{}</code
+              >.
+            </p>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-num">03</div>
+          <div>
+            <h3>Subscribe to events</h3>
+            <p>
+              HMAC-signed webhooks for <code>post.queued</code>, <code
+                >post.published</code
+              >, <code>post.failed</code>, <code>token.expiring</code>, and <code
+                >version.deprecated</code
+              >. No polling.
+            </p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section-divider">
+    <div class="container">
+      <h2>Four principles, no exceptions.</h2>
+
+      <div class="pillar">
+        <div class="pillar-num">01 · Preflight, not postflight</div>
+        <p class="muted">
+          Every documented rule — character counts, media formats, audit states,
+          URN patterns — runs locally before the platform sees the request.
+        </p>
+      </div>
+
+      <div class="pillar">
+        <div class="pillar-num">02 · Transparent errors</div>
+        <p class="muted">
+          No empty <code>{"{ body: {}, message: \"\" }"}</code>. Every failure ships
+          with a stable code, the specific rule that failed, the raw upstream body,
+          and a remediation hint.
+        </p>
+      </div>
+
+      <div class="pillar">
+        <div class="pillar-num">03 · Versions we pin for you</div>
+        <p class="muted">
+          LinkedIn sunset five API versions in six months. We pin the header,
+          track upcoming deprecations, and upgrade internally. Your workflow
+          doesn&apos;t break at 2&nbsp;a.m.
+        </p>
+      </div>
+
+      <div class="pillar">
+        <div class="pillar-num">04 · Idempotency by default</div>
+        <p class="muted">
+          Every write accepts an <code>Idempotency-Key</code>. Retries are safe.
+          No double-posting loops when a worker restarts mid-publish.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-divider">
+    <div class="container">
+      <h2>What you can do.</h2>
+      <p class="muted">
+        The v1 API surface. Small on purpose — one primitive, done well.
+      </p>
+
+      <ul class="endpoint-list">
+        {
+          endpoints.map((e) => (
+            <li class="endpoint">
+              <div class="endpoint-head">
+                <span class={`method method-${e.method.toLowerCase()}`}>
+                  {e.method}
+                </span>
+                <code class="endpoint-path">{e.path}</code>
+              </div>
+              <p class="endpoint-desc">{e.desc}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section class="section-divider" id="platforms">
+    <div class="container">
+      <h2>Platform support.</h2>
+      <p class="muted">
+        Bluesky first — it forced us to build the token-refresh story for every
+        other platform. The rest follow in the order the data pointed to.
+      </p>
+
+      <ul class="platform-list">
+        {
+          platforms.map((p) => (
+            <li class={`platform-row platform-${p.status}`}>
+              <span class="platform-brand">
+                <PlatformIcon platform={p.slug} />
+                <span class="platform-name">{p.name}</span>
+              </span>
+              <span class="platform-dots" aria-hidden="true" />
+              <span class="platform-status">
+                <span class="status-glyph" aria-hidden="true" />
+                {statusLabel[p.status]}
+              </span>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="small muted">
+        YouTube, Reddit, Telegram, Discord, Snapchat, Google Business, and
+        WhatsApp are deliberately not in the v1 scope. See the roadmap for the
+        reasoning.
+      </p>
+    </div>
+  </section>
+
+  <section class="section-divider" id="faq">
+    <div class="container">
+      <h2>FAQs.</h2>
+
+      <dl class="faq-list">
+        {
+          faqs.map((f) => (
+            <div class="faq">
+              <dt class="faq-q">{f.q}</dt>
+              <dd class="faq-a">{f.a}</dd>
+            </div>
+          ))
+        }
+      </dl>
+    </div>
+  </section>
+
+  <section class="final-cta section-divider">
+    <div class="container">
+      <h2>Stop debugging silent failures.</h2>
+      <p class="muted">
+        Star the repo. Send your first Bluesky post. File an issue when
+        something&apos;s weird. We&apos;re building in the open.
+      </p>
+      <div class="cta-row">
+        <a
+          class="btn btn-primary"
+          href="https://github.com/rosekamallove/letmepost.dev"
+          target="_blank"
+          rel="noopener">Star on GitHub <Icon name="ph:arrow-up-right" width={13} height={13} /></a
+        >
+        <a class="btn btn-secondary" href="/contact">Get in touch</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .hero {
+    padding: 5.5rem 0 4rem;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 1.75rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--border-strong);
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    background: var(--success);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 18%, transparent);
+  }
+
+  .eyebrow-tag {
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.65rem;
+  }
+
+  .accent-text {
+    color: var(--accent);
+  }
+
+  .lede {
+    font-size: 1rem;
+    margin-top: 1.25rem;
+    margin-bottom: 2.5rem;
+    color: var(--text-muted);
+  }
+
+  .cta-row {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  /* Pillars: muted numbers, not accent */
+  .pillar {
+    padding: 1.25rem 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .pillar:last-of-type {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pillar-num {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.4rem;
+    font-weight: 700;
+  }
+
+  .pillar p {
+    margin: 0;
+  }
+
+  /* Platform list: no row borders, icons per brand, dotted leader between */
+  .platform-list {
+    list-style: none;
+    padding: 0;
+    margin: 1.5rem 0 1.25rem;
+  }
+
+  .platform-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    font-size: 0.95rem;
+  }
+
+  .platform-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    color: var(--text);
+  }
+
+  .platform-brand :global(.platform-icon) {
+    color: var(--text-muted);
+    flex-shrink: 0;
+    transition: color var(--tr-fast);
+  }
+
+  .platform-row:hover .platform-brand :global(.platform-icon) {
+    color: var(--text);
+  }
+
+  .platform-name {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .platform-dots {
+    flex: 1;
+    align-self: center;
+    height: 0;
+    border-bottom: 1px dotted var(--border-strong);
+  }
+
+  .platform-status {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .status-glyph {
+    width: 6px;
+    height: 6px;
+    background: var(--text-muted);
+    opacity: 0.5;
+  }
+
+  .platform-live .status-glyph {
+    background: var(--success);
+    opacity: 1;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 18%, transparent);
+  }
+
+  .platform-next .status-glyph {
+    background: var(--accent);
+    opacity: 1;
+  }
+
+  .small {
+    font-size: 0.8rem;
+    margin-top: 1rem;
+  }
+</style>

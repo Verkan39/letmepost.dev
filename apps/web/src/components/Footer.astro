@@ -1,0 +1,85 @@
+---
+import { Icon } from "astro-icon/components";
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">letmepost.dev</div>
+      <p class="muted">
+        Open-source social media publishing API.<br />
+        Fails loudly, not silently.
+      </p>
+    </div>
+
+    <div class="footer-links">
+      <a href="/#platforms">Platforms</a>
+      <a href="/status">Status</a>
+      <a
+        class="ext"
+        href="https://github.com/rosekamallove/letmepost.dev"
+        rel="noopener"
+        target="_blank"
+      >
+        GitHub <Icon name="ph:arrow-up-right" width={11} height={11} />
+      </a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+      <a href="/data-deletion">Data deletion</a>
+      <a href="/contact">Contact</a>
+    </div>
+
+    <div class="footer-bar muted">
+      © {year} letmepost.dev · Apache-2.0
+    </div>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    border-top: 1px solid var(--border);
+    background: transparent;
+    padding: 2.5rem 0 1.5rem;
+    font-size: 0.85rem;
+    margin-top: 4rem;
+  }
+
+  .footer-top {
+    margin-bottom: 1.75rem;
+  }
+
+  .footer-brand {
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.35rem;
+  }
+
+  .footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .footer-links a {
+    text-decoration: none;
+    color: var(--text);
+    transition: color var(--tr-fast);
+  }
+
+  .ext {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .footer-links a:hover {
+    color: var(--accent);
+  }
+
+  .footer-bar {
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+  }
+</style>

@@ -1,0 +1,65 @@
+---
+import Logo from "./Logo.astro";
+import { Icon } from "astro-icon/components";
+---
+
+<header class="site-header">
+  <div class="container header-inner">
+    <Logo />
+    <nav aria-label="Primary">
+      <a href="/#platforms">Platforms</a>
+      <a href="/status">Status</a>
+      <a
+        class="ext"
+        href="https://github.com/rosekamallove/letmepost.dev"
+        rel="noopener noreferrer"
+        target="_blank"
+      >
+        GitHub
+        <Icon name="ph:arrow-up-right" width={12} height={12} />
+      </a>
+    </nav>
+  </div>
+</header>
+
+<style>
+  .site-header {
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 52px;
+  }
+
+  nav {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.85rem;
+  }
+
+  nav a {
+    text-decoration: none;
+    color: var(--text-muted);
+    transition: color var(--tr-fast);
+  }
+
+  .ext {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  nav a:hover {
+    color: var(--accent);
+  }
+
+  @media (max-width: 520px) {
+    nav a:not(:last-child) {
+      display: none;
+    }
+  }
+</style>

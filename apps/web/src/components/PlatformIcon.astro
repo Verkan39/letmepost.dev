@@ -1,0 +1,40 @@
+---
+import { Icon } from "astro-icon/components";
+
+// Phosphor icon names for each platform. Bluesky isn't in Phosphor's brand
+// set, so it falls through to `butterfly` (their actual brand mark is one).
+type PlatformSlug =
+  | "bluesky"
+  | "linkedin"
+  | "x"
+  | "instagram"
+  | "facebook"
+  | "threads"
+  | "tiktok"
+  | "pinterest";
+
+interface Props {
+  platform: PlatformSlug;
+  size?: number;
+}
+
+const { platform, size = 16 } = Astro.props;
+
+const phosphorName: Record<PlatformSlug, string> = {
+  bluesky: "ph:butterfly",
+  linkedin: "ph:linkedin-logo",
+  x: "ph:x-logo",
+  instagram: "ph:instagram-logo",
+  facebook: "ph:facebook-logo",
+  threads: "ph:threads-logo",
+  tiktok: "ph:tiktok-logo",
+  pinterest: "ph:pinterest-logo",
+};
+---
+
+<Icon
+  name={phosphorName[platform]}
+  width={size}
+  height={size}
+  class="platform-icon"
+/>

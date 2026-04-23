@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://letmepost.dev/sitemap-index.xml

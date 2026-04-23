@@ -1,0 +1,28 @@
+{
+  "name": "@letmepost/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "typecheck": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "^3.2.1",
+    "@fontsource-variable/jetbrains-mono": "^5.1.1",
+    "@fontsource/instrument-serif": "^5.2.8",
+    "@iconify-json/ph": "^1.2.2",
+    "@resvg/resvg-js": "^2.6.2",
+    "astro": "^5.1.0",
+    "astro-icon": "^1.1.5"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.8",
+    "@letmepost/config-tsconfig": "workspace:*",
+    "typescript": "^5.7.2"
+  }
+}

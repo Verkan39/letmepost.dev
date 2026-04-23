@@ -1,0 +1,25 @@
+{
+  "name": "letmepost.dev",
+  "short_name": "letmepost",
+  "description": "Open-source social media publishing API that fails loudly.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#2D7652",
+  "background_color": "#F2EDE3",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "180x180",
+      "purpose": "maskable"
+    }
+  ]
+}

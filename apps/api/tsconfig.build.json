@@ -1,0 +1,12 @@
+{
+  "extends": "@letmepost/config-tsconfig/base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node"],
+    "rootDir": "src",
+    "outDir": "dist",
+    "noEmit": false
+  },
+  "include": ["src"]
+}

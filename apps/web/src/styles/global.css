@@ -128,6 +128,11 @@ h2 {
   margin-top: 2.5rem;
 }
 
+/* First heading of a section sits directly against section padding — no double-space. */
+.container > h2:first-child {
+  margin-top: 0;
+}
+
 h3 {
   font-size: 1.05rem;
   margin-top: 1.5rem;
@@ -479,8 +484,4 @@ section + section {
 /* -------------------------------------------------------------------------- */
 .final-cta {
   padding-bottom: 4.5rem;
-}
-
-.final-cta h2 {
-  margin-top: 0;
 }

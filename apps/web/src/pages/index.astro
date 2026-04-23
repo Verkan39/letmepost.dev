@@ -84,28 +84,28 @@ const endpoints = [
 
 const faqs = [
   {
-    q: "Is it really open source?",
-    a: "Apache 2.0 from day one. Same code runs the hosted SaaS and the self-host Docker Compose. No feature gate.",
+    q: "What actually works today?",
+    a: 'Bluesky is live end-to-end — connect an account, send a post, get a webhook back. LinkedIn is next (~3 weeks of build). Meta and TikTok are review-gated by the platforms themselves and take 6–12 weeks from app submission. See the <a href="https://github.com/rosekamallove/letmepost.dev/blob/main/plan.md">plan</a> for dates.',
   },
   {
     q: "Why another social media API?",
-    a: "Because every existing one fails silently and charges per-profile. We fix both. See PRODUCT.md in the repo for the long version.",
-  },
-  {
-    q: "When do LinkedIn, Meta, and TikTok land?",
-    a: "LinkedIn is next, ~3 weeks of build. Meta and TikTok are review-gated by the platforms themselves (6–12 weeks). Bluesky works today. See plan.md.",
+    a: 'Because every existing one fails silently and charges per-profile. 2025–26 research across 150+ citations: LinkedIn sunset five API versions in six months; Postiz shipped infinite double-posting bugs; Ayrshare\'s own docs admit error 138 "masks multiple underlying causes." We fix all three. <a href="https://github.com/rosekamallove/letmepost.dev/blob/main/PRODUCT.md">Read the brief</a>.',
   },
   {
     q: "How much does it cost?",
-    a: "TBD on the hosted tier. The OSS self-host is always free. Hosted pricing will be flat-rate with a real free tier. No per-profile tax.",
+    a: "Free during alpha. When hosted billing turns on, it's flat-rate with a real free tier — no per-profile tax, no per-seat lock-in. Self-host stays free forever.",
+  },
+  {
+    q: "Is it really open source?",
+    a: "Apache 2.0 from day one. Same code runs the hosted SaaS and the self-host Docker Compose. No feature gate, no open-core trick.",
   },
   {
     q: "Postiz, Zernio, Ayrshare — what's the difference?",
-    a: "Postiz is OSS but known for silent-failure bugs. Zernio is closed-source. Ayrshare charges per-profile and returns opaque errors. We ship OSS + transparent errors + flat pricing.",
+    a: "Postiz is OSS but known for silent-failure bugs. Zernio is closed-source (rebranded from Late in late 2025). Ayrshare charges per-profile and returns opaque errors. We ship OSS + transparent errors + flat pricing — nobody else has all three.",
   },
   {
     q: "Can I self-host it?",
-    a: "Yes, first-class. Docker Compose, BYO Postgres and Redis. Same API, same behavior as hosted.",
+    a: "Yes, first-class. Docker Compose, BYO Postgres and Redis, BYO platform credentials. Same API, same behavior as hosted.",
   },
 ];
 ---
@@ -118,13 +118,12 @@ const faqs = [
         open source · <span class="eyebrow-tag">[alpha]</span>
       </div>
       <h1>
-        Social media publishing<br />
-        that <span class="accent-text">fails loudly.</span>
+        A publishing API that <span class="accent-text">fails loudly.</span>
       </h1>
       <p class="lede">
-        An open-source API for developers and AI agents. Preflight validation,
-        transparent errors, stable platform versions, and idempotency keys on
-        every write. No per-profile tax.
+        An open-source publishing API for developers and AI agents. When a
+        post fails, you get the rule that failed, the raw platform response,
+        and a remediation — never an empty body. No per-profile tax.
       </p>
       <div class="cta-row">
         <a
@@ -133,21 +132,22 @@ const faqs = [
           target="_blank"
           rel="noopener">Star on GitHub <Icon name="ph:arrow-up-right" width={13} height={13} /></a
         >
-        <a class="btn btn-secondary" href="#how-it-works">
-          See how it works
+        <a class="btn btn-secondary" href="#request">
+          Show me the request
           <Icon name="ph:arrow-down" width={13} height={13} />
         </a>
       </div>
     </div>
   </section>
 
-  <section class="section-divider">
+  <section class="section-divider" id="request">
     <div class="container">
       <h2>One endpoint. Any platform.</h2>
       <p class="muted">
-        <code>POST /v1/posts</code> routes to the right platform, runs every documented
-        rule locally before the upstream call, and returns a real error with the
-        rule id and raw upstream body when it doesn&apos;t.
+        <code>POST /v1/posts</code> routes to the right platform and runs every
+        documented rule locally before the upstream call. One request shape,
+        one error shape, same contract whether you&apos;re posting to Bluesky
+        today or LinkedIn next month.
       </p>
 
       <div class="code-window">
@@ -336,7 +336,7 @@ const faqs = [
           faqs.map((f) => (
             <div class="faq">
               <dt class="faq-q">{f.q}</dt>
-              <dd class="faq-a">{f.a}</dd>
+              <dd class="faq-a" set:html={f.a} />
             </div>
           ))
         }
@@ -346,7 +346,7 @@ const faqs = [
 
   <section class="final-cta section-divider">
     <div class="container">
-      <h2>Stop debugging silent failures.</h2>
+      <h2>Kick the tires.</h2>
       <p class="muted">
         Star the repo. Send your first Bluesky post. File an issue when
         something&apos;s weird. We&apos;re building in the open.
@@ -366,7 +366,7 @@ const faqs = [
 
 <style>
   .hero {
-    padding: 5.5rem 0 4rem;
+    padding: 5.5rem 0 3.5rem;
   }
 
   .eyebrow {
@@ -400,10 +400,12 @@ const faqs = [
   }
 
   .lede {
-    font-size: 1rem;
+    font-size: 1.1rem;
+    line-height: 1.6;
+    max-width: 34rem;
     margin-top: 1.25rem;
     margin-bottom: 2.5rem;
-    color: var(--text-muted);
+    color: var(--text-secondary);
   }
 
   .cta-row {
@@ -423,11 +425,11 @@ const faqs = [
   }
 
   .pillar-num {
-    color: var(--text-muted);
+    color: var(--accent);
     font-size: 0.78rem;
     letter-spacing: 0.04em;
     margin-bottom: 0.4rem;
-    font-weight: 700;
+    font-weight: 800;
   }
 
   .pillar p {

@@ -9,4 +9,5 @@ coverage
 .DS_Store
 .vscode
 .idea
+.claude
 DAY_ZERO.md

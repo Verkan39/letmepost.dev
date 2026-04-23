@@ -10,18 +10,28 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
     "@hono/zod-validator": "^0.4.1",
     "@letmepost/schemas": "workspace:*",
+    "@neondatabase/serverless": "^1.1.0",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.6.13",
+    "postgres": "^3.4.9",
+    "ws": "^8.20.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@letmepost/config-tsconfig": "workspace:*",
     "@types/node": "^22.10.2",
+    "@types/ws": "^8.18.1",
+    "drizzle-kit": "^0.31.10",
     "msw": "^2.6.8",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",

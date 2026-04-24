@@ -12,7 +12,8 @@ const require = createRequire(import.meta.url);
 const FONT_REQUESTS = [
   "@fontsource/instrument-serif/files/instrument-serif-latin-400-italic.woff2",
   "@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2",
-  "@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2",
+  "@fontsource/commit-mono/files/commit-mono-latin-400-normal.woff2",
+  "@fontsource/commit-mono/files/commit-mono-latin-700-normal.woff2",
 ];
 
 function resolveFontFiles(): string[] {

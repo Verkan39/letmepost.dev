@@ -7,8 +7,15 @@ interface Props {
 const { wordmark = true, size = 32 } = Astro.props;
 ---
 
-<a href="/" class="logo" aria-label="letmepost.dev">
-  <span class="logo-mark" style={`--mark-size: ${size}px;`}>
+<a
+  href="/"
+  aria-label="letmepost.dev"
+  class="inline-flex items-center gap-[0.3rem] no-underline text-text hover:text-text leading-none"
+>
+  <span
+    class="inline-flex items-center justify-center text-accent shrink-0"
+    style={`width: ${size}px; height: ${size}px;`}
+  >
     <svg
       width={size}
       height={size}
@@ -22,7 +29,7 @@ const { wordmark = true, size = 32 } = Astro.props;
         y="9.5"
         width="13"
         height="13"
-        fill="var(--bg)"
+        fill="var(--color-bg)"
         transform="rotate(16 16 16)"
       ></rect>
     </svg>
@@ -30,79 +37,17 @@ const { wordmark = true, size = 32 } = Astro.props;
 
   {
     wordmark && (
-      <span class="wordmark">
-        <span class="word">letmepost</span>
-        <span class="tld">.dev</span>
-        <span class="tag">[alpha]</span>
+      <span class="inline-flex items-baseline">
+        <span class="font-serif italic font-normal text-[1.6rem] max-[480px]:text-[1.35rem] tracking-[-0.01em] leading-none text-text">
+          letmepost
+        </span>
+        <span class="font-serif italic font-normal text-[1.6rem] max-[480px]:text-[1.35rem] tracking-[-0.01em] leading-none text-accent">
+          .dev
+        </span>
+        <span class="ml-[0.4rem] font-mono text-[0.54rem] font-semibold text-text-muted tracking-[0.04em] opacity-60 uppercase self-end pb-[0.15rem]">
+          [alpha]
+        </span>
       </span>
     )
   }
 </a>
-
-<style>
-  .logo {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    text-decoration: none;
-    color: var(--text);
-    line-height: 1;
-  }
-  .logo:hover {
-    color: var(--text);
-  }
-
-  .wordmark {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0;
-  }
-
-  .word,
-  .tld {
-    font-family: var(--font-serif);
-    font-weight: 400;
-    font-style: italic;
-    font-size: 1.6rem;
-    letter-spacing: -0.01em;
-    line-height: 1;
-  }
-
-  .word {
-    color: var(--text);
-  }
-
-  .tld {
-    color: var(--accent);
-  }
-
-  .tag {
-    margin-left: 0.4rem;
-    font-family: var(--font-mono);
-    font-size: 0.54rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    letter-spacing: 0.04em;
-    opacity: 0.6;
-    text-transform: uppercase;
-    align-self: flex-end;
-    padding-bottom: 0.15rem;
-  }
-
-  .logo-mark {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--accent);
-    flex-shrink: 0;
-    width: var(--mark-size);
-    height: var(--mark-size);
-  }
-
-  @media (max-width: 480px) {
-    .word,
-    .tld {
-      font-size: 1.35rem;
-    }
-  }
-</style>

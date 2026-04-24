@@ -82,6 +82,13 @@ const endpoints = [
   },
 ];
 
+const methodClasses: Record<string, string> = {
+  POST: "text-http-post bg-http-post/10",
+  GET: "text-http-get bg-http-get/10",
+  PUT: "text-http-put bg-http-put/10",
+  DELETE: "text-http-delete bg-http-delete/10",
+};
+
 const faqs = [
   {
     q: "What actually works today?",
@@ -108,24 +115,42 @@ const faqs = [
     a: "Yes, first-class. Docker Compose, BYO Postgres and Redis, BYO platform credentials. Same API, same behavior as hosted.",
   },
 ];
+
+function glyphClasses(status: string): string {
+  if (status === "live") return "bg-success opacity-100";
+  if (status === "next") return "bg-accent opacity-100";
+  return "bg-text-muted opacity-50";
+}
+
+const liveGlyphShadow =
+  "box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success) 18%, transparent);";
 ---
 
 <BaseLayout title="letmepost.dev">
-  <section class="hero">
+  <!-- Hero -->
+  <section class="pt-22 pb-14">
     <div class="container">
-      <div class="eyebrow">
-        <span class="dot"></span>
-        open source · <span class="eyebrow-tag">[alpha]</span>
+      <div
+        class="inline-flex items-center gap-2 text-text-muted text-[0.72rem] uppercase tracking-[0.1em] mb-7 py-[0.3rem] px-[0.6rem] border border-border-strong"
+      >
+        <span
+          class="w-[7px] h-[7px] bg-success inline-block"
+          style={liveGlyphShadow}></span>
+        open source · <span
+          class="text-accent font-bold text-[0.65rem]">[alpha]</span
+        >
       </div>
       <h1>
-        A publishing API that <span class="accent-text">fails loudly.</span>
+        A publishing API that <span class="text-accent">fails loudly.</span>
       </h1>
-      <p class="lede">
+      <p
+        class="text-[1.1rem] leading-[1.6] max-w-[34rem] mt-5 mb-10 text-text-secondary"
+      >
         An open-source publishing API for developers and AI agents. When a
         post fails, you get the rule that failed, the raw platform response,
         and a remediation — never an empty body. No per-profile tax.
       </p>
-      <div class="cta-row">
+      <div class="flex gap-[0.6rem] flex-wrap">
         <a
           class="btn btn-primary"
           href="https://github.com/rosekamallove/letmepost.dev"
@@ -140,83 +165,129 @@ const faqs = [
     </div>
   </section>
 
-  <section class="section-divider" id="request">
+  <!-- Request -->
+  <section
+    id="request"
+    class="border-t border-border pt-14 pb-14 max-[640px]:pt-10 max-[640px]:pb-10"
+  >
     <div class="container">
-      <h2>One endpoint. Any platform.</h2>
-      <p class="muted">
+      <h2 class="!mt-0">One endpoint. Any platform.</h2>
+      <p class="text-text-muted">
         <code>POST /v1/posts</code> routes to the right platform and runs every
         documented rule locally before the upstream call. One request shape,
         one error shape, same contract whether you&apos;re posting to Bluesky
         today or LinkedIn next month.
       </p>
 
-      <div class="code-window">
-        <div class="code-titlebar">
-          <span class="tl tl-red" aria-hidden="true"></span>
-          <span class="tl tl-yellow" aria-hidden="true"></span>
-          <span class="tl tl-green" aria-hidden="true"></span>
-          <span class="code-title">schedule-post.ts</span>
+      <div class="border border-border my-6 bg-code-bg">
+        <div
+          class="flex items-center gap-[0.45rem] py-[0.65rem] px-[0.9rem] border-b border-[hsl(24_10%_16%)] text-[0.7rem] text-code-muted tracking-[0.02em]"
+        >
+          <span
+            class="w-[11px] h-[11px] rounded-full inline-block shrink-0 bg-[#ff5f57]"
+            aria-hidden="true"></span>
+          <span
+            class="w-[11px] h-[11px] rounded-full inline-block shrink-0 bg-[#febc2e]"
+            aria-hidden="true"></span>
+          <span
+            class="w-[11px] h-[11px] rounded-full inline-block shrink-0 bg-[#28c840]"
+            aria-hidden="true"></span>
+          <span class="ml-[0.6rem]">schedule-post.ts</span>
         </div>
         <Code code={codeSample} lang="ts" theme="github-dark-dimmed" />
       </div>
     </div>
   </section>
 
-  <section class="section-divider">
+  <!-- Error -->
+  <section
+    class="border-t border-border pt-14 pb-14 max-[640px]:pt-10 max-[640px]:pb-10"
+  >
     <div class="container">
-      <h2>When it fails, you get something you can act on.</h2>
-      <p class="muted">
+      <h2 class="!mt-0">When it fails, you get something you can act on.</h2>
+      <p class="text-text-muted">
         Every failure response is the same shape. Stable code, the rule that
         fired, the upstream platform version we tried, a remediation hint, a
         request id you can grep.
       </p>
 
-      <div class="code-window">
-        <div class="code-titlebar">
-          <span class="tl tl-red" aria-hidden="true"></span>
-          <span class="tl tl-yellow" aria-hidden="true"></span>
-          <span class="tl tl-green" aria-hidden="true"></span>
-          <span class="code-title">error-response.json</span>
+      <div class="border border-border my-6 bg-code-bg">
+        <div
+          class="flex items-center gap-[0.45rem] py-[0.65rem] px-[0.9rem] border-b border-[hsl(24_10%_16%)] text-[0.7rem] text-code-muted tracking-[0.02em]"
+        >
+          <span
+            class="w-[11px] h-[11px] rounded-full inline-block shrink-0 bg-[#ff5f57]"
+            aria-hidden="true"></span>
+          <span
+            class="w-[11px] h-[11px] rounded-full inline-block shrink-0 bg-[#febc2e]"
+            aria-hidden="true"></span>
+          <span
+            class="w-[11px] h-[11px] rounded-full inline-block shrink-0 bg-[#28c840]"
+            aria-hidden="true"></span>
+          <span class="ml-[0.6rem]">error-response.json</span>
         </div>
         <Code code={errorSample} lang="json" theme="github-dark-dimmed" />
       </div>
     </div>
   </section>
 
-  <section class="section-divider" id="how-it-works">
+  <!-- How it works -->
+  <section
+    id="how-it-works"
+    class="border-t border-border pt-14 pb-14 max-[640px]:pt-10 max-[640px]:pb-10"
+  >
     <div class="container">
-      <h2>How it works.</h2>
-      <p class="muted">Three steps. Minutes, not days.</p>
+      <h2 class="!mt-0">How it works.</h2>
+      <p class="text-text-muted">Three steps. Minutes, not days.</p>
 
-      <ol class="steps">
-        <li class="step">
-          <div class="step-num">01</div>
+      <ol class="list-none p-0 mt-6 mb-4 border-t border-border">
+        <li class="flex gap-[1.1rem] py-5 border-b border-border">
+          <div
+            class="text-accent font-extrabold text-[0.85rem] min-w-9 pt-[0.1rem] tracking-[0.04em]"
+          >
+            01
+          </div>
           <div>
-            <h3>Connect an account</h3>
-            <p>
+            <h3 class="!m-0 !mb-[0.35rem] !text-base !font-bold">
+              Connect an account
+            </h3>
+            <p class="text-text-muted m-0 text-[0.92rem]">
               One OAuth flow per platform, or an app-password submit for
               Bluesky. Tokens get AES-256-GCM encrypted at rest. We refresh on
               the right schedule per platform.
             </p>
           </div>
         </li>
-        <li class="step">
-          <div class="step-num">02</div>
+        <li class="flex gap-[1.1rem] py-5 border-b border-border">
+          <div
+            class="text-accent font-extrabold text-[0.85rem] min-w-9 pt-[0.1rem] tracking-[0.04em]"
+          >
+            02
+          </div>
           <div>
-            <h3>Send a post</h3>
-            <p>
+            <h3 class="!m-0 !mb-[0.35rem] !text-base !font-bold">
+              Send a post
+            </h3>
+            <p class="text-text-muted m-0 text-[0.92rem]">
               <code>POST /v1/posts</code> with an Idempotency-Key. Preflight rules
               run locally before the upstream call. If anything fails, you get
-              a rule id and a remediation hint — not a <code>body:&nbsp;{}</code
+              a rule id and a remediation hint — not a <code
+                >body:&nbsp;{}</code
               >.
             </p>
           </div>
         </li>
-        <li class="step">
-          <div class="step-num">03</div>
+        <li class="flex gap-[1.1rem] py-5 border-b border-border">
+          <div
+            class="text-accent font-extrabold text-[0.85rem] min-w-9 pt-[0.1rem] tracking-[0.04em]"
+          >
+            03
+          </div>
           <div>
-            <h3>Subscribe to events</h3>
-            <p>
+            <h3 class="!m-0 !mb-[0.35rem] !text-base !font-bold">
+              Subscribe to events
+            </h3>
+            <p class="text-text-muted m-0 text-[0.92rem]">
               HMAC-signed webhooks for <code>post.queued</code>, <code
                 >post.published</code
               >, <code>post.failed</code>, <code>token.expiring</code>, and <code
@@ -229,64 +300,92 @@ const faqs = [
     </div>
   </section>
 
-  <section class="section-divider">
+  <!-- Principles -->
+  <section
+    class="border-t border-border pt-14 pb-14 max-[640px]:pt-10 max-[640px]:pb-10"
+  >
     <div class="container">
-      <h2>Four principles, no exceptions.</h2>
+      <h2 class="!mt-0">Four principles, no exceptions.</h2>
 
-      <div class="pillar">
-        <div class="pillar-num">01 · Preflight, not postflight</div>
-        <p class="muted">
+      <div class="py-5 border-t border-border">
+        <div
+          class="text-accent text-[0.78rem] tracking-[0.04em] mb-[0.4rem] font-extrabold"
+        >
+          01 · Preflight, not postflight
+        </div>
+        <p class="text-text-muted m-0">
           Every documented rule — character counts, media formats, audit states,
           URN patterns — runs locally before the platform sees the request.
         </p>
       </div>
 
-      <div class="pillar">
-        <div class="pillar-num">02 · Transparent errors</div>
-        <p class="muted">
-          No empty <code>{"{ body: {}, message: \"\" }"}</code>. Every failure ships
-          with a stable code, the specific rule that failed, the raw upstream body,
-          and a remediation hint.
+      <div class="py-5 border-t border-border">
+        <div
+          class="text-accent text-[0.78rem] tracking-[0.04em] mb-[0.4rem] font-extrabold"
+        >
+          02 · Transparent errors
+        </div>
+        <p class="text-text-muted m-0">
+          No empty <code>{"{ body: {}, message: \"\" }"}</code>. Every failure
+          ships with a stable code, the specific rule that failed, the raw
+          upstream body, and a remediation hint.
         </p>
       </div>
 
-      <div class="pillar">
-        <div class="pillar-num">03 · Versions we pin for you</div>
-        <p class="muted">
+      <div class="py-5 border-t border-border">
+        <div
+          class="text-accent text-[0.78rem] tracking-[0.04em] mb-[0.4rem] font-extrabold"
+        >
+          03 · Versions we pin for you
+        </div>
+        <p class="text-text-muted m-0">
           LinkedIn sunset five API versions in six months. We pin the header,
           track upcoming deprecations, and upgrade internally. Your workflow
           doesn&apos;t break at 2&nbsp;a.m.
         </p>
       </div>
 
-      <div class="pillar">
-        <div class="pillar-num">04 · Idempotency by default</div>
-        <p class="muted">
-          Every write accepts an <code>Idempotency-Key</code>. Retries are safe.
-          No double-posting loops when a worker restarts mid-publish.
+      <div class="py-5 border-t border-b border-border">
+        <div
+          class="text-accent text-[0.78rem] tracking-[0.04em] mb-[0.4rem] font-extrabold"
+        >
+          04 · Idempotency by default
+        </div>
+        <p class="text-text-muted m-0">
+          Every write accepts an <code>Idempotency-Key</code>. Retries are
+          safe. No double-posting loops when a worker restarts mid-publish.
         </p>
       </div>
     </div>
   </section>
 
-  <section class="section-divider">
+  <!-- Endpoints -->
+  <section
+    class="border-t border-border pt-14 pb-14 max-[640px]:pt-10 max-[640px]:pb-10"
+  >
     <div class="container">
-      <h2>What you can do.</h2>
-      <p class="muted">
+      <h2 class="!mt-0">What you can do.</h2>
+      <p class="text-text-muted">
         The v1 API surface. Small on purpose — one primitive, done well.
       </p>
 
-      <ul class="endpoint-list">
+      <ul class="list-none p-0 mt-6 mb-4 border-t border-border">
         {
           endpoints.map((e) => (
-            <li class="endpoint">
-              <div class="endpoint-head">
-                <span class={`method method-${e.method.toLowerCase()}`}>
+            <li class="py-[1.15rem] border-b border-border">
+              <div class="flex items-center gap-3 mb-[0.4rem]">
+                <span
+                  class={`text-[0.68rem] font-bold tracking-[0.08em] py-[0.2rem] px-[0.55rem] border border-current leading-none uppercase min-w-[3.5rem] text-center ${methodClasses[e.method]}`}
+                >
                   {e.method}
                 </span>
-                <code class="endpoint-path">{e.path}</code>
+                <code class="font-semibold text-[0.95rem] !bg-transparent !p-0 !text-text">
+                  {e.path}
+                </code>
               </div>
-              <p class="endpoint-desc">{e.desc}</p>
+              <p class="text-text-muted m-0 text-[0.9rem] pl-[4.25rem] max-[520px]:pl-0">
+                {e.desc}
+              </p>
             </li>
           ))
         }
@@ -294,32 +393,46 @@ const faqs = [
     </div>
   </section>
 
-  <section class="section-divider" id="platforms">
+  <!-- Platforms -->
+  <section
+    id="platforms"
+    class="border-t border-border pt-14 pb-14 max-[640px]:pt-10 max-[640px]:pb-10"
+  >
     <div class="container">
-      <h2>Platform support.</h2>
-      <p class="muted">
+      <h2 class="!mt-0">Platform support.</h2>
+      <p class="text-text-muted">
         Bluesky first — it forced us to build the token-refresh story for every
         other platform. The rest follow in the order the data pointed to.
       </p>
 
-      <ul class="platform-list">
+      <ul class="list-none p-0 mt-6 mb-5">
         {
           platforms.map((p) => (
-            <li class={`platform-row platform-${p.status}`}>
-              <span class="platform-brand">
-                <PlatformIcon platform={p.slug} />
-                <span class="platform-name">{p.name}</span>
+            <li class="group flex items-center gap-3 py-2 text-[0.95rem]">
+              <span class="inline-flex items-center gap-[0.55rem] text-text">
+                <PlatformIcon
+                  platform={p.slug}
+                  class="group-hover:text-text"
+                />
+                <span class="font-semibold whitespace-nowrap">{p.name}</span>
               </span>
-              <span class="platform-dots" aria-hidden="true" />
-              <span class="platform-status">
-                <span class="status-glyph" aria-hidden="true" />
+              <span
+                class="flex-1 self-center h-0 border-b border-dotted border-border-strong"
+                aria-hidden="true"
+              />
+              <span class="text-[0.72rem] uppercase tracking-[0.08em] text-text-muted whitespace-nowrap inline-flex items-center gap-[0.4rem]">
+                <span
+                  class={`inline-block w-[6px] h-[6px] ${glyphClasses(p.status)}`}
+                  style={p.status === "live" ? liveGlyphShadow : ""}
+                  aria-hidden="true"
+                />
                 {statusLabel[p.status]}
               </span>
             </li>
           ))
         }
       </ul>
-      <p class="small muted">
+      <p class="text-[0.8rem] mt-4 text-text-muted">
         YouTube, Reddit, Telegram, Discord, Snapchat, Google Business, and
         WhatsApp are deliberately not in the v1 scope. See the roadmap for the
         reasoning.
@@ -327,16 +440,25 @@ const faqs = [
     </div>
   </section>
 
-  <section class="section-divider" id="faq">
+  <!-- FAQs -->
+  <section
+    id="faq"
+    class="border-t border-border pt-14 pb-14 max-[640px]:pt-10 max-[640px]:pb-10"
+  >
     <div class="container">
-      <h2>FAQs.</h2>
+      <h2 class="!mt-0">FAQs.</h2>
 
-      <dl class="faq-list">
+      <dl class="m-0 mt-6 mb-4 p-0 border-t border-border">
         {
           faqs.map((f) => (
-            <div class="faq">
-              <dt class="faq-q">{f.q}</dt>
-              <dd class="faq-a" set:html={f.a} />
+            <div class="py-[1.15rem] border-b border-border">
+              <dt class="flex gap-[0.6rem] font-bold text-text m-0 mb-2 text-[0.95rem] before:content-['Q'] before:text-accent before:font-extrabold">
+                {f.q}
+              </dt>
+              <dd
+                class="text-text-muted m-0 text-[0.9rem] pl-5 relative before:content-['→'] before:absolute before:left-0 before:text-accent"
+                set:html={f.a}
+              />
             </div>
           ))
         }
@@ -344,14 +466,17 @@ const faqs = [
     </div>
   </section>
 
-  <section class="final-cta section-divider">
+  <!-- Final CTA -->
+  <section
+    class="border-t border-border pt-14 pb-18 max-[640px]:pt-10 max-[640px]:pb-14"
+  >
     <div class="container">
-      <h2>Kick the tires.</h2>
-      <p class="muted">
+      <h2 class="!mt-0">Kick the tires.</h2>
+      <p class="text-text-muted">
         Star the repo. Send your first Bluesky post. File an issue when
         something&apos;s weird. We&apos;re building in the open.
       </p>
-      <div class="cta-row">
+      <div class="flex gap-[0.6rem] flex-wrap">
         <a
           class="btn btn-primary"
           href="https://github.com/rosekamallove/letmepost.dev"
@@ -363,154 +488,3 @@ const faqs = [
     </div>
   </section>
 </BaseLayout>
-
-<style>
-  .hero {
-    padding: 5.5rem 0 3.5rem;
-  }
-
-  .eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--text-muted);
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin-bottom: 1.75rem;
-    padding: 0.3rem 0.6rem;
-    border: 1px solid var(--border-strong);
-  }
-
-  .dot {
-    width: 7px;
-    height: 7px;
-    background: var(--success);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 18%, transparent);
-  }
-
-  .eyebrow-tag {
-    color: var(--accent);
-    font-weight: 700;
-    font-size: 0.65rem;
-  }
-
-  .accent-text {
-    color: var(--accent);
-  }
-
-  .lede {
-    font-size: 1.1rem;
-    line-height: 1.6;
-    max-width: 34rem;
-    margin-top: 1.25rem;
-    margin-bottom: 2.5rem;
-    color: var(--text-secondary);
-  }
-
-  .cta-row {
-    display: flex;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-  }
-
-  /* Pillars: muted numbers, not accent */
-  .pillar {
-    padding: 1.25rem 0;
-    border-top: 1px solid var(--border);
-  }
-
-  .pillar:last-of-type {
-    border-bottom: 1px solid var(--border);
-  }
-
-  .pillar-num {
-    color: var(--accent);
-    font-size: 0.78rem;
-    letter-spacing: 0.04em;
-    margin-bottom: 0.4rem;
-    font-weight: 800;
-  }
-
-  .pillar p {
-    margin: 0;
-  }
-
-  /* Platform list: no row borders, icons per brand, dotted leader between */
-  .platform-list {
-    list-style: none;
-    padding: 0;
-    margin: 1.5rem 0 1.25rem;
-  }
-
-  .platform-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.5rem 0;
-    font-size: 0.95rem;
-  }
-
-  .platform-brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.55rem;
-    color: var(--text);
-  }
-
-  .platform-brand :global(.platform-icon) {
-    color: var(--text-muted);
-    flex-shrink: 0;
-    transition: color var(--tr-fast);
-  }
-
-  .platform-row:hover .platform-brand :global(.platform-icon) {
-    color: var(--text);
-  }
-
-  .platform-name {
-    font-weight: 600;
-    white-space: nowrap;
-  }
-
-  .platform-dots {
-    flex: 1;
-    align-self: center;
-    height: 0;
-    border-bottom: 1px dotted var(--border-strong);
-  }
-
-  .platform-status {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-muted);
-    white-space: nowrap;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-
-  .status-glyph {
-    width: 6px;
-    height: 6px;
-    background: var(--text-muted);
-    opacity: 0.5;
-  }
-
-  .platform-live .status-glyph {
-    background: var(--success);
-    opacity: 1;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 18%, transparent);
-  }
-
-  .platform-next .status-glyph {
-    background: var(--accent);
-    opacity: 1;
-  }
-
-  .small {
-    font-size: 0.8rem;
-    margin-top: 1rem;
-  }
-</style>

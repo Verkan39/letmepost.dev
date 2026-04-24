@@ -3,83 +3,35 @@ import { Icon } from "astro-icon/components";
 const year = new Date().getFullYear();
 ---
 
-<footer class="site-footer">
+<footer class="border-t border-border bg-transparent pt-10 pb-6 text-[0.85rem] mt-16">
   <div class="container">
-    <div class="footer-top">
-      <div class="footer-brand">letmepost.dev</div>
-      <p class="muted">
+    <div class="mb-7">
+      <div class="font-extrabold tracking-[-0.02em] mb-1.5">letmepost.dev</div>
+      <p class="text-text-muted">
         Open-source social media publishing API.<br />
         Fails loudly, not silently.
       </p>
     </div>
 
-    <div class="footer-links">
-      <a href="/#platforms">Platforms</a>
-      <a href="/status">Status</a>
+    <div class="flex flex-wrap gap-x-6 gap-y-1 mb-6">
+      <a href="/#platforms" class="no-underline text-text transition-colors hover:text-accent">Platforms</a>
+      <a href="/status" class="no-underline text-text transition-colors hover:text-accent">Status</a>
       <a
-        class="ext"
+        class="inline-flex items-center gap-1 no-underline text-text transition-colors hover:text-accent"
         href="https://github.com/rosekamallove/letmepost.dev"
         rel="noopener"
         target="_blank"
       >
         GitHub <Icon name="ph:arrow-up-right" width={12} height={12} />
       </a>
-      <a href="/privacy">Privacy</a>
-      <a href="/terms">Terms</a>
-      <a href="/data-deletion">Data deletion</a>
-      <a href="/contact">Contact</a>
+      <a href="/privacy" class="no-underline text-text transition-colors hover:text-accent">Privacy</a>
+      <a href="/terms" class="no-underline text-text transition-colors hover:text-accent">Terms</a>
+      <a href="/data-deletion" class="no-underline text-text transition-colors hover:text-accent">Data deletion</a>
+      <a href="/contact" class="no-underline text-text transition-colors hover:text-accent">Contact</a>
     </div>
 
-    <div class="footer-bar muted">
+    <div class="pt-5 border-t border-border text-text-muted">
       © {year} letmepost.dev · Apache-2.0
     </div>
   </div>
 </footer>
-
-<style>
-  .site-footer {
-    border-top: 1px solid var(--border);
-    background: transparent;
-    padding: 2.5rem 0 1.5rem;
-    font-size: 0.85rem;
-    margin-top: 4rem;
-  }
-
-  .footer-top {
-    margin-bottom: 1.75rem;
-  }
-
-  .footer-brand {
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    margin-bottom: 0.35rem;
-  }
-
-  .footer-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 1.5rem;
-    margin-bottom: 1.5rem;
-  }
-
-  .footer-links a {
-    text-decoration: none;
-    color: var(--text);
-    transition: color var(--tr-fast);
-  }
-
-  .ext {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-
-  .footer-links a:hover {
-    color: var(--accent);
-  }
-
-  .footer-bar {
-    padding-top: 1.25rem;
-    border-top: 1px solid var(--border);
-  }
-</style>

@@ -17,8 +17,10 @@
     "@fontsource/instrument-serif": "^5.2.8",
     "@iconify-json/ph": "^1.2.2",
     "@resvg/resvg-js": "^2.6.2",
+    "@tailwindcss/vite": "^4.2.4",
     "astro": "^5.1.0",
-    "astro-icon": "^1.1.5"
+    "astro-icon": "^1.1.5",
+    "tailwindcss": "^4.2.4"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.8",

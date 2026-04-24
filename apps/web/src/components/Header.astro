@@ -3,14 +3,22 @@ import Logo from "./Logo.astro";
 import { Icon } from "astro-icon/components";
 ---
 
-<header class="site-header">
-  <div class="container header-inner">
+<header class="border-b border-border bg-transparent">
+  <div class="container flex items-center justify-between h-[52px]">
     <Logo />
-    <nav aria-label="Primary">
-      <a href="/#platforms">Platforms</a>
-      <a href="/status">Status</a>
+    <nav aria-label="Primary" class="flex gap-6 text-[0.85rem]">
       <a
-        class="ext"
+        href="/#platforms"
+        class="no-underline text-text-muted transition-colors hover:text-accent max-[520px]:hidden"
+        >Platforms</a
+      >
+      <a
+        href="/status"
+        class="no-underline text-text-muted transition-colors hover:text-accent max-[520px]:hidden"
+        >Status</a
+      >
+      <a
+        class="inline-flex items-center gap-1 no-underline text-text-muted transition-colors hover:text-accent"
         href="https://github.com/rosekamallove/letmepost.dev"
         rel="noopener noreferrer"
         target="_blank"
@@ -21,45 +29,3 @@ import { Icon } from "astro-icon/components";
     </nav>
   </div>
 </header>
-
-<style>
-  .site-header {
-    border-bottom: 1px solid var(--border);
-    background: transparent;
-  }
-
-  .header-inner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 52px;
-  }
-
-  nav {
-    display: flex;
-    gap: 1.5rem;
-    font-size: 0.85rem;
-  }
-
-  nav a {
-    text-decoration: none;
-    color: var(--text-muted);
-    transition: color var(--tr-fast);
-  }
-
-  .ext {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-
-  nav a:hover {
-    color: var(--accent);
-  }
-
-  @media (max-width: 520px) {
-    nav a:not(:last-child) {
-      display: none;
-    }
-  }
-</style>

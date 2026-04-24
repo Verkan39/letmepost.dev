@@ -6,15 +6,20 @@ import BaseLayout from "../layouts/BaseLayout.astro";
   title="Status"
   description="letmepost.dev service status and recent incidents."
 >
-  <section class="status">
-    <div class="container">
+  <section class="pt-14 pb-16">
+    <div class="container prose">
       <h1>Status</h1>
 
-      <div class="status-card">
-        <span class="dot" aria-hidden="true"></span>
+      <div
+        class="flex gap-[0.8rem] items-center py-4 px-[1.1rem] border-t border-b border-border my-6 mb-9"
+      >
+        <span
+          class="w-[10px] h-[10px] bg-success shrink-0"
+          style="box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success) 22%, transparent);"
+          aria-hidden="true"></span>
         <div>
-          <div class="status-title">All systems operational</div>
-          <div class="muted status-sub">
+          <div class="font-bold text-[0.95rem]">All systems operational</div>
+          <div class="text-text-muted text-[0.82rem]">
             Pre-launch. This page will surface real uptime and incident history
             once the API is live.
           </div>
@@ -43,32 +48,3 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     </div>
   </section>
 </BaseLayout>
-
-<style>
-  .status {
-    padding: 3.5rem 0 4rem;
-  }
-  .status-card {
-    display: flex;
-    gap: 0.8rem;
-    align-items: center;
-    padding: 1rem 1.1rem;
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    margin: 1.5rem 0 2.25rem;
-  }
-  .dot {
-    width: 10px;
-    height: 10px;
-    background: var(--success);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 22%, transparent);
-    flex-shrink: 0;
-  }
-  .status-title {
-    font-weight: 700;
-    font-size: 0.95rem;
-  }
-  .status-sub {
-    font-size: 0.82rem;
-  }
-</style>

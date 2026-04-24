@@ -16,9 +16,10 @@ type PlatformSlug =
 interface Props {
   platform: PlatformSlug;
   size?: number;
+  class?: string;
 }
 
-const { platform, size = 16 } = Astro.props;
+const { platform, size = 16, class: className = "" } = Astro.props;
 
 const phosphorName: Record<PlatformSlug, string> = {
   bluesky: "ph:butterfly",
@@ -36,5 +37,5 @@ const phosphorName: Record<PlatformSlug, string> = {
   name={phosphorName[platform]}
   width={size}
   height={size}
-  class="platform-icon"
+  class={`shrink-0 text-text-muted transition-colors ${className}`}
 />

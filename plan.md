@@ -2,9 +2,9 @@
 
 ## Context
 
-We've shipped the monorepo scaffold (Turborepo + pnpm), `apps/api` with Hono + Zod + Vitest + MSW, a working Bluesky publisher (app-password auth + createRecord + 300-grapheme preflight + transparent errors), and `packages/schemas`. 20 tests green. Credentials currently come from the request body — no DB yet.
+**Status (April 2026):** Phases 1–5 landed; Phase 7 dashboard scaffolded with shadcn + auth + org + accounts/keys/webhooks screens; MVP slices of Phase 8 (Twitter/X) and Phase 11 (Pinterest) publishers shipped behind the AccountProvider framework. **179 API tests green.** Bluesky publishes end-to-end today; Pinterest + X are built and gated on platform review; LinkedIn, Meta, TikTok are next.
 
-Everything else is unbuilt: no database, no OAuth account connection, no job queue, no webhooks, no rate limiting, no auth, no dashboard, no marketing/docs site, no SDKs, no observability. Only Bluesky as a platform.
+What's still missing from the original plan: Phase 6 LinkedIn, Phase 9 Meta trio, Phase 10 TikTok, Phase 12 SDK pipeline, Phase 13 docs polish, Phase 14 obs + launch prep, Phase 15 launch. Also new work: Phase 5.5 Profiles (added after the initial plan to pick up the agency / multi-brand use case without per-profile pricing).
 
 This plan takes us from that state to a public v1 launch. Every phase is filtered through the **seven product principles** in `PRODUCT.md` and traces to the **six research-corpus problems** we exist to solve:
 
@@ -17,7 +17,7 @@ This plan takes us from that state to a public v1 launch. Every phase is filtere
 
 The goal is not to match any competitor's feature count. The goal is to be the publishing primitive where **failure is loud, preventable, and documented** — with API version abstraction and flat pricing as the commercial wedges.
 
-**Honest estimate: 28 weeks of coding, 7–8 months to public launch** accounting for Meta/TikTok approval variance.
+**Honest estimate: 29 weeks of coding, 7–8 months to public launch** accounting for Meta/TikTok approval variance. (Original estimate was 28; +1 for the Phase 5.5 profiles retrofit.)
 
 ---
 
@@ -102,6 +102,19 @@ Also Day 0 (non-gating, cheap): register `letmepost` GitHub org, reserve `@letme
 **Risks:** PKCE vs. classic OAuth differences across LinkedIn/X/Meta must not become `if platform === …` soup. Invest in the abstraction.
 **NOT in scope:** LinkedIn publisher itself (next phase), dashboard UI.
 
+## Phase 5.5 — Profiles (Workspace Primitive)
+
+**Goal:** Zernio-style profiles — an org sub-unit that groups platform accounts. Agencies get one org with 20 profiles (one per client); a brand with multiple product lines gets multiple profiles under one org. Crucially: **profiles are free.** Per-profile pricing is research-corpus problem #5; we use profiles as a structure primitive and keep pricing flat at the org level — that's a commercial wedge against Ayrshare / Zernio in itself.
+
+**Ships:** new `profiles` table (`id`, `organization_id`, `name`, `slug`, `created_at`, `updated_at`); `platform_accounts.profile_id` NOT NULL with a "Default" profile auto-created per org in the migration (all existing rows attach to it); `api_keys.scope` gains optional `profile_id` so keys can be narrowed to a single profile (empty scope = org-wide, preserves existing behavior); `/v1/profiles` CRUD (create / list / rename / delete — delete blocked when non-empty); all `/v1/accounts` and `/v1/posts` routes accept and enforce the profile scope; dashboard gets a profile switcher in the sidebar (primary day-to-day surface; org switcher moves to a settings page); post + webhook lifecycle events carry `profileId` in the data payload.
+
+**Problems solved:** 5 (we *have* the structure others charge per-unit for, without the charge). Enabling for multi-client agencies, which are a high-LTV segment.
+**Principles served:** 5 (same schema OSS + hosted), 7 (data shapes designed — retrofit *before* real users, not after).
+**Depends on:** Phases 1, 2, 5.
+**Effort:** 1 week.
+**Risks:** API-key scope semantics is the subtle part — an org-wide key must still work against any profile's accounts; a profile-scoped key must 404 on cross-profile account IDs. Build the test matrix up front (org-key × profile-key × same-profile × cross-profile × missing-account).
+**NOT in scope:** Per-profile billing or usage meters (Phase 14); per-profile webhook endpoints (endpoints stay org-scoped; consumers filter on the `profileId` event field); per-profile custom branding; cross-profile account sharing.
+
 ## Phase 6 — LinkedIn: The Wedge
 
 **Goal:** Ship the platform that *demonstrates the pitch*. This is the phase that has to be visibly better than every competitor.
@@ -118,23 +131,33 @@ Also Day 0 (non-gating, cheap): register `letmepost` GitHub org, reserve `@letme
 
 **Problems solved:** 1, 2 (the headline), 3 (opaque rejections pattern).
 **Principles served:** 1, 2, 3 — this phase *is* the pitch.
-**Depends on:** Phases 1–5; MDP approval from Day 0.
+**Depends on:** Phases 1–5.5; MDP approval from Day 0.
 **Effort:** 3 weeks. This phase must be excellent, not fast.
 **Risks:** MDP approval blocking; LinkedIn dev-tier rate limits; URN edge cases for Company Pages vs. Showcase Pages. This is the phase you'll be tempted to cut corners on — don't.
 **NOT in scope:** Carousels beyond image-multi, polls, events, analytics, comment threads, DMs.
 
 ## Phase 7 — Minimal Dashboard (Operator Surface Only)
 
-**Goal:** Get out of curl-only. Ship exactly what onboarding needs — nothing else.
+**Goal:** Get out of curl-only. Ship exactly what onboarding + debugging need — nothing else.
 
-**Ships:** `apps/dashboard` Next.js App Router with better-auth session, shared `packages/ui`; screens: sign in, org switcher, Connect Account (LinkedIn + Bluesky), API Keys list/create/revoke, Post Log (last 100 filterable by platform + status + error code), Webhook endpoint config, Account list with token-expiry badges; post detail shows the full error contract inline including raw platform response.
+**Ships:** `apps/dashboard` Next.js App Router with better-auth session, shadcn component system, Commit Mono + paper/forest-green theme matching the landing. Screens:
+- **Sign-in / sign-up** with org creation + default profile creation in the same flow
+- **Profile switcher** in the sidebar (primary day-to-day context); **org switcher** on a settings page (less frequent)
+- **Connect Account** — OAuth redirect or credentials form driven by the provider's `ConnectDescriptor`, scoped to the active profile
+- **Account list** — per-profile, with token-expiry badges and reconnect affordances
+- **API Keys** — list / create / revoke; scope selector (org-wide vs single profile); plaintext shown once in a modal
+- **Webhook endpoints** — create / filter events / rotate secret / delete; signing secret shown once in a modal
+- **Post Log** — the operator's "where did my post go" screen. Paginated list filterable by **profile × platform × status × error-code × time-range**. Row shows (platform icon | text excerpt | status chip | created-at | account). Detail view shows: full post record, every attempt with upstream response, the rule that failed (if any), remediation text, webhook delivery trail for that post, raw platform response JSON, copy-as-curl. **This is the screen where "fails loudly" becomes visible to the user** — the product's wedge lives here.
+- **Webhook delivery log** — per-endpoint delivery history with status codes, response bodies, retry schedule, manual redeliver button. Smaller slice; can defer to 7.5 if time-boxed.
 
-**Problems solved:** 1 (visibility of failure).
+Post detail renders the canonical `ErrorResponse` contract inline — code, rule, platform, platform_version, platform_response, remediation, request_id, trace_id. Destructive actions (disconnect account, revoke key, delete endpoint) confirm via shadcn modals.
+
+**Problems solved:** 1 (visibility of failure is the whole Post Log).
 **Principles served:** 7.
-**Depends on:** Phases 1–6.
-**Effort:** 2 weeks.
-**Risks:** Scope creep is the only real risk. Every "just-add" is a no.
-**NOT in scope:** Billing, analytics, team invites beyond single-org, whitelabel, theming, mobile.
+**Depends on:** Phases 1–5.5, 6.
+**Effort:** 2 weeks (scaffold + theme already landed; remaining work is Post Log + webhook log + profile switcher polish).
+**Risks:** Scope creep is the only real risk. Every "just-add" is a no. Post Log detail view is where quality matters most — the error record is the product.
+**NOT in scope:** Billing, analytics dashboards, team invites beyond single-org, whitelabel, theming switcher, mobile-first layout, API call log (request-level, as opposed to post-level).
 
 ## Phase 8 — Twitter/X
 
@@ -251,19 +274,20 @@ Also Day 0 (non-gating, cheap): register `letmepost` GitHub org, reserve `@letme
 | 5–6 | Phase 3: Idempotency + errors + obs wiring | Error-code registry docs drafts |
 | 7–8 | Phase 4: Queue + webhooks | — |
 | 9–10 | Phase 5: OAuth framework + Bluesky migration | LinkedIn preflight rule docs authored |
-| 11–13 | **Phase 6: LinkedIn (3 wks)** | TS SDK skeleton stubbed in week 13 |
-| 14–15 | Phase 7: Dashboard | TS SDK continues |
-| 16–17 | Phase 8: X | Py/Go generators |
-| 18–20 | **Phase 9: Meta trio (3 wks, gated on approval)** | If Meta not yet approved, swap in Phase 11 Pinterest + Phase 13 docs |
-| 21–23 | Phase 10: TikTok (gated on approval) | Same swap rule |
-| 24 | Phase 11: Pinterest | — |
-| 25–27 | **Phase 13: Site + docs polish (3 wks)** | Contract test cron stabilization |
-| 28 | Phase 14: Obs + security + launch prep + pricing | — |
-| 29 | Phase 15: Launch | — |
+| 11 | **Phase 5.5: Profiles (retrofit)** | — |
+| 12–14 | **Phase 6: LinkedIn (3 wks)** | TS SDK skeleton stubbed in week 14 |
+| 15–16 | Phase 7: Dashboard | TS SDK continues |
+| 17–18 | Phase 8: X | Py/Go generators |
+| 19–21 | **Phase 9: Meta trio (3 wks, gated on approval)** | If Meta not yet approved, swap in Phase 11 Pinterest + Phase 13 docs |
+| 22–24 | Phase 10: TikTok (gated on approval) | Same swap rule |
+| 25 | Phase 11: Pinterest | — |
+| 26–28 | **Phase 13: Site + docs polish (3 wks)** | Contract test cron stabilization |
+| 29 | Phase 14: Obs + security + launch prep + pricing | — |
+| 30 | Phase 15: Launch | — |
 
-Note: weeks 25–27 count as the *polish* window for docs, assuming the continuous-drip rule worked. If not, add 1–2 weeks. Realistic ship window: **7–8 months from Day 0**, accounting for Meta/TikTok approval variance.
+Note: weeks 26–28 count as the *polish* window for docs, assuming the continuous-drip rule worked. If not, add 1–2 weeks. Realistic ship window: **7–8 months from Day 0**, accounting for Meta/TikTok approval variance.
 
-**Strictly sequential:** 1 → 2 → 3 → 4 → 5 → 6.
+**Strictly sequential:** 1 → 2 → 3 → 4 → 5 → 5.5 → 6.
 **Can parallelize:** Phase 7 (dashboard) with Phase 8 (X) and Phase 12 (SDKs).
 **Calendar-gated:** 9 (Meta), 10 (TikTok) — build readiness, deploy same-day on approval.
 **Always-background:** Docs narrative (Phase 13).
@@ -283,6 +307,8 @@ The following will be asked for. The answer is "not in v1":
 - **Team-management UI** beyond single-org multi-member.
 - **Analytics dashboards** beyond post-log + error-log.
 - **Whitelabel / agency tier UI.**
+- **Per-profile / per-seat pricing** — actively rejected, not just deferred. Profiles exist in v1 as a free org-structure primitive. Pricing stays flat at the org level. Revisiting this is a PRODUCT.md-level decision, not a roadmap one.
+- **Per-profile custom branding, per-profile webhook endpoints, cross-profile account sharing** — explicitly out of the Phase 5.5 profiles slice; revisit only if a paying customer asks.
 - **MCP server, LangGraph adapter, CrewAI adapter** — identified as differentiators but not v1. Could slot in as Phase 15.5.
 - **Ayrshare SDK drop-in adapter** — migration lever, but not v1.
 - **SOC 2, HIPAA, BAAs** — when a customer pays for them.
@@ -303,13 +329,15 @@ The following will be asked for. The answer is "not in v1":
 
 The v1 launch is shippable when:
 
-1. All 15 phases' "Ships" items are green.
-2. **End-to-end smoke test passes for all 7 platforms:** Bluesky, LinkedIn, Twitter/X, Instagram, Facebook, Threads, TikTok, Pinterest — each publishes a real post through the hosted API with idempotency + webhooks + error mapping verified.
+1. All phases' "Ships" items are green (1, 2, 3, 4, 5, 5.5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15).
+2. **End-to-end smoke test passes for all 8 platforms:** Bluesky, LinkedIn, Twitter/X, Instagram, Facebook, Threads, TikTok, Pinterest — each publishes a real post through the hosted API with idempotency + webhooks + error mapping verified.
 3. **Contract tests green on cron** for every platform (real API, not MSW) for 7 consecutive days.
-4. **Docs parity check:** every error code in `packages/schemas` has a docs page; every preflight rule has a docs page with upstream citation; every endpoint has runnable examples in all 4 language tabs.
-5. **SDK parity:** TS SDK published, Py/Go SDKs generated and published to PyPI + pkg.go.dev; smoke tests green in each.
-6. **Self-host parity:** `docker compose up` works end-to-end against a fresh Postgres + Redis; same API responses as hosted.
-7. **Lighthouse 100** on all marketing + docs pages (mobile + desktop).
-8. **Load test:** API handles 500 req/s sustained on a single Railway instance with p95 < 250ms (excluding upstream platform latency).
-9. **Pricing page live** with committed tier shape.
-10. **n8n community node published** and linked in docs.
+4. **Profile isolation verified:** an API key scoped to Profile A cannot read, publish from, or modify accounts in Profile B within the same org. Cross-profile access 404s (not 403) to avoid leaking existence. Org-wide keys keep working against any profile.
+5. **Post Log renders the full error contract** for every failure class (`preflight_failed`, `platform_rejected`, `platform_auth_failed`, `platform_unavailable`, `validation_failed`, `internal_error`), with the raw platform response visible and copy-as-curl on every row.
+6. **Docs parity check:** every error code in `packages/schemas` has a docs page; every preflight rule has a docs page with upstream citation; every endpoint has runnable examples in all 4 language tabs.
+7. **SDK parity:** TS SDK published, Py/Go SDKs generated and published to PyPI + pkg.go.dev; smoke tests green in each.
+8. **Self-host parity:** `docker compose up` works end-to-end against a fresh Postgres + Redis; same API responses as hosted.
+9. **Lighthouse 100** on all marketing + docs pages (mobile + desktop).
+10. **Load test:** API handles 500 req/s sustained on a single Railway instance with p95 < 250ms (excluding upstream platform latency).
+11. **Pricing page live** with committed tier shape — flat at org level, profiles free.
+12. **n8n community node published** and linked in docs.

@@ -41,6 +41,9 @@ importers:
       postgres:
         specifier: ^3.4.9
         version: 3.4.9
+      rate-limiter-flexible:
+        specifier: ^11.0.1
+        version: 11.0.1
       ws:
         specifier: ^8.20.0
         version: 8.20.0
@@ -81,9 +84,9 @@ importers:
       '@astrojs/sitemap':
         specifier: ^3.2.1
         version: 3.7.2
-      '@fontsource-variable/jetbrains-mono':
-        specifier: ^5.1.1
-        version: 5.2.8
+      '@fontsource/commit-mono':
+        specifier: ^5.2.5
+        version: 5.2.5
       '@fontsource/instrument-serif':
         specifier: ^5.2.8
         version: 5.2.8
@@ -934,8 +937,8 @@ packages:
     resolution: {integrity: sha512-rZAP3aVgB9ds9KOeUSL+zZ21hPmo8dh6fnIFwRQj5EAZl9gzR7wxYbYXYysAM8CTqGmUGyp2S4kUdV17MnGuWQ==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
-  '@fontsource-variable/jetbrains-mono@5.2.8':
-    resolution: {integrity: sha512-WBA9elru6Jdp5df2mES55wuOO0WIrn3kpXnI4+W2ek5u3ZgLS9XS4gmIlcQhiZOWEKl95meYdvK7xI+ETLCq/Q==}
+  '@fontsource/commit-mono@5.2.5':
+    resolution: {integrity: sha512-htX8yQWtiPt5L1Hzh4sirvfUJT2+KYiquDB/Q2sY2tWQYplpBUOD5zHnIM3k36Hnm4V+JIIqA/wmwupSQ68WjA==}
 
   '@fontsource/instrument-serif@5.2.8':
     resolution: {integrity: sha512-s+bkz+syj2rO00Rmq9g0P+PwuLig33DR1xDR8pTWmovH1pUjwnncrFk++q9mmOex8fUQ7oW80gPpPDaw7V1MMw==}
@@ -2894,6 +2897,9 @@ packages:
   radix3@1.1.2:
     resolution: {integrity: sha512-b484I/7b8rDEdSDKckSSBA8knMpcdsXudlE/LNL639wFoHKwLbEkQFZHWEYwDC0wa0FKUcCY+GAF73Z7wxNVFA==}
 
+  rate-limiter-flexible@11.0.1:
+    resolution: {integrity: sha512-hvyCUefjRund2N6hro2H8Dql7OvB6+B3Qv2FLWWbdsdyQScXf4+N0tM0Bryz11awTtNxx6C1QbHYb1rCiAx7pA==}
+
   readdirp@4.1.2:
     resolution: {integrity: sha512-GDhwkLfywWL2s6vEjyhri+eXmfH6j1L7JE27WhqLeYzoh/A3DBaYGEj2H/HFZCn/kMfim73FXxEJTw06WtxQwg==}
     engines: {node: '>= 14.18.0'}
@@ -4192,7 +4198,7 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@fontsource-variable/jetbrains-mono@5.2.8': {}
+  '@fontsource/commit-mono@5.2.5': {}
 
   '@fontsource/instrument-serif@5.2.8': {}
 
@@ -6326,6 +6332,8 @@ snapshots:
   quansync@0.2.11: {}
 
   radix3@1.1.2: {}
+
+  rate-limiter-flexible@11.0.1: {}
 
   readdirp@4.1.2: {}
 

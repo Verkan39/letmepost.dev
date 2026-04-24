@@ -4,12 +4,14 @@ import { CreatePostRequest } from "@letmepost/schemas";
 import { LetmepostError } from "../errors.js";
 import { apiKeyAuth } from "../middleware/api-key.js";
 import { idempotency } from "../middleware/idempotency.js";
+import { rateLimit } from "../middleware/rate-limit.js";
 import { blueskyPublisher } from "../platforms/bluesky/publisher.js";
 import { DrizzlePlatformAccountsRepository } from "../repositories/platform-accounts.js";
 
 export const posts = new Hono();
 
 posts.use("*", apiKeyAuth());
+posts.use("*", rateLimit());
 posts.use("*", idempotency());
 
 posts.post(

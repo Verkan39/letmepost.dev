@@ -51,3 +51,22 @@ export function assertMaxGraphemes(
     });
   }
 }
+
+export function assertMaxBytes(
+  size: number,
+  max: number,
+  ctx: RuleContext & { subject?: string; remediation?: string },
+): void {
+  if (size > max) {
+    const subject = ctx.subject ?? "payload";
+    throw new LetmepostError({
+      code: "preflight_failed",
+      status: 400,
+      message: `${subject} is ${size} bytes; ${ctx.platform} allows at most ${max}.`,
+      rule: ctx.rule,
+      platform: ctx.platform,
+      remediation:
+        ctx.remediation ?? `Reduce the ${subject} to ${max} bytes or fewer.`,
+    });
+  }
+}

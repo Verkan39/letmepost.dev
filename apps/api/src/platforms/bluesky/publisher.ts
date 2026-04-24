@@ -1,7 +1,16 @@
-import type { CreatePostResponse } from "@letmepost/schemas";
+import type { CreatePostResponse, MediaInput } from "@letmepost/schemas";
+import { LetmepostError } from "../../errors.js";
 import type { Publisher } from "../_shared/publisher.js";
-import { BlueskyClient } from "./client.js";
-import { validateBlueskyText } from "./preflight.js";
+import {
+  BlueskyClient,
+  type BlueskyBlobRef,
+  type BlueskyEmbed,
+} from "./client.js";
+import {
+  type ResolvedMediaItem,
+  validateBlueskyMedia,
+  validateBlueskyText,
+} from "./preflight.js";
 
 /**
  * Credentials the Bluesky publisher needs to authenticate + post. Callers
@@ -15,17 +24,139 @@ export type BlueskyCredentials = {
   appPassword: string;
 };
 
-export const blueskyPublisher: Publisher<BlueskyCredentials, string> = {
-  async publish(creds, text): Promise<CreatePostResponse> {
+export type BlueskyPublishInput = {
+  text: string;
+  media?: MediaInput[];
+};
+
+/**
+ * A media item with bytes + mime type resolved, ready for preflight + upload.
+ */
+interface LoadedMediaItem extends ResolvedMediaItem {
+  bytes: Uint8Array;
+}
+
+async function loadMediaItem(item: MediaInput): Promise<LoadedMediaItem> {
+  let bytes: Uint8Array;
+  let mimeType: string;
+
+  if (item.bytesBase64) {
+    bytes = Uint8Array.from(Buffer.from(item.bytesBase64, "base64"));
+    mimeType = item.kind === "image" ? "image/jpeg" : "video/mp4";
+  } else if (item.url) {
+    let res: Response;
+    try {
+      res = await fetch(item.url);
+    } catch {
+      throw new LetmepostError({
+        code: "platform_unavailable",
+        status: 503,
+        message: `Failed to fetch media from ${item.url}.`,
+        remediation:
+          "Verify the media URL is publicly reachable. letmepost fetches synchronously in Phase 3.5.",
+      });
+    }
+    if (!res.ok) {
+      throw new LetmepostError({
+        code: "validation_failed",
+        status: 400,
+        message: `Media URL returned ${res.status}: ${item.url}`,
+        remediation:
+          "Ensure the URL is public and returns 200. Consider inlining bytesBase64 for authenticated sources.",
+      });
+    }
+    const buf = await res.arrayBuffer();
+    bytes = new Uint8Array(buf);
+    const contentType = res.headers.get("content-type");
+    if (contentType && contentType.length > 0) {
+      // Strip parameters (e.g. "image/jpeg; charset=binary").
+      mimeType = contentType.split(";")[0]!.trim().toLowerCase();
+    } else {
+      mimeType = item.kind === "image" ? "image/jpeg" : "video/mp4";
+    }
+  } else {
+    // Zod refinement should prevent this, but keep a loud fallback.
+    throw new LetmepostError({
+      code: "validation_failed",
+      status: 400,
+      message: "Media item must provide either 'url' or 'bytesBase64'.",
+    });
+  }
+
+  const resolved: LoadedMediaItem = {
+    kind: item.kind,
+    mimeType,
+    byteLength: bytes.byteLength,
+    bytes,
+  };
+  if (item.altText !== undefined) resolved.altText = item.altText;
+  return resolved;
+}
+
+function buildEmbed(
+  items: LoadedMediaItem[],
+  blobRefs: BlueskyBlobRef[],
+): BlueskyEmbed | undefined {
+  if (items.length === 0) return undefined;
+  // Invariant enforced by preflight: all-image OR single-video, never mixed.
+  if (items[0]!.kind === "video") {
+    return {
+      $type: "app.bsky.embed.video",
+      video: blobRefs[0]!,
+      alt: items[0]!.altText ?? "",
+    };
+  }
+  return {
+    $type: "app.bsky.embed.images",
+    images: items.map((item, i) => ({
+      image: blobRefs[i]!,
+      alt: item.altText ?? "",
+    })),
+  };
+}
+
+export const blueskyPublisher: Publisher<BlueskyCredentials, BlueskyPublishInput> = {
+  async publish(creds, input): Promise<CreatePostResponse> {
+    const { text, media = [] } = input;
+
     validateBlueskyText(text);
+
+    // Resolve bytes FIRST (so size preflight is honest), then preflight, then
+    // upload. If any resolve/preflight step fails, we never hit upstream.
+    const loaded = await Promise.all(media.map(loadMediaItem));
+    validateBlueskyMedia(
+      loaded.map((l) => {
+        const item: ResolvedMediaItem = {
+          kind: l.kind,
+          mimeType: l.mimeType,
+          byteLength: l.byteLength,
+        };
+        if (l.altText !== undefined) item.altText = l.altText;
+        return item;
+      }),
+    );
+
     const client = new BlueskyClient(creds.handle, creds.appPassword);
     const session = await client.createSession();
-    const { uri, cid } = await client.createPost(session, text);
+
+    const blobRefs: BlueskyBlobRef[] = [];
+    for (const item of loaded) {
+      const ref = await client.uploadBlob(session, item.bytes, item.mimeType);
+      blobRefs.push(ref);
+    }
+
+    const embed = buildEmbed(loaded, blobRefs);
+
+    const mainInput: Parameters<BlueskyClient["createPost"]>[1] = embed
+      ? { text, embed }
+      : { text };
+    const main = await client.createPost(session, mainInput);
+
     return {
-      id: cid,
+      id: main.cid,
       platform: "bluesky",
-      uri,
-      cid,
+      uri: main.uri,
+      cid: main.cid,
       createdAt: new Date().toISOString(),
     };
   },

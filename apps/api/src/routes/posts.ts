@@ -30,7 +30,7 @@ posts.post(
     }
   }),
   async (c) => {
-    const { account: accountRef, text } = c.req.valid("json");
+    const { account: accountRef, text, media } = c.req.valid("json");
     const { organizationId } = c.var.apiKey;
     const repo = new DrizzlePlatformAccountsRepository(c.var.db);
 
@@ -57,7 +57,10 @@ posts.post(
       case "bluesky": {
         const result = await blueskyPublisher.publish(
           { handle: account.platformAccountId, appPassword: account.token },
-          text,
+          {
+            text,
+            ...(media !== undefined ? { media } : {}),
+          },
         );
         return c.json(result, 201);
       }

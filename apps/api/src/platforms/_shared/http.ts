@@ -6,7 +6,14 @@ export interface PlatformRequest {
   method: HttpMethod;
   url: string;
   headers?: Record<string, string>;
-  /** If an object is given, it is JSON.stringified and Content-Type is set. */
+  /**
+   * Request body. Shape determines serialization:
+   * - `Uint8Array` → sent as raw bytes. Caller MUST set `Content-Type` header.
+   * - `string` → sent as-is. Caller should set `Content-Type`.
+   * - `object` → JSON.stringified; `Content-Type: application/json` set unless
+   *   already provided.
+   * - `undefined` → no body.
+   */
   body?: unknown;
   /** Abort after N ms. Defaults to 30_000. */
   timeoutMs?: number;
@@ -50,9 +57,12 @@ export async function platformFetch<T = unknown>(
   req: PlatformRequest,
 ): Promise<PlatformResponse<T>> {
   const headers: Record<string, string> = { ...req.headers };
-  let body: string | undefined;
+  let body: string | Uint8Array | undefined;
   if (req.body !== undefined) {
-    if (typeof req.body === "string") {
+    if (req.body instanceof Uint8Array) {
+      body = req.body;
+      // Caller owns Content-Type for binary bodies — don't guess.
+    } else if (typeof req.body === "string") {
       body = req.body;
     } else {
       headers["Content-Type"] ??= "application/json";

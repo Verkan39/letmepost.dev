@@ -50,12 +50,15 @@ export const auth = betterAuth({
     },
   },
   emailAndPassword: {
-    enabled: false,
+    enabled: true,
   },
   socialProviders: buildSocialProviders(),
   plugins: [organization()],
   secret,
   baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+  // The dashboard runs on :3001 in dev; better-auth blocks cross-origin
+  // cookie flows otherwise. Expand this list as other surfaces come online.
+  trustedOrigins: ["http://localhost:3001"],
 });
 
 export type Auth = typeof auth;

@@ -8,6 +8,13 @@
       "when": 1777025594042,
       "tag": "0000_lazy_namora",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777030223798,
+      "tag": "0001_silent_corsair",
+      "breakpoints": true
     }
   ]
 }

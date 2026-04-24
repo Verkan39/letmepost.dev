@@ -193,6 +193,7 @@ describeIfDb("schema integrity (integration)", () => {
           organizationId: "00000000-0000-0000-0000-000000000000",
           url: "https://example.com/webhook",
           signingSecret: "s",
+          secretHash: "h",
         }),
       ).rejects.toThrow();
     });

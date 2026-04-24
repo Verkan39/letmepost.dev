@@ -5,9 +5,12 @@ import {
   BlueskyClient,
   type BlueskyBlobRef,
   type BlueskyEmbed,
+  type BlueskyPostResult,
+  type BlueskySession,
 } from "./client.js";
 import {
   type ResolvedMediaItem,
+  validateBlueskyFirstComment,
   validateBlueskyMedia,
   validateBlueskyText,
 } from "./preflight.js";
@@ -27,6 +30,7 @@ export type BlueskyCredentials = {
 export type BlueskyPublishInput = {
   text: string;
   media?: MediaInput[];
+  firstComment?: { text: string };
 };
 
 /**
@@ -115,9 +119,25 @@ function buildEmbed(
   };
 }
 
+async function publishFirstComment(
+  client: BlueskyClient,
+  session: BlueskySession,
+  text: string,
+  mainPost: BlueskyPostResult,
+): Promise<BlueskyPostResult> {
+  validateBlueskyFirstComment(text);
+  return client.createPost(session, {
+    text,
+    reply: {
+      root: { uri: mainPost.uri, cid: mainPost.cid },
+      parent: { uri: mainPost.uri, cid: mainPost.cid },
+    },
+  });
+}
+
 export const blueskyPublisher: Publisher<BlueskyCredentials, BlueskyPublishInput> = {
   async publish(creds, input): Promise<CreatePostResponse> {
-    const { text, media = [] } = input;
+    const { text, media = [], firstComment } = input;
 
     validateBlueskyText(text);
 
@@ -136,6 +156,10 @@ export const blueskyPublisher: Publisher<BlueskyCredentials, BlueskyPublishInput
       }),
     );
 
+    // firstComment preflight is cheap + doesn't need the session; run it early
+    // so a bad comment fails before we spend upstream calls on the main post.
+    if (firstComment) validateBlueskyFirstComment(firstComment.text);
+
     const client = new BlueskyClient(creds.handle, creds.appPassword);
     const session = await client.createSession();
 
@@ -152,12 +176,42 @@ export const blueskyPublisher: Publisher<BlueskyCredentials, BlueskyPublishInput
       : { text };
     const main = await client.createPost(session, mainInput);
 
-    return {
+    const response: CreatePostResponse = {
       id: main.cid,
       platform: "bluesky",
       uri: main.uri,
       cid: main.cid,
       createdAt: new Date().toISOString(),
     };
+
+    // First-comment semantics: if the main post succeeded but the reply fails,
+    // we DO NOT roll back or error out. The user's content is live; we surface
+    // the failure as a warning so callers can retry the reply independently.
+    // Rationale: undoing a successful publish on a distributed PDS is racy and
+    // surprising; losing the first comment is a recoverable failure.
+    if (firstComment) {
+      try {
+        const reply = await publishFirstComment(
+          client,
+          session,
+          firstComment.text,
+          main,
+        );
+        response.firstCommentUri = reply.uri;
+        response.firstCommentCid = reply.cid;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "First-comment publish failed.";
+        response.warnings = [
+          ...(response.warnings ?? []),
+          {
+            code: "first_comment_failed",
+            message,
+          },
+        ];
+      }
+    }
+
+    return response;
   },
 };

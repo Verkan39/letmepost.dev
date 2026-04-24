@@ -30,7 +30,7 @@ posts.post(
     }
   }),
   async (c) => {
-    const { account: accountRef, text, media } = c.req.valid("json");
+    const { account: accountRef, text, media, firstComment } = c.req.valid("json");
     const { organizationId } = c.var.apiKey;
     const repo = new DrizzlePlatformAccountsRepository(c.var.db);
 
@@ -60,6 +60,7 @@ posts.post(
           {
             text,
             ...(media !== undefined ? { media } : {}),
+            ...(firstComment !== undefined ? { firstComment } : {}),
           },
         );
         return c.json(result, 201);

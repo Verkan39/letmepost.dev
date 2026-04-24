@@ -142,3 +142,14 @@ export function validateBlueskyMedia(media: ResolvedMediaItem[]): void {
     }
   }
 }
+
+export function validateBlueskyFirstComment(text: string): void {
+  assertNonEmpty(text, {
+    rule: "bluesky.first_comment.non_empty",
+    platform: PLATFORM,
+  });
+  assertMaxGraphemes(text, BLUESKY_MAX_GRAPHEMES, {
+    rule: "bluesky.first_comment.max_graphemes",
+    platform: PLATFORM,
+  });
+}

@@ -76,6 +76,25 @@ function createRecordOk(uri: string, cid: string) {
   );
 }
 
+type RecordResult =
+  | { uri: string; cid: string }
+  | { status: number; body: Record<string, unknown> };
+
+function createRecordSequence(results: RecordResult[]) {
+  let i = 0;
+  return http.post(
+    "https://bsky.social/xrpc/com.atproto.repo.createRecord",
+    () => {
+      const result = results[Math.min(i, results.length - 1)]!;
+      i++;
+      if ("status" in result) {
+        return HttpResponse.json(result.body, { status: result.status });
+      }
+      return HttpResponse.json(result);
+    },
+  );
+}
+
 describeIfDb("POST /v1/posts (bluesky, media)", () => {
   it("publishes a post with a single image", async () => {
     const { db } = await getTestDb();
@@ -437,6 +456,183 @@ describeIfDb("POST /v1/posts (bluesky, media)", () => {
       expect(body.error.platformResponse).toMatchObject({
         error: "PayloadTooLarge",
       });
+    });
+  });
+});
+
+describeIfDb("POST /v1/posts (bluesky, first comment)", () => {
+  it("publishes a text-only post with a first-comment reply", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+      server.use(
+        sessionHandler(),
+        createRecordSequence([
+          { uri: "at://did:plc:test/app.bsky.feed.post/main", cid: "bafy-main" },
+          { uri: "at://did:plc:test/app.bsky.feed.post/reply", cid: "bafy-reply" },
+        ]),
+      );
+
+      const app = createApp({ db: tx });
+      const res = await app.request("/v1/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+        },
+        body: JSON.stringify({
+          account: { platform: "bluesky", id: fixture.accountId },
+          text: "main thread",
+          firstComment: { text: "follow-up comment" },
+        }),
+      });
+
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as {
+        cid?: string;
+        firstCommentUri?: string;
+        firstCommentCid?: string;
+      };
+      expect(body.cid).toBe("bafy-main");
+      expect(body.firstCommentUri).toMatch(/app\.bsky\.feed\.post\/reply/);
+      expect(body.firstCommentCid).toBe("bafy-reply");
+    });
+  });
+
+  it("publishes an image post with a first-comment reply", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+      server.use(
+        sessionHandler(),
+        uploadBlobOk(),
+        createRecordSequence([
+          { uri: "at://did:plc:test/app.bsky.feed.post/m", cid: "bafy-m" },
+          { uri: "at://did:plc:test/app.bsky.feed.post/r", cid: "bafy-r" },
+        ]),
+      );
+
+      const app = createApp({ db: tx });
+      const res = await app.request("/v1/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+        },
+        body: JSON.stringify({
+          account: { platform: "bluesky", id: fixture.accountId },
+          text: "photo",
+          media: [{ kind: "image", bytesBase64: TINY_JPEG_BASE64 }],
+          firstComment: { text: "source link in replies" },
+        }),
+      });
+
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as { firstCommentCid?: string };
+      expect(body.firstCommentCid).toBe("bafy-r");
+    });
+  });
+
+  it("rejects an empty first-comment text", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+
+      const app = createApp({ db: tx });
+      const res = await app.request("/v1/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+        },
+        body: JSON.stringify({
+          account: { platform: "bluesky", id: fixture.accountId },
+          text: "main",
+          firstComment: { text: "   " },
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as {
+        error: { code: string; rule?: string };
+      };
+      expect(body.error.code).toBe("preflight_failed");
+      expect(body.error.rule).toBe("bluesky.first_comment.non_empty");
+    });
+  });
+
+  it("rejects an over-300-grapheme first-comment", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+
+      const app = createApp({ db: tx });
+      const res = await app.request("/v1/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+        },
+        body: JSON.stringify({
+          account: { platform: "bluesky", id: fixture.accountId },
+          text: "main",
+          firstComment: { text: "a".repeat(301) },
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as {
+        error: { code: string; rule?: string };
+      };
+      expect(body.error.code).toBe("preflight_failed");
+      expect(body.error.rule).toBe("bluesky.first_comment.max_graphemes");
+    });
+  });
+
+  it("returns the main post with a warning when the first-comment reply fails", async () => {
+    // Design choice: if the main post is already live on the PDS, we do NOT
+    // roll back or fail the request. The user's content is published. We
+    // surface the first-comment failure as a non-fatal warning under
+    // `warnings[].code = "first_comment_failed"` so the caller can retry the
+    // reply independently. A hard failure here would be lossy — we can't
+    // un-publish.
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+      server.use(
+        sessionHandler(),
+        createRecordSequence([
+          { uri: "at://did:plc:test/app.bsky.feed.post/ok", cid: "bafy-ok" },
+          {
+            status: 400,
+            body: { error: "InvalidRequest", message: "reply blocked" },
+          },
+        ]),
+      );
+
+      const app = createApp({ db: tx });
+      const res = await app.request("/v1/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+        },
+        body: JSON.stringify({
+          account: { platform: "bluesky", id: fixture.accountId },
+          text: "main ok",
+          firstComment: { text: "reply will fail" },
+        }),
+      });
+
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as {
+        cid?: string;
+        firstCommentCid?: string;
+        warnings?: Array<{ code: string }>;
+      };
+      expect(body.cid).toBe("bafy-ok");
+      expect(body.firstCommentCid).toBeUndefined();
+      expect(body.warnings?.[0]?.code).toBe("first_comment_failed");
     });
   });
 });

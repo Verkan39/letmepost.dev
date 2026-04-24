@@ -6,6 +6,7 @@ import {
 } from "@letmepost/schemas";
 import {
   countGraphemes,
+  validateBlueskyFirstComment,
   validateBlueskyMedia,
   validateBlueskyText,
   type ResolvedMediaItem,
@@ -184,5 +185,35 @@ describe("validateBlueskyMedia", () => {
         image({ altText: "a".repeat(BLUESKY_ALT_TEXT_MAX_GRAPHEMES) }),
       ]),
     ).not.toThrow();
+  });
+});
+
+describe("validateBlueskyFirstComment", () => {
+  it("accepts 300-grapheme text", () => {
+    expect(() => validateBlueskyFirstComment("a".repeat(300))).not.toThrow();
+  });
+
+  it("rejects empty first comment text with non_empty", () => {
+    try {
+      validateBlueskyFirstComment("   ");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(LetmepostError);
+      expect((err as LetmepostError).rule).toBe(
+        "bluesky.first_comment.non_empty",
+      );
+    }
+  });
+
+  it("rejects over-300-grapheme text with max_graphemes", () => {
+    try {
+      validateBlueskyFirstComment("a".repeat(301));
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(LetmepostError);
+      expect((err as LetmepostError).rule).toBe(
+        "bluesky.first_comment.max_graphemes",
+      );
+    }
   });
 });

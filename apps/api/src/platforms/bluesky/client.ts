@@ -32,6 +32,16 @@ export interface BlueskyUploadBlobResponse {
   blob: BlueskyBlobRef;
 }
 
+export interface BlueskyStrongRef {
+  uri: string;
+  cid: string;
+}
+
+export interface BlueskyReplyRef {
+  root: BlueskyStrongRef;
+  parent: BlueskyStrongRef;
+}
+
 /**
  * Discriminated union of record-level `embed` values we support today. The
  * AT Proto lexicon allows richer embeds (external, record, recordWithMedia)
@@ -51,6 +61,7 @@ export type BlueskyEmbed =
 export interface BlueskyCreatePostInput {
   text: string;
   embed?: BlueskyEmbed;
+  reply?: BlueskyReplyRef;
 }
 
 export class BlueskyClient {
@@ -113,7 +124,7 @@ export class BlueskyClient {
 
   /**
    * Create an `app.bsky.feed.post` record. Accepts optional `embed` (images
-   * or video).
+   * or video) and optional `reply` (to thread a post below another one).
    */
   async createPost(
     session: BlueskySession,
@@ -121,8 +132,8 @@ export class BlueskyClient {
   ): Promise<BlueskyPostResult> {
     // Keep the legacy string signature so callers that only post text
     // (and any tests pinned to the old shape) keep working.
-    const { text, embed } =
-      typeof input === "string" ? { text: input, embed: undefined } : input;
+    const { text, embed, reply } =
+      typeof input === "string" ? { text: input, embed: undefined, reply: undefined } : input;
 
     const record: Record<string, unknown> = {
       $type: "app.bsky.feed.post",
@@ -130,6 +141,7 @@ export class BlueskyClient {
       createdAt: new Date().toISOString(),
     };
     if (embed) record.embed = embed;
+    if (reply) record.reply = reply;
 
     const res = await platformFetch<BlueskyPostResult>({
       method: "POST",

@@ -42,10 +42,16 @@ const MediaVideo = z
 export const MediaInput = z.union([MediaImage, MediaVideo]);
 export type MediaInput = z.infer<typeof MediaInput>;
 
+export const FirstComment = z.object({
+  text: z.string().min(1),
+});
+export type FirstComment = z.infer<typeof FirstComment>;
+
 export const CreatePostRequest = z.object({
   account: AccountRef,
   text: z.string().min(1),
   media: z.array(MediaInput).optional(),
+  firstComment: FirstComment.optional(),
 });
 export type CreatePostRequest = z.infer<typeof CreatePostRequest>;
 
@@ -55,5 +61,20 @@ export const CreatePostResponse = z.object({
   uri: z.string().optional(),
   cid: z.string().optional(),
   createdAt: z.string(),
+  firstCommentUri: z.string().optional(),
+  firstCommentCid: z.string().optional(),
+  /**
+   * Non-fatal warnings attached to an otherwise successful publish. Today,
+   * used when the main post succeeded but the first-comment reply failed —
+   * we surface a warning rather than fail the whole request.
+   */
+  warnings: z
+    .array(
+      z.object({
+        code: z.string(),
+        message: z.string(),
+      }),
+    )
+    .optional(),
 });
 export type CreatePostResponse = z.infer<typeof CreatePostResponse>;

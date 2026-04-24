@@ -1,12 +1,24 @@
-import type { BlueskyAccount, CreatePostResponse } from "@letmepost/schemas";
+import type { CreatePostResponse } from "@letmepost/schemas";
 import type { Publisher } from "../_shared/publisher.js";
 import { BlueskyClient } from "./client.js";
 import { validateBlueskyText } from "./preflight.js";
 
-export const blueskyPublisher: Publisher<BlueskyAccount, string> = {
-  async publish(account, text): Promise<CreatePostResponse> {
+/**
+ * Credentials the Bluesky publisher needs to authenticate + post. Callers
+ * resolve these from a stored platform_account via the repository — the
+ * publisher never touches the DB directly.
+ */
+export type BlueskyCredentials = {
+  /** Bluesky handle or email used at createSession time. */
+  handle: string;
+  /** Decrypted app password. */
+  appPassword: string;
+};
+
+export const blueskyPublisher: Publisher<BlueskyCredentials, string> = {
+  async publish(creds, text): Promise<CreatePostResponse> {
     validateBlueskyText(text);
-    const client = new BlueskyClient(account.identifier, account.appPassword);
+    const client = new BlueskyClient(creds.handle, creds.appPassword);
     const session = await client.createSession();
     const { uri, cid } = await client.createPost(session, text);
     return {

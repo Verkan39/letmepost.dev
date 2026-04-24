@@ -456,9 +456,10 @@ const liveGlyphShadow =
                 {f.q}
               </dt>
               <dd
-                class="text-text-muted m-0 text-[0.9rem] pl-5 relative before:content-['→'] before:absolute before:left-0 before:text-accent"
-                set:html={f.a}
-              />
+                class="flex gap-[0.6rem] text-text-muted m-0 text-[0.9rem] before:content-['A'] before:text-accent before:font-extrabold"
+              >
+                <span set:html={f.a} />
+              </dd>
             </div>
           ))
         }

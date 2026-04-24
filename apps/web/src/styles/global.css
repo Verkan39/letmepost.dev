@@ -175,14 +175,17 @@
 /* -------------------------------------------------------------------------- */
 /* Components — reused patterns worth a class                                  */
 /* -------------------------------------------------------------------------- */
-@layer components {
-  .container {
-    width: 100%;
-    max-width: 720px;
-    margin-inline: auto;
-    padding-inline: 1.5rem;
-  }
 
+/* Override Tailwind's built-in `.container` utility — we want one fixed
+   paper-width, not its responsive 40rem/48rem/64rem/80rem/96rem ladder. */
+@utility container {
+  width: 100%;
+  max-width: 720px;
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+}
+
+@layer components {
   .btn {
     display: inline-flex;
     align-items: center;
@@ -232,7 +235,7 @@
 .astro-code {
   padding: 1.25rem 1.5rem !important;
   margin: 0 !important;
-  font-size: 1.25rem !important;
+  font-size: 1.05rem !important;
   line-height: 1.55 !important;
   overflow-x: auto;
   background: var(--color-code-bg) !important;

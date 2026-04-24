@@ -1,15 +1,18 @@
 import { and, eq } from "drizzle-orm";
 import type { DrizzleClient } from "../db/index.js";
-import { accounts, type Account as AccountRow } from "../db/schema/accounts.js";
+import {
+  platformAccounts,
+  type PlatformAccount as PlatformAccountRow,
+} from "../db/schema/platform_accounts.js";
 import { decrypt, encrypt } from "../encryption/envelope.js";
 
-type Platform = AccountRow["platform"];
+type Platform = PlatformAccountRow["platform"];
 
 /**
- * Account as seen by callers — the raw `token` is plaintext (decrypted on read).
- * All envelope columns are stripped. Callers must never see ciphertext.
+ * Platform account as seen by callers — the raw `token` is plaintext (decrypted
+ * on read). All envelope columns are stripped. Callers must never see ciphertext.
  */
-export type DecryptedAccount = {
+export type DecryptedPlatformAccount = {
   id: string;
   organizationId: string;
   platform: Platform;
@@ -22,7 +25,7 @@ export type DecryptedAccount = {
   updatedAt: Date;
 };
 
-export type CreateAccountInput = {
+export type CreatePlatformAccountInput = {
   organizationId: string;
   platform: Platform;
   platformAccountId: string;
@@ -32,26 +35,31 @@ export type CreateAccountInput = {
   tokenExpiresAt?: Date | null;
 };
 
-export type UpdateTokenInput = {
+export type UpdatePlatformTokenInput = {
   token: string;
   tokenMetadata?: Record<string, unknown> | null;
   tokenExpiresAt?: Date | null;
 };
 
-export interface AccountsRepository {
-  create(input: CreateAccountInput): Promise<DecryptedAccount>;
-  findById(id: string): Promise<DecryptedAccount | null>;
+export interface PlatformAccountsRepository {
+  create(
+    input: CreatePlatformAccountInput,
+  ): Promise<DecryptedPlatformAccount>;
+  findById(id: string): Promise<DecryptedPlatformAccount | null>;
   findByOrgAndPlatform(
     organizationId: string,
     platform: Platform,
     platformAccountId: string,
-  ): Promise<DecryptedAccount | null>;
-  listByOrg(organizationId: string): Promise<DecryptedAccount[]>;
+  ): Promise<DecryptedPlatformAccount | null>;
+  listByOrg(organizationId: string): Promise<DecryptedPlatformAccount[]>;
   delete(id: string): Promise<boolean>;
-  updateToken(id: string, input: UpdateTokenInput): Promise<DecryptedAccount>;
+  updateToken(
+    id: string,
+    input: UpdatePlatformTokenInput,
+  ): Promise<DecryptedPlatformAccount>;
 }
 
-function hydrate(row: AccountRow): DecryptedAccount {
+function hydrate(row: PlatformAccountRow): DecryptedPlatformAccount {
   const token = decrypt({
     ciphertext: row.tokenCiphertext,
     dekCiphertext: row.tokenDekCiphertext,
@@ -72,13 +80,17 @@ function hydrate(row: AccountRow): DecryptedAccount {
   };
 }
 
-export class DrizzleAccountsRepository implements AccountsRepository {
+export class DrizzlePlatformAccountsRepository
+  implements PlatformAccountsRepository
+{
   constructor(private readonly db: DrizzleClient) {}
 
-  async create(input: CreateAccountInput): Promise<DecryptedAccount> {
+  async create(
+    input: CreatePlatformAccountInput,
+  ): Promise<DecryptedPlatformAccount> {
     const envelope = encrypt(input.token);
     const [row] = await this.db
-      .insert(accounts)
+      .insert(platformAccounts)
       .values({
         organizationId: input.organizationId,
         platform: input.platform,
@@ -92,15 +104,15 @@ export class DrizzleAccountsRepository implements AccountsRepository {
         tokenExpiresAt: input.tokenExpiresAt ?? null,
       })
       .returning();
-    if (!row) throw new Error("accounts.create returned no row");
+    if (!row) throw new Error("platformAccounts.create returned no row");
     return hydrate(row);
   }
 
-  async findById(id: string): Promise<DecryptedAccount | null> {
+  async findById(id: string): Promise<DecryptedPlatformAccount | null> {
     const rows = await this.db
       .select()
-      .from(accounts)
-      .where(eq(accounts.id, id))
+      .from(platformAccounts)
+      .where(eq(platformAccounts.id, id))
       .limit(1);
     const row = rows[0];
     return row ? hydrate(row) : null;
@@ -110,15 +122,15 @@ export class DrizzleAccountsRepository implements AccountsRepository {
     organizationId: string,
     platform: Platform,
     platformAccountId: string,
-  ): Promise<DecryptedAccount | null> {
+  ): Promise<DecryptedPlatformAccount | null> {
     const rows = await this.db
       .select()
-      .from(accounts)
+      .from(platformAccounts)
       .where(
         and(
-          eq(accounts.organizationId, organizationId),
-          eq(accounts.platform, platform),
-          eq(accounts.platformAccountId, platformAccountId),
+          eq(platformAccounts.organizationId, organizationId),
+          eq(platformAccounts.platform, platform),
+          eq(platformAccounts.platformAccountId, platformAccountId),
         ),
       )
       .limit(1);
@@ -126,29 +138,31 @@ export class DrizzleAccountsRepository implements AccountsRepository {
     return row ? hydrate(row) : null;
   }
 
-  async listByOrg(organizationId: string): Promise<DecryptedAccount[]> {
+  async listByOrg(
+    organizationId: string,
+  ): Promise<DecryptedPlatformAccount[]> {
     const rows = await this.db
       .select()
-      .from(accounts)
-      .where(eq(accounts.organizationId, organizationId));
+      .from(platformAccounts)
+      .where(eq(platformAccounts.organizationId, organizationId));
     return rows.map(hydrate);
   }
 
   async delete(id: string): Promise<boolean> {
     const rows = await this.db
-      .delete(accounts)
-      .where(eq(accounts.id, id))
+      .delete(platformAccounts)
+      .where(eq(platformAccounts.id, id))
       .returning();
     return rows.length > 0;
   }
 
   async updateToken(
     id: string,
-    input: UpdateTokenInput,
-  ): Promise<DecryptedAccount> {
+    input: UpdatePlatformTokenInput,
+  ): Promise<DecryptedPlatformAccount> {
     const envelope = encrypt(input.token);
     const [row] = await this.db
-      .update(accounts)
+      .update(platformAccounts)
       .set({
         tokenCiphertext: envelope.ciphertext,
         tokenDekCiphertext: envelope.dekCiphertext,
@@ -161,9 +175,11 @@ export class DrizzleAccountsRepository implements AccountsRepository {
           ? { tokenExpiresAt: input.tokenExpiresAt }
           : {}),
       })
-      .where(eq(accounts.id, id))
+      .where(eq(platformAccounts.id, id))
       .returning();
-    if (!row) throw new Error(`accounts.updateToken: no account with id=${id}`);
+    if (!row) {
+      throw new Error(`platformAccounts.updateToken: no account with id=${id}`);
+    }
     return hydrate(row);
   }
 }

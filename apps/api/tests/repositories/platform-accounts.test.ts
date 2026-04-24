@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
-import { accounts } from "../../src/db/schema/accounts.js";
-import { organizations } from "../../src/db/schema/organizations.js";
+import { organization } from "../../src/db/schema/auth.js";
+import { platformAccounts } from "../../src/db/schema/platform_accounts.js";
 import { posts } from "../../src/db/schema/posts.js";
-import { DrizzleAccountsRepository } from "../../src/repositories/accounts.js";
+import { DrizzlePlatformAccountsRepository } from "../../src/repositories/platform-accounts.js";
 import {
   canRunDbTests,
   closeTestDb,
@@ -13,7 +13,7 @@ import {
 
 const describeIfDb = canRunDbTests ? describe : describe.skip;
 
-describeIfDb("AccountsRepository (integration)", () => {
+describeIfDb("PlatformAccountsRepository (integration)", () => {
   afterAll(async () => {
     await closeTestDb();
   });
@@ -21,9 +21,9 @@ describeIfDb("AccountsRepository (integration)", () => {
   it("round-trips plaintext token through encryption at rest", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
-      const repo = new DrizzleAccountsRepository(tx);
+      const repo = new DrizzlePlatformAccountsRepository(tx);
       const [org] = await tx
-        .insert(organizations)
+        .insert(organization)
         .values({ name: "Acme", slug: `acme-${Date.now()}` })
         .returning();
 
@@ -45,9 +45,9 @@ describeIfDb("AccountsRepository (integration)", () => {
   it("ciphertext column never equals plaintext", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
-      const repo = new DrizzleAccountsRepository(tx);
+      const repo = new DrizzlePlatformAccountsRepository(tx);
       const [org] = await tx
-        .insert(organizations)
+        .insert(organization)
         .values({ name: "Acme", slug: `acme-${Date.now()}` })
         .returning();
 
@@ -59,13 +59,16 @@ describeIfDb("AccountsRepository (integration)", () => {
         token: plaintext,
       });
 
-      const rows = await tx.select().from(accounts).where(eq(accounts.id, created.id));
+      const rows = await tx
+        .select()
+        .from(platformAccounts)
+        .where(eq(platformAccounts.id, created.id));
       const row = rows[0]!;
       expect(row.tokenCiphertext).not.toBe(plaintext);
       expect(row.tokenCiphertext).not.toContain(plaintext);
-      expect(Buffer.from(row.tokenCiphertext, "base64").toString("utf8")).not.toBe(
-        plaintext,
-      );
+      expect(
+        Buffer.from(row.tokenCiphertext, "base64").toString("utf8"),
+      ).not.toBe(plaintext);
       expect(row.tokenDekCiphertext).not.toContain(plaintext);
       expect(row.tokenIv).not.toBe("");
       expect(row.tokenAuthTag).not.toBe("");
@@ -75,13 +78,13 @@ describeIfDb("AccountsRepository (integration)", () => {
   it("findByOrgAndPlatform scopes by org", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
-      const repo = new DrizzleAccountsRepository(tx);
+      const repo = new DrizzlePlatformAccountsRepository(tx);
       const [orgA] = await tx
-        .insert(organizations)
+        .insert(organization)
         .values({ name: "A", slug: `a-${Date.now()}` })
         .returning();
       const [orgB] = await tx
-        .insert(organizations)
+        .insert(organization)
         .values({ name: "B", slug: `b-${Date.now()}` })
         .returning();
 
@@ -111,9 +114,9 @@ describeIfDb("AccountsRepository (integration)", () => {
   it("updateToken replaces the envelope", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
-      const repo = new DrizzleAccountsRepository(tx);
+      const repo = new DrizzlePlatformAccountsRepository(tx);
       const [org] = await tx
-        .insert(organizations)
+        .insert(organization)
         .values({ name: "Acme", slug: `acme-${Date.now()}` })
         .returning();
 
@@ -124,7 +127,9 @@ describeIfDb("AccountsRepository (integration)", () => {
         token: "old-password",
       });
 
-      const updated = await repo.updateToken(first.id, { token: "new-password" });
+      const updated = await repo.updateToken(first.id, {
+        token: "new-password",
+      });
       expect(updated.token).toBe("new-password");
 
       const refetched = await repo.findById(first.id);
@@ -135,13 +140,13 @@ describeIfDb("AccountsRepository (integration)", () => {
   it("listByOrg returns decrypted accounts for the requested org only", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
-      const repo = new DrizzleAccountsRepository(tx);
+      const repo = new DrizzlePlatformAccountsRepository(tx);
       const [orgA] = await tx
-        .insert(organizations)
+        .insert(organization)
         .values({ name: "A", slug: `a-${Date.now()}` })
         .returning();
       const [orgB] = await tx
-        .insert(organizations)
+        .insert(organization)
         .values({ name: "B", slug: `b-${Date.now()}` })
         .returning();
 
@@ -174,9 +179,9 @@ describeIfDb("AccountsRepository (integration)", () => {
   it("delete is idempotent and returns false when the row is gone", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
-      const repo = new DrizzleAccountsRepository(tx);
+      const repo = new DrizzlePlatformAccountsRepository(tx);
       const [org] = await tx
-        .insert(organizations)
+        .insert(organization)
         .values({ name: "Acme", slug: `acme-${Date.now()}` })
         .returning();
       const created = await repo.create({
@@ -192,12 +197,12 @@ describeIfDb("AccountsRepository (integration)", () => {
     });
   });
 
-  it("deleting the organization cascades to its accounts and posts", async () => {
+  it("deleting the organization cascades to its platform accounts and posts", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
-      const repo = new DrizzleAccountsRepository(tx);
+      const repo = new DrizzlePlatformAccountsRepository(tx);
       const [org] = await tx
-        .insert(organizations)
+        .insert(organization)
         .values({ name: "Acme", slug: `acme-${Date.now()}` })
         .returning();
 
@@ -214,7 +219,7 @@ describeIfDb("AccountsRepository (integration)", () => {
         text: "hello",
       });
 
-      await tx.delete(organizations).where(eq(organizations.id, org!.id));
+      await tx.delete(organization).where(eq(organization.id, org!.id));
 
       expect(await repo.findById(acct.id)).toBeNull();
       const remainingPosts = await tx

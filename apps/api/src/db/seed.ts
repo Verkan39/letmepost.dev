@@ -1,10 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { DrizzleClient } from "./index.js";
 import { apiKeys } from "./schema/api_keys.js";
-import { organizationMembers } from "./schema/organization_members.js";
-import { organizations } from "./schema/organizations.js";
-import { users } from "./schema/users.js";
-import { DrizzleAccountsRepository } from "../repositories/accounts.js";
+import { member, organization, user } from "./schema/auth.js";
+import { DrizzlePlatformAccountsRepository } from "../repositories/platform-accounts.js";
 
 export type SeedFixture = {
   organizationId: string;
@@ -22,6 +20,7 @@ export type SeedOptions = {
   orgName?: string;
   orgSlug?: string;
   userEmail?: string;
+  userName?: string;
   blueskyHandle?: string;
   blueskyAppPassword?: string;
   apiKeyPrefix?: "lmp_live_" | "lmp_test_";
@@ -32,12 +31,9 @@ function hashApiKey(plaintext: string): string {
 }
 
 /**
- * Test-only seed helper. Creates one org, one user, one org membership, one API key,
- * and one Bluesky account (token encrypted via the envelope module). Returns ids and
- * the plaintext API key so tests can assert round-tripped behavior.
- *
- * Not wired to a CLI — import this from your test file. For integration tests, wrap
- * the whole test in a Drizzle transaction and roll back.
+ * Test-only seed helper. Creates one user (better-auth), one organization,
+ * one membership, one API key (ours, org-scoped), and one Bluesky platform
+ * account (token encrypted via the envelope module).
  */
 export async function seed(
   db: DrizzleClient,
@@ -47,25 +43,28 @@ export async function seed(
   const orgName = options.orgName ?? `seed-org-${suffix}`;
   const orgSlug = options.orgSlug ?? `seed-${suffix}`;
   const userEmail = options.userEmail ?? `seed+${suffix}@letmepost.test`;
+  const userName = options.userName ?? `Seed User ${suffix}`;
   const handle = options.blueskyHandle ?? `seed-${suffix}.bsky.social`;
   const appPassword = options.blueskyAppPassword ?? `test-${suffix}-password`;
   const prefix = options.apiKeyPrefix ?? "lmp_test_";
 
-  const [org] = await db
-    .insert(organizations)
+  const [userRow] = await db
+    .insert(user)
+    .values({ email: userEmail, name: userName, emailVerified: true })
+    .returning();
+  if (!userRow) throw new Error("seed: failed to insert user");
+
+  const [orgRow] = await db
+    .insert(organization)
     .values({ name: orgName, slug: orgSlug })
     .returning();
-  if (!org) throw new Error("seed: failed to insert organization");
+  if (!orgRow) throw new Error("seed: failed to insert organization");
 
-  const [user] = await db
-    .insert(users)
-    .values({ email: userEmail, name: "Seed User" })
-    .returning();
-  if (!user) throw new Error("seed: failed to insert user");
-
-  await db
-    .insert(organizationMembers)
-    .values({ organizationId: org.id, userId: user.id, role: "owner" });
+  await db.insert(member).values({
+    organizationId: orgRow.id,
+    userId: userRow.id,
+    role: "owner",
+  });
 
   const rawSecret = randomBytes(24).toString("base64url");
   const plaintext = `${prefix}${rawSecret}`;
@@ -74,7 +73,7 @@ export async function seed(
   const [apiKey] = await db
     .insert(apiKeys)
     .values({
-      organizationId: org.id,
+      organizationId: orgRow.id,
       name: "seed-key",
       prefix,
       hashedKey: hashApiKey(plaintext),
@@ -84,9 +83,9 @@ export async function seed(
     .returning();
   if (!apiKey) throw new Error("seed: failed to insert api key");
 
-  const accountsRepo = new DrizzleAccountsRepository(db);
-  const account = await accountsRepo.create({
-    organizationId: org.id,
+  const repo = new DrizzlePlatformAccountsRepository(db);
+  const account = await repo.create({
+    organizationId: orgRow.id,
     platform: "bluesky",
     platformAccountId: handle,
     displayName: handle,
@@ -95,8 +94,8 @@ export async function seed(
   });
 
   return {
-    organizationId: org.id,
-    userId: user.id,
+    organizationId: orgRow.id,
+    userId: userRow.id,
     apiKey: { id: apiKey.id, plaintext, prefix, last4 },
     accountId: account.id,
   };

@@ -1,15 +1,18 @@
 import { eq } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
-import { accounts } from "../../src/db/schema/accounts.js";
 import { apiKeys } from "../../src/db/schema/api_keys.js";
+import { member, organization, user } from "../../src/db/schema/auth.js";
 import { idempotencyRecords } from "../../src/db/schema/idempotency_records.js";
-import { organizationMembers } from "../../src/db/schema/organization_members.js";
-import { organizations } from "../../src/db/schema/organizations.js";
+import { platformAccounts } from "../../src/db/schema/platform_accounts.js";
 import { platformVersions } from "../../src/db/schema/platform_versions.js";
 import { posts } from "../../src/db/schema/posts.js";
-import { users } from "../../src/db/schema/users.js";
 import { webhookEndpoints } from "../../src/db/schema/webhook_endpoints.js";
-import { canRunDbTests, closeTestDb, getTestDb, runInTransaction } from "./support.js";
+import {
+  canRunDbTests,
+  closeTestDb,
+  getTestDb,
+  runInTransaction,
+} from "./support.js";
 
 const describeIfDb = canRunDbTests ? describe : describe.skip;
 
@@ -18,22 +21,28 @@ describeIfDb("schema integrity (integration)", () => {
     await closeTestDb();
   });
 
-  it("users.email is unique (case-sensitive)", async () => {
+  it("user.email is unique (case-sensitive)", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
-      await tx.insert(users).values({ email: "dup@example.com" });
+      await tx
+        .insert(user)
+        .values({ email: "dup@example.com", name: "One", emailVerified: true });
       await expect(
-        tx.insert(users).values({ email: "dup@example.com" }),
+        tx.insert(user).values({
+          email: "dup@example.com",
+          name: "Two",
+          emailVerified: true,
+        }),
       ).rejects.toThrow();
     });
   });
 
-  it("organizations.slug is unique", async () => {
+  it("organization.slug is unique", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
-      await tx.insert(organizations).values({ name: "One", slug: "dup-slug" });
+      await tx.insert(organization).values({ name: "One", slug: "dup-slug" });
       await expect(
-        tx.insert(organizations).values({ name: "Two", slug: "dup-slug" }),
+        tx.insert(organization).values({ name: "Two", slug: "dup-slug" }),
       ).rejects.toThrow();
     });
   });
@@ -42,7 +51,7 @@ describeIfDb("schema integrity (integration)", () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
       const [org] = await tx
-        .insert(organizations)
+        .insert(organization)
         .values({ name: "A", slug: `a-${Date.now()}` })
         .returning();
       const hashed = "deadbeef".repeat(8);
@@ -65,26 +74,30 @@ describeIfDb("schema integrity (integration)", () => {
     });
   });
 
-  it("organization_members (org, user) is unique", async () => {
+  it("member (org, user) is unique", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
       const [org] = await tx
-        .insert(organizations)
+        .insert(organization)
         .values({ name: "A", slug: `a-${Date.now()}` })
         .returning();
-      const [user] = await tx
-        .insert(users)
-        .values({ email: `m-${Date.now()}@ex.com` })
+      const [u] = await tx
+        .insert(user)
+        .values({
+          email: `m-${Date.now()}@ex.com`,
+          name: "M",
+          emailVerified: true,
+        })
         .returning();
-      await tx.insert(organizationMembers).values({
+      await tx.insert(member).values({
         organizationId: org!.id,
-        userId: user!.id,
+        userId: u!.id,
         role: "admin",
       });
       await expect(
-        tx.insert(organizationMembers).values({
+        tx.insert(member).values({
           organizationId: org!.id,
-          userId: user!.id,
+          userId: u!.id,
           role: "member",
         }),
       ).rejects.toThrow();
@@ -95,7 +108,7 @@ describeIfDb("schema integrity (integration)", () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
       const [org] = await tx
-        .insert(organizations)
+        .insert(organization)
         .values({ name: "A", slug: `a-${Date.now()}` })
         .returning();
       await tx.insert(idempotencyRecords).values({
@@ -119,11 +132,11 @@ describeIfDb("schema integrity (integration)", () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
       const [org] = await tx
-        .insert(organizations)
+        .insert(organization)
         .values({ name: "A", slug: `a-${Date.now()}` })
         .returning();
-      const [insertedAccount] = await tx
-        .insert(accounts)
+      const [acct] = await tx
+        .insert(platformAccounts)
         .values({
           organizationId: org!.id,
           platform: "bluesky",
@@ -138,7 +151,7 @@ describeIfDb("schema integrity (integration)", () => {
         .insert(posts)
         .values({
           organizationId: org!.id,
-          accountId: insertedAccount!.id,
+          accountId: acct!.id,
           text: "hello world",
         })
         .returning();
@@ -149,22 +162,26 @@ describeIfDb("schema integrity (integration)", () => {
     });
   });
 
-  it("organization_members.role defaults to 'member'", async () => {
+  it("member.role defaults to 'member'", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
       const [org] = await tx
-        .insert(organizations)
+        .insert(organization)
         .values({ name: "A", slug: `a-${Date.now()}` })
         .returning();
-      const [user] = await tx
-        .insert(users)
-        .values({ email: `r-${Date.now()}@ex.com` })
+      const [u] = await tx
+        .insert(user)
+        .values({
+          email: `r-${Date.now()}@ex.com`,
+          name: "R",
+          emailVerified: true,
+        })
         .returning();
-      const [member] = await tx
-        .insert(organizationMembers)
-        .values({ organizationId: org!.id, userId: user!.id })
+      const [row] = await tx
+        .insert(member)
+        .values({ organizationId: org!.id, userId: u!.id })
         .returning();
-      expect(member!.role).toBe("member");
+      expect(row!.role).toBe("member");
     });
   });
 
@@ -181,28 +198,31 @@ describeIfDb("schema integrity (integration)", () => {
     });
   });
 
-  it("deleting a user cascades to their organization memberships", async () => {
+  it("deleting a user cascades to their org memberships", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
       const [org] = await tx
-        .insert(organizations)
+        .insert(organization)
         .values({ name: "A", slug: `a-${Date.now()}` })
         .returning();
-      const [user] = await tx
-        .insert(users)
-        .values({ email: `c-${Date.now()}@ex.com` })
+      const [u] = await tx
+        .insert(user)
+        .values({
+          email: `c-${Date.now()}@ex.com`,
+          name: "C",
+          emailVerified: true,
+        })
         .returning();
-      await tx.insert(organizationMembers).values({
-        organizationId: org!.id,
-        userId: user!.id,
-      });
+      await tx
+        .insert(member)
+        .values({ organizationId: org!.id, userId: u!.id });
 
-      await tx.delete(users).where(eq(users.id, user!.id));
+      await tx.delete(user).where(eq(user.id, u!.id));
 
       const remaining = await tx
         .select()
-        .from(organizationMembers)
-        .where(eq(organizationMembers.userId, user!.id));
+        .from(member)
+        .where(eq(member.userId, u!.id));
       expect(remaining).toHaveLength(0);
     });
   });

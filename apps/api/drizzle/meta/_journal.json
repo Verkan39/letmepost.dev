@@ -15,6 +15,13 @@
       "when": 1777030223798,
       "tag": "0001_silent_corsair",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777070034291,
+      "tag": "0002_silly_microbe",
+      "breakpoints": true
     }
   ]
 }

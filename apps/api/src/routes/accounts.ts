@@ -1,7 +1,9 @@
+import { eq } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { Platform } from "@letmepost/schemas";
+import { profiles as profilesTable } from "../db/schema/profiles.js";
 import { LetmepostError } from "../errors.js";
 import { idempotency } from "../middleware/idempotency.js";
 import { rateLimit } from "../middleware/rate-limit.js";
@@ -9,6 +11,7 @@ import { requireSession } from "../middleware/session.js";
 import { getProvider } from "../platforms/index.js";
 import { computeRefreshDelayMs } from "../platforms/_shared/refresh.js";
 import { DrizzlePlatformAccountsRepository } from "../repositories/platform-accounts.js";
+import { DrizzleProfilesRepository } from "../repositories/profiles.js";
 
 /**
  * `/v1/accounts` — connected social media accounts for the session's active
@@ -34,6 +37,7 @@ const PlatformParam = z.object({ platform: Platform });
 
 function publicView(account: {
   id: string;
+  profileId: string;
   platform: string;
   platformAccountId: string;
   displayName: string | null;
@@ -43,6 +47,7 @@ function publicView(account: {
 }) {
   return {
     id: account.id,
+    profileId: account.profileId,
     platform: account.platform,
     platformAccountId: account.platformAccountId,
     displayName: account.displayName,
@@ -152,7 +157,14 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
       const provider = getProvider(platform);
       const { organizationId } = c.var.session;
 
-      const body = (await c.req.json().catch(() => ({}))) as unknown;
+      const body = (await c.req.json().catch(() => ({}))) as
+        | { profileId?: unknown }
+        | undefined;
+      const requestedProfileId =
+        body && typeof body.profileId === "string" ? body.profileId : null;
+
+      const profileId = await resolveProfileId(c.var.db, organizationId, requestedProfileId);
+
       const connected = await provider.completeConnect(
         { organizationId, baseUrl },
         body,
@@ -185,6 +197,7 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
 
       const created = await repo.create({
         organizationId,
+        profileId,
         platform,
         platformAccountId: connected.platformAccountId,
         displayName: connected.displayName,
@@ -254,6 +267,64 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
   });
 
   return app;
+}
+
+/**
+ * Resolve the profile a connect/complete should land in.
+ *
+ *  - If the caller supplied a `profileId` in the body, verify it belongs to
+ *    the same org and use it.
+ *  - Otherwise, fall back to the org's "Default" profile (slug=`default`),
+ *    which sign-up creates automatically.
+ *
+ * Throws `validation_failed` (400) for cross-org IDs, `not_found` (404) for
+ * unknown IDs, and `internal_error` (500) if the org has no Default profile
+ * (shouldn't happen — sign-up creates it; the migration backfilled it).
+ */
+async function resolveProfileId(
+  db: import("../db/index.js").DrizzleClient,
+  organizationId: string,
+  requestedProfileId: string | null,
+): Promise<string> {
+  if (requestedProfileId) {
+    const [row] = await db
+      .select({ id: profilesTable.id, organizationId: profilesTable.organizationId })
+      .from(profilesTable)
+      .where(eq(profilesTable.id, requestedProfileId))
+      .limit(1);
+    if (!row) {
+      throw new LetmepostError({
+        code: "not_found",
+        status: 404,
+        message: "Profile not found.",
+        rule: "profile.unknown",
+      });
+    }
+    if (row.organizationId !== organizationId) {
+      throw new LetmepostError({
+        code: "not_found",
+        status: 404,
+        message: "Profile not found.",
+        rule: "profile.cross_org",
+      });
+    }
+    return row.id;
+  }
+
+  const repo = new DrizzleProfilesRepository(db);
+  const def = await repo.findByOrgAndSlug(organizationId, "default");
+  if (def) return def.id;
+
+  // No Default profile — auto-create one. This shouldn't trigger after the
+  // migration backfill, but it makes the connect flow resilient for orgs
+  // created via paths that don't seed a Default (e.g. tests that build an
+  // org by hand).
+  const created = await repo.create({
+    organizationId,
+    name: "Default",
+    slug: "default",
+  });
+  return created.id;
 }
 
 export const accountRoutes = createAccountRoutes();

@@ -10,6 +10,7 @@ import {
 import { idColumn, timestamps } from "./_shared.js";
 import { organization } from "./auth.js";
 import { platform } from "./platform_versions.js";
+import { profiles } from "./profiles.js";
 
 /**
  * Per-platform connected social media account (Bluesky, LinkedIn, etc.).
@@ -30,6 +31,9 @@ export const platformAccounts = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "restrict" }),
     platform: platform("platform").notNull(),
     /** Stable per-platform identifier — e.g. Bluesky DID, LinkedIn URN. */
     platformAccountId: text("platform_account_id").notNull(),
@@ -49,6 +53,7 @@ export const platformAccounts = pgTable(
   },
   (t) => ({
     byOrg: index("platform_accounts_organization_id_idx").on(t.organizationId),
+    byProfile: index("platform_accounts_profile_id_idx").on(t.profileId),
     uniqPlatformAccount: uniqueIndex(
       "platform_accounts_org_platform_account_unique",
     ).on(t.organizationId, t.platform, t.platformAccountId),

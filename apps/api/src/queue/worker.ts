@@ -147,6 +147,7 @@ const publishWorker = new Worker<PublishJobData>(
           id: post.id,
           platform: account.platform,
           accountId: account.id,
+          profileId: account.profileId,
           uri: result.uri,
           cid: result.cid,
           publishedAt: publishedAt.toISOString(),
@@ -178,7 +179,7 @@ const publishWorker = new Worker<PublishJobData>(
 async function finaliseFailure(
   postId: string,
   err: unknown,
-  account: { id: string; platform: string } | null,
+  account: { id: string; platform: string; profileId: string } | null,
   organizationId: string,
   requestId: string | undefined,
 ): Promise<void> {
@@ -222,6 +223,7 @@ async function finaliseFailure(
         id: postId,
         platform: account.platform,
         accountId: account.id,
+        profileId: account.profileId,
         error: errorRecord,
         rejectedAt: new Date().toISOString(),
       },

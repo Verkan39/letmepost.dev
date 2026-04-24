@@ -15,6 +15,7 @@ type Platform = PlatformAccountRow["platform"];
 export type DecryptedPlatformAccount = {
   id: string;
   organizationId: string;
+  profileId: string;
   platform: Platform;
   platformAccountId: string;
   displayName: string | null;
@@ -27,6 +28,7 @@ export type DecryptedPlatformAccount = {
 
 export type CreatePlatformAccountInput = {
   organizationId: string;
+  profileId: string;
   platform: Platform;
   platformAccountId: string;
   displayName?: string | null;
@@ -69,6 +71,7 @@ function hydrate(row: PlatformAccountRow): DecryptedPlatformAccount {
   return {
     id: row.id,
     organizationId: row.organizationId,
+    profileId: row.profileId,
     platform: row.platform,
     platformAccountId: row.platformAccountId,
     displayName: row.displayName,
@@ -93,6 +96,7 @@ export class DrizzlePlatformAccountsRepository
       .insert(platformAccounts)
       .values({
         organizationId: input.organizationId,
+        profileId: input.profileId,
         platform: input.platform,
         platformAccountId: input.platformAccountId,
         displayName: input.displayName ?? null,

@@ -6,6 +6,7 @@ import { idempotencyRecords } from "../../src/db/schema/idempotency_records.js";
 import { platformAccounts } from "../../src/db/schema/platform_accounts.js";
 import { platformVersions } from "../../src/db/schema/platform_versions.js";
 import { posts } from "../../src/db/schema/posts.js";
+import { profiles } from "../../src/db/schema/profiles.js";
 import { webhookEndpoints } from "../../src/db/schema/webhook_endpoints.js";
 import {
   canRunDbTests,
@@ -135,10 +136,19 @@ describeIfDb("schema integrity (integration)", () => {
         .insert(organization)
         .values({ name: "A", slug: `a-${Date.now()}` })
         .returning();
+      const [profile] = await tx
+        .insert(profiles)
+        .values({
+          organizationId: org!.id,
+          name: "Default",
+          slug: "default",
+        })
+        .returning();
       const [acct] = await tx
         .insert(platformAccounts)
         .values({
           organizationId: org!.id,
+          profileId: profile!.id,
           platform: "bluesky",
           platformAccountId: "did:plc:defaults",
           tokenCiphertext: "x",

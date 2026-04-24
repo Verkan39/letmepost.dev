@@ -10,6 +10,7 @@ import { posts as postsTable } from "../db/schema/posts.js";
 import { LetmepostError } from "../errors.js";
 import { apiKeyAuth } from "../middleware/api-key.js";
 import { idempotency } from "../middleware/idempotency.js";
+import { assertKeyCanAccessProfile } from "../middleware/profile-scope.js";
 import { rateLimit } from "../middleware/rate-limit.js";
 import { blueskyPublisher } from "../platforms/bluesky/publisher.js";
 import { pinterestPublisher } from "../platforms/pinterest/publisher.js";
@@ -77,6 +78,10 @@ posts.post(
           "Verify the account id and that it belongs to your organization.",
       });
     }
+
+    // Enforce the api-key's profile scope. Cross-profile keys 404 here so we
+    // don't leak the account's existence to a caller that shouldn't see it.
+    assertKeyCanAccessProfile(c.var.apiKey, account);
 
     if (account.platform !== accountRef.platform) {
       throw new LetmepostError({
@@ -146,6 +151,7 @@ posts.post(
           id: row.id,
           platform: account.platform,
           accountId: account.id,
+          profileId: account.profileId,
           scheduledAt: when.toISOString(),
           queuedAt: row.createdAt.toISOString(),
         },
@@ -206,6 +212,7 @@ posts.post(
           id: row.id,
           platform: account.platform,
           accountId: account.id,
+          profileId: account.profileId,
           uri: result.uri,
           cid: result.cid,
           firstCommentUri: result.firstCommentUri,
@@ -241,6 +248,7 @@ posts.post(
               id: row.id,
               platform: account.platform,
               accountId: account.id,
+              profileId: account.profileId,
               error: letmepostErrorToRecord(err),
               rejectedAt: new Date().toISOString(),
             },

@@ -21,6 +21,10 @@ import { authRoutes } from "./routes/auth.js";
 import { health } from "./routes/health.js";
 import { posts } from "./routes/posts.js";
 import {
+  createProfileRoutes,
+  profileRoutes,
+} from "./routes/profiles.js";
+import {
   createWebhookEndpointRoutes,
   webhookEndpointRoutes,
 } from "./routes/webhook-endpoints.js";
@@ -115,6 +119,10 @@ export function createApp(options: AppOptions = {}) {
       createWebhookEndpointRoutes({ sessionMiddleware: injectSession }),
     );
     app.route(
+      "/v1/profiles",
+      createProfileRoutes({ sessionMiddleware: injectSession }),
+    );
+    app.route(
       "/v1/accounts",
       createAccountRoutes({
         sessionMiddleware: injectSession,
@@ -125,6 +133,7 @@ export function createApp(options: AppOptions = {}) {
     );
   } else {
     app.route("/v1/webhook-endpoints", webhookEndpointRoutes);
+    app.route("/v1/profiles", profileRoutes);
     if (options.refreshEnqueuer) {
       app.route(
         "/v1/accounts",

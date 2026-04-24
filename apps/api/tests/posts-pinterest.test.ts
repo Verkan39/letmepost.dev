@@ -64,6 +64,7 @@ async function seedWithPinterest(tx: DrizzleClient) {
   const repo = new DrizzlePlatformAccountsRepository(tx);
   const account = await repo.create({
     organizationId: fixture.organizationId,
+    profileId: fixture.profileId,
     platform: "pinterest",
     platformAccountId: "pinterest-user-1",
     displayName: "pinterest-user-1",

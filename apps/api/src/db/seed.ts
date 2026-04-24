@@ -3,9 +3,11 @@ import type { DrizzleClient } from "./index.js";
 import { apiKeys } from "./schema/api_keys.js";
 import { member, organization, user } from "./schema/auth.js";
 import { DrizzlePlatformAccountsRepository } from "../repositories/platform-accounts.js";
+import { DrizzleProfilesRepository } from "../repositories/profiles.js";
 
 export type SeedFixture = {
   organizationId: string;
+  profileId: string;
   userId: string;
   apiKey: {
     id: string;
@@ -66,6 +68,13 @@ export async function seed(
     role: "owner",
   });
 
+  const profileRepo = new DrizzleProfilesRepository(db);
+  const profile = await profileRepo.create({
+    organizationId: orgRow.id,
+    name: "Default",
+    slug: "default",
+  });
+
   const rawSecret = randomBytes(24).toString("base64url");
   const plaintext = `${prefix}${rawSecret}`;
   const last4 = plaintext.slice(-4);
@@ -86,6 +95,7 @@ export async function seed(
   const repo = new DrizzlePlatformAccountsRepository(db);
   const account = await repo.create({
     organizationId: orgRow.id,
+    profileId: profile.id,
     platform: "bluesky",
     platformAccountId: handle,
     displayName: handle,
@@ -95,6 +105,7 @@ export async function seed(
 
   return {
     organizationId: orgRow.id,
+    profileId: profile.id,
     userId: userRow.id,
     apiKey: { id: apiKey.id, plaintext, prefix, last4 },
     accountId: account.id,

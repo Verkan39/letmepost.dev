@@ -64,6 +64,7 @@ async function seedWithTwitter(tx: DrizzleClient) {
   const repo = new DrizzlePlatformAccountsRepository(tx);
   const account = await repo.create({
     organizationId: fixture.organizationId,
+    profileId: fixture.profileId,
     platform: "twitter",
     platformAccountId: "twitter-user-1",
     displayName: "twitter-user-1",

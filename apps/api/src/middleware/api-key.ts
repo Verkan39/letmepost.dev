@@ -8,6 +8,13 @@ export type ApiKeyContext = {
   organizationId: string;
   apiKeyId: string;
   scopes: string[];
+  /**
+   * Profile scope for this key. NULL means org-wide (works against any
+   * profile in the org). A specific id means the key is restricted to that
+   * profile — cross-profile access surfaces as 404 to avoid leaking
+   * existence.
+   */
+  profileId: string | null;
 };
 
 declare module "hono" {
@@ -74,6 +81,7 @@ export function apiKeyAuth(): MiddlewareHandler {
       organizationId: row.organizationId,
       apiKeyId: row.id,
       scopes: row.scopes,
+      profileId: row.profileId,
     });
 
     // Best-effort last_used_at update — don't block the request.

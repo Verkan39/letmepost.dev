@@ -4,6 +4,7 @@ import { organization } from "../../src/db/schema/auth.js";
 import { platformAccounts } from "../../src/db/schema/platform_accounts.js";
 import { posts } from "../../src/db/schema/posts.js";
 import { DrizzlePlatformAccountsRepository } from "../../src/repositories/platform-accounts.js";
+import { DrizzleProfilesRepository } from "../../src/repositories/profiles.js";
 import {
   canRunDbTests,
   closeTestDb,
@@ -12,6 +13,20 @@ import {
 } from "../db/support.js";
 
 const describeIfDb = canRunDbTests ? describe : describe.skip;
+
+/** Create a "Default" profile for the given org and return its id. */
+async function defaultProfileFor(
+  tx: Awaited<ReturnType<typeof getTestDb>>["db"],
+  organizationId: string,
+): Promise<string> {
+  const repo = new DrizzleProfilesRepository(tx);
+  const profile = await repo.create({
+    organizationId,
+    name: "Default",
+    slug: "default",
+  });
+  return profile.id;
+}
 
 describeIfDb("PlatformAccountsRepository (integration)", () => {
   afterAll(async () => {
@@ -27,9 +42,12 @@ describeIfDb("PlatformAccountsRepository (integration)", () => {
         .values({ name: "Acme", slug: `acme-${Date.now()}` })
         .returning();
 
+      const profileId = await defaultProfileFor(tx, org!.id);
+
       const plaintext = "bsky-app-password-round-trip";
       const created = await repo.create({
         organizationId: org!.id,
+        profileId,
         platform: "bluesky",
         platformAccountId: "did:plc:test",
         displayName: "alice.bsky.social",
@@ -51,9 +69,12 @@ describeIfDb("PlatformAccountsRepository (integration)", () => {
         .values({ name: "Acme", slug: `acme-${Date.now()}` })
         .returning();
 
+      const profileId = await defaultProfileFor(tx, org!.id);
+
       const plaintext = "super-secret-at-rest";
       const created = await repo.create({
         organizationId: org!.id,
+        profileId,
         platform: "bluesky",
         platformAccountId: "did:plc:secret",
         token: plaintext,
@@ -88,8 +109,12 @@ describeIfDb("PlatformAccountsRepository (integration)", () => {
         .values({ name: "B", slug: `b-${Date.now()}` })
         .returning();
 
+      const profileA = await defaultProfileFor(tx, orgA!.id);
+      await defaultProfileFor(tx, orgB!.id);
+
       await repo.create({
         organizationId: orgA!.id,
+        profileId: profileA,
         platform: "bluesky",
         platformAccountId: "did:plc:shared",
         token: "token-a",
@@ -120,8 +145,10 @@ describeIfDb("PlatformAccountsRepository (integration)", () => {
         .values({ name: "Acme", slug: `acme-${Date.now()}` })
         .returning();
 
+      const profileId = await defaultProfileFor(tx, org!.id);
       const first = await repo.create({
         organizationId: org!.id,
+        profileId,
         platform: "bluesky",
         platformAccountId: "did:plc:rotate",
         token: "old-password",
@@ -150,20 +177,26 @@ describeIfDb("PlatformAccountsRepository (integration)", () => {
         .values({ name: "B", slug: `b-${Date.now()}` })
         .returning();
 
+      const profileA = await defaultProfileFor(tx, orgA!.id);
+      const profileB = await defaultProfileFor(tx, orgB!.id);
+
       await repo.create({
         organizationId: orgA!.id,
+        profileId: profileA,
         platform: "bluesky",
         platformAccountId: "did:plc:a1",
         token: "t-a1",
       });
       await repo.create({
         organizationId: orgA!.id,
+        profileId: profileA,
         platform: "bluesky",
         platformAccountId: "did:plc:a2",
         token: "t-a2",
       });
       await repo.create({
         organizationId: orgB!.id,
+        profileId: profileB,
         platform: "bluesky",
         platformAccountId: "did:plc:b1",
         token: "t-b1",
@@ -184,8 +217,10 @@ describeIfDb("PlatformAccountsRepository (integration)", () => {
         .insert(organization)
         .values({ name: "Acme", slug: `acme-${Date.now()}` })
         .returning();
+      const profileId = await defaultProfileFor(tx, org!.id);
       const created = await repo.create({
         organizationId: org!.id,
+        profileId,
         platform: "bluesky",
         platformAccountId: "did:plc:delete-me",
         token: "t",
@@ -206,8 +241,10 @@ describeIfDb("PlatformAccountsRepository (integration)", () => {
         .values({ name: "Acme", slug: `acme-${Date.now()}` })
         .returning();
 
+      const profileId = await defaultProfileFor(tx, org!.id);
       const acct = await repo.create({
         organizationId: org!.id,
+        profileId,
         platform: "bluesky",
         platformAccountId: "did:plc:cascade",
         token: "t",

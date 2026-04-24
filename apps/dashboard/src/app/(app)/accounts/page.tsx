@@ -16,10 +16,14 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/app/confirm-dialog";
 
 export default function AccountsListPage() {
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDisconnect, setPendingDisconnect] = useState<Account | null>(
+    null,
+  );
 
   async function refresh() {
     setError(null);
@@ -41,7 +45,6 @@ export default function AccountsListPage() {
   }, []);
 
   async function handleDelete(id: string) {
-    if (!window.confirm("Disconnect this account?")) return;
     try {
       await apiFetch<{ id: string }>(`/v1/accounts/${id}`, {
         method: "DELETE",
@@ -128,7 +131,7 @@ export default function AccountsListPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleDelete(acc.id)}
+                  onClick={() => setPendingDisconnect(acc)}
                 >
                   <Trash className="size-4" />
                   Disconnect
@@ -138,6 +141,32 @@ export default function AccountsListPage() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDisconnect !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDisconnect(null);
+        }}
+        title="Disconnect account?"
+        description={
+          pendingDisconnect ? (
+            <>
+              This removes{" "}
+              <span className="font-medium text-foreground">
+                {pendingDisconnect.displayName ??
+                  pendingDisconnect.handle ??
+                  pendingDisconnect.id}
+              </span>{" "}
+              from your organization. Posting will stop until you reconnect.
+            </>
+          ) : null
+        }
+        confirmLabel="Disconnect"
+        variant="destructive"
+        onConfirm={async () => {
+          if (pendingDisconnect) await handleDelete(pendingDisconnect.id);
+        }}
+      />
     </div>
   );
 }

@@ -4,12 +4,18 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* --------------------------------------------------------------------------
+   Dashboard tokens — mirror the landing's paper + forest-green palette so the
+   two surfaces read as the same product. We skip the landing's noise texture
+   here: it fights with data-dense operator screens (tables, code, badges).
+   -------------------------------------------------------------------------- */
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-mono);
-  --font-heading: var(--font-mono);
+  --font-sans: "Commit Mono", ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
+  --font-mono: "Commit Mono", ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
+  --font-heading: "Commit Mono", ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,50 +45,68 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* Zero radius — matches the landing's brutalist feel. */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Paper — warm cream */
+  --background: hsl(30 25% 98%);
+  --foreground: hsl(24 10% 10%);
+
+  /* Cards and popovers sit slightly raised */
+  --card: hsl(30 20% 96%);
+  --card-foreground: hsl(24 10% 10%);
+  --popover: hsl(30 20% 96%);
+  --popover-foreground: hsl(24 10% 10%);
+
+  /* Primary CTA — forest green */
+  --primary: hsl(150 45% 32%);
+  --primary-foreground: hsl(30 25% 98%);
+
+  /* Secondary + muted surfaces share a slightly-tinted paper tone */
+  --secondary: hsl(30 20% 94.5%);
+  --secondary-foreground: hsl(24 10% 10%);
+  --muted: hsl(30 20% 94.5%);
+  --muted-foreground: hsl(24 6% 48%);
+
+  /* Hover / subtle-emphasis surfaces */
+  --accent: hsl(150 45% 32% / 0.08);
+  --accent-foreground: hsl(24 10% 10%);
+
+  --destructive: hsl(0 70% 50%);
+
+  --border: hsl(28 14% 82%);
+  --input: hsl(28 14% 82%);
+  --ring: hsl(150 45% 32%);
+
+  --chart-1: hsl(150 45% 32%);
+  --chart-2: hsl(24 6% 48%);
+  --chart-3: hsl(24 8% 30%);
+  --chart-4: hsl(28 14% 60%);
+  --chart-5: hsl(28 12% 40%);
+
+  --radius: 0;
+
+  /* Sidebar picks up the same palette with a subtle shift to feel like a rail */
+  --sidebar: hsl(30 20% 96%);
+  --sidebar-foreground: hsl(24 10% 10%);
+  --sidebar-primary: hsl(150 45% 32%);
+  --sidebar-primary-foreground: hsl(30 25% 98%);
+  --sidebar-accent: hsl(150 45% 32% / 0.12);
+  --sidebar-accent-foreground: hsl(24 10% 10%);
+  --sidebar-border: hsl(28 14% 82%);
+  --sidebar-ring: hsl(150 45% 32%);
 }
 
+/* Dark mode left at shadcn defaults (inert — nothing toggles `.dark` yet).
+   When we want a proper dark theme it lands as its own slice. */
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -121,10 +145,15 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    font-family: var(--font-mono);
+    color-scheme: light;
+  }
   body {
     @apply bg-background text-foreground;
   }
-  html {
-    @apply font-mono;
+  ::selection {
+    background: hsl(150 45% 32% / 0.18);
+    color: var(--foreground);
   }
 }

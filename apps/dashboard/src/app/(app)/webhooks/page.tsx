@@ -9,6 +9,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -24,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/app/confirm-dialog";
 
 type Endpoint = {
   id: string;
@@ -49,6 +51,7 @@ export default function WebhooksPage() {
   const [secretReveal, setSecretReveal] = useState<CreateResponse | null>(
     null,
   );
+  const [pendingDelete, setPendingDelete] = useState<Endpoint | null>(null);
 
   async function refresh() {
     setError(null);
@@ -109,7 +112,6 @@ export default function WebhooksPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm("Delete this webhook endpoint?")) return;
     try {
       await apiFetch(`/v1/webhook-endpoints/${id}`, { method: "DELETE" });
       toast.success("Endpoint deleted.");
@@ -156,7 +158,7 @@ export default function WebhooksPage() {
         </CardHeader>
         <form onSubmit={handleCreate}>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="hook-url">URL</Label>
               <Input
                 id="hook-url"
@@ -168,7 +170,7 @@ export default function WebhooksPage() {
               />
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label htmlFor="hook-events">Events filter (optional)</Label>
                 <Input
                   id="hook-events"
@@ -177,7 +179,7 @@ export default function WebhooksPage() {
                   onChange={(e) => setEvents(e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label htmlFor="hook-desc">Description (optional)</Label>
                 <Input
                   id="hook-desc"
@@ -188,12 +190,12 @@ export default function WebhooksPage() {
               </div>
             </div>
           </CardContent>
-          <CardContent className="pt-0">
+          <CardFooter className="justify-end">
             <Button type="submit" disabled={creating}>
               <Plus className="size-4" />
               {creating ? "Creating…" : "Create endpoint"}
             </Button>
-          </CardContent>
+          </CardFooter>
         </form>
       </Card>
 
@@ -253,7 +255,7 @@ export default function WebhooksPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleDelete(ep.id)}
+                    onClick={() => setPendingDelete(ep)}
                   >
                     <Trash className="size-4" />
                     Delete
@@ -295,6 +297,30 @@ export default function WebhooksPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        title="Delete this endpoint?"
+        description={
+          pendingDelete ? (
+            <>
+              Deliveries to{" "}
+              <span className="font-medium text-foreground">
+                {pendingDelete.url}
+              </span>{" "}
+              will stop immediately.
+            </>
+          ) : null
+        }
+        confirmLabel="Delete endpoint"
+        variant="destructive"
+        onConfirm={async () => {
+          if (pendingDelete) await handleDelete(pendingDelete.id);
+        }}
+      />
     </div>
   );
 }

@@ -31,6 +31,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/app/confirm-dialog";
 
 type ApiKey = {
   id: string;
@@ -52,6 +53,7 @@ export default function ApiKeysPage() {
   const [prefix, setPrefix] = useState<"lmp_live_" | "lmp_test_">("lmp_live_");
   const [creating, setCreating] = useState(false);
   const [plaintext, setPlaintext] = useState<CreateResponse | null>(null);
+  const [pendingRevoke, setPendingRevoke] = useState<ApiKey | null>(null);
 
   async function refresh() {
     setError(null);
@@ -99,7 +101,6 @@ export default function ApiKeysPage() {
   }
 
   async function handleRevoke(id: string) {
-    if (!window.confirm("Revoke this API key? This cannot be undone.")) return;
     try {
       await apiFetch(`/v1/api-keys/${id}`, { method: "DELETE" });
       toast.success("Key revoked.");
@@ -222,7 +223,7 @@ export default function ApiKeysPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleRevoke(k.id)}
+                      onClick={() => setPendingRevoke(k)}
                     >
                       <Trash className="size-4" />
                       Revoke
@@ -265,6 +266,29 @@ export default function ApiKeysPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={pendingRevoke !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingRevoke(null);
+        }}
+        title="Revoke this API key?"
+        description={
+          pendingRevoke ? (
+            <>
+              <span className="font-medium text-foreground">
+                {pendingRevoke.name}
+              </span>{" "}
+              will stop working immediately. This cannot be undone.
+            </>
+          ) : null
+        }
+        confirmLabel="Revoke key"
+        variant="destructive"
+        onConfirm={async () => {
+          if (pendingRevoke) await handleRevoke(pendingRevoke.id);
+        }}
+      />
     </div>
   );
 }

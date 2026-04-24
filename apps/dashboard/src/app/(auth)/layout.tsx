@@ -4,13 +4,13 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex-1 flex items-center justify-center bg-muted/30 px-4 py-12">
-      <div className="w-full max-w-sm">
-        <div className="mb-6 text-center">
-          <div className="text-lg font-semibold tracking-tight">
+    <div className="flex-1 flex min-h-screen items-center justify-center px-4 py-16">
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center space-y-1.5">
+          <div className="text-xl font-semibold tracking-tight">
             letmepost.dev
           </div>
-          <div className="text-xs text-muted-foreground">
+          <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
             operator dashboard
           </div>
         </div>

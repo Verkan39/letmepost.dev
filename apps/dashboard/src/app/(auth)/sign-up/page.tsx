@@ -83,36 +83,40 @@ export default function SignUpPage() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Create an account</CardTitle>
-        <CardDescription>
-          One user, one organization. You can invite teammates later.
-        </CardDescription>
-      </CardHeader>
-      <form onSubmit={onSubmit}>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
+    <form onSubmit={onSubmit}>
+      <Card className="py-6 gap-6">
+        <CardHeader className="gap-1.5 px-6">
+          <CardTitle className="text-base font-semibold">
+            Create an account
+          </CardTitle>
+          <CardDescription>
+            One user, one organization. You can invite teammates later.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-6 space-y-4">
+          <div className="space-y-1.5">
             <Label htmlFor="name">Your name</Label>
             <Input
               id="name"
               required
+              className="h-9 text-sm"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               type="email"
               autoComplete="email"
               required
+              className="h-9 text-sm"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="password">Password</Label>
             <Input
               id="password"
@@ -120,33 +124,40 @@ export default function SignUpPage() {
               autoComplete="new-password"
               minLength={8}
               required
+              className="h-9 text-sm"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="orgName">Organization name</Label>
             <Input
               id="orgName"
               required
               placeholder="Acme Robotics"
+              className="h-9 text-sm"
               value={orgName}
               onChange={(e) => setOrgName(e.target.value)}
             />
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col gap-3">
-          <Button type="submit" className="w-full" disabled={submitting}>
+        <CardFooter className="px-6 py-4 flex-col items-stretch gap-3">
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full"
+            disabled={submitting}
+          >
             {submitting ? "Creating…" : "Create account"}
           </Button>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground text-center">
             Already have an account?{" "}
-            <Link className="underline" href="/sign-in">
+            <Link className="underline underline-offset-2" href="/sign-in">
               Sign in
             </Link>
           </p>
         </CardFooter>
-      </form>
-    </Card>
+      </Card>
+    </form>
   );
 }

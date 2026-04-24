@@ -83,18 +83,18 @@ export function AppSidebar() {
               size="lg"
               className="data-[state=open]:bg-sidebar-accent"
             >
-              <div className="flex size-8 items-center justify-center bg-primary text-primary-foreground text-xs font-semibold">
+              <div className="flex size-8 shrink-0 items-center justify-center bg-primary text-primary-foreground text-xs font-semibold">
                 LM
               </div>
-              <div className="flex flex-col leading-none text-left">
+              <div className="flex flex-col leading-none text-left min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
                 <span className="text-sm font-semibold truncate">
                   {activeOrg?.name ?? "No organization"}
                 </span>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground truncate">
                   letmepost.dev
                 </span>
               </div>
-              <CaretUpDown className="ml-auto size-4" />
+              <CaretUpDown className="ml-auto size-4 shrink-0 group-data-[collapsible=icon]:hidden" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
@@ -179,10 +179,10 @@ export function AppSidebar() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton size="lg">
-              <Avatar className="size-8">
+              <Avatar className="size-8 shrink-0">
                 <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
-              <div className="flex flex-col leading-none text-left overflow-hidden">
+              <div className="flex flex-col leading-none text-left min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
                 <span className="text-sm font-semibold truncate">
                   {session?.user.name ?? session?.user.email ?? "Account"}
                 </span>
@@ -190,7 +190,7 @@ export function AppSidebar() {
                   {session?.user.email ?? ""}
                 </span>
               </div>
-              <CaretUpDown className="ml-auto size-4" />
+              <CaretUpDown className="ml-auto size-4 shrink-0 group-data-[collapsible=icon]:hidden" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">

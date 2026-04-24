@@ -6,20 +6,18 @@ import PlatformIcon from "../components/PlatformIcon.astro";
 
 const platforms = [
   { name: "Bluesky", slug: "bluesky", status: "live" },
-  { name: "LinkedIn", slug: "linkedin", status: "next" },
-  { name: "Twitter / X", slug: "x", status: "soon" },
-  { name: "Instagram", slug: "instagram", status: "soon" },
-  { name: "Facebook", slug: "facebook", status: "soon" },
-  { name: "Threads", slug: "threads", status: "soon" },
-  { name: "TikTok", slug: "tiktok", status: "later" },
-  { name: "Pinterest", slug: "pinterest", status: "later" },
+  { name: "Pinterest", slug: "pinterest", status: "under_review" },
+  { name: "Twitter / X", slug: "x", status: "under_review" },
+  { name: "LinkedIn", slug: "linkedin", status: "under_review" },
+  { name: "Instagram", slug: "instagram", status: "under_review" },
+  { name: "Facebook", slug: "facebook", status: "under_review" },
+  { name: "Threads", slug: "threads", status: "under_review" },
+  { name: "TikTok", slug: "tiktok", status: "under_review" },
 ] as const;
 
 const statusLabel: Record<string, string> = {
   live: "live",
-  next: "next",
-  soon: "soon",
-  later: "later",
+  under_review: "under review",
 };
 
 const codeSample = `// Idempotency keys make retries safe.
@@ -92,7 +90,7 @@ const methodClasses: Record<string, string> = {
 const faqs = [
   {
     q: "What actually works today?",
-    a: 'Bluesky is live end-to-end — connect an account, send a post, get a webhook back. LinkedIn is next (~3 weeks of build). Meta and TikTok are review-gated by the platforms themselves and take 6–12 weeks from app submission. See the <a href="https://github.com/rosekamallove/letmepost.dev/blob/main/plan.md">plan</a> for dates.',
+    a: 'Bluesky is live end-to-end — connect an account, send a post, get a webhook back. Pinterest and Twitter/X publishers are built and tested but waiting on platform review (Pinterest Standard access; X Elevated write tier). LinkedIn, Meta (Instagram / Facebook / Threads), and TikTok are review-gated and typically clear 2–12 weeks from submission. See the <a href="https://github.com/rosekamallove/letmepost.dev/blob/main/plan.md">plan</a> for dates.',
   },
   {
     q: "Why another social media API?",
@@ -118,7 +116,7 @@ const faqs = [
 
 function glyphClasses(status: string): string {
   if (status === "live") return "bg-success opacity-100";
-  if (status === "next") return "bg-accent opacity-100";
+  if (status === "under_review") return "bg-accent opacity-100";
   return "bg-text-muted opacity-50";
 }
 
@@ -401,8 +399,9 @@ const liveGlyphShadow =
     <div class="container">
       <h2 class="!mt-0">Platform support.</h2>
       <p class="text-text-muted">
-        Bluesky first — it forced us to build the token-refresh story for every
-        other platform. The rest follow in the order the data pointed to.
+        Bluesky is live. Everything else is either built and awaiting platform
+        approval, or approvals are in flight while we build. We'll flip each
+        row to live the moment review clears.
       </p>
 
       <ul class="list-none p-0 mt-6 mb-5">

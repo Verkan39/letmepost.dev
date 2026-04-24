@@ -25,13 +25,13 @@ The goal is not to match any competitor's feature count. The goal is to be the p
 
 These are calendar-gated and take months. Start them all before writing any Phase 1 code.
 
-| Action | Why Day 0 | Expected wait |
-|---|---|---|
-| **Meta App Review** (IG Graph + FB Pages + Threads) | 2–8 weeks per review cycle, rejections normal, business verification is its own slog | 6–12 weeks realistic |
-| **TikTok Content Posting API** approval | Manual review, audit-state gate, "direct-post" is a separate review from "upload" | 4–10 weeks |
-| **X API paid tier** (Basic $200/mo minimum) | Paid billing near-instant; Elevated write + use-case review 1–3 weeks | 1–3 weeks |
-| **LinkedIn MDP / Community Management API** application | Many post scopes require MDP approval; we want this ready by Phase 6 | 2–6 weeks |
-| **Pinterest developer account + trial access** | Needed by Phase 11 | 1–2 weeks |
+| Action | Why Day 0 | Expected wait | Buildable pre-approval? |
+|---|---|---|---|
+| **Meta App Review** (IG Graph + FB Pages + Threads) | 2–8 weeks per review cycle, rejections normal, business verification is its own slog | 6–12 weeks realistic | **Yes.** App in Development Mode can publish to the developer's own account + any account registered as a Tester. Same Graph API endpoints, same response shapes as post-approval — approval only lifts the "testers only" restriction. Phase 9 is genuinely a same-day deploy on approval. |
+| **TikTok Content Posting API** approval | Manual review, audit-state gate, "direct-post" is a separate review from "upload" | 4–10 weeks | **Yes.** Explicit Sandbox Mode. Unaudited clients can post, restricted to `SELF_ONLY` privacy — matches our audit-state preflight design exactly (we already plan to surface `SELF_ONLY` as a non-fatal `post.validated` warning). Build Phase 10 against real TikTok during the wait. |
+| **X API paid tier** | Paid billing near-instant; Elevated write + use-case review 1–3 weeks. **⚠ Feb 2026 shift:** X killed tiered pricing for new signups — Basic/Pro are closed to new developers; pay-per-use is the new floor. Budget starts accruing from Phase 8 start, not from launch. Revisit whether X stays in v1. | 1–3 weeks | **Partial.** No free write path; pay-per-use bills from the first call. |
+| **LinkedIn MDP / Community Management API** application | Many post scopes require MDP approval; we want this ready by Phase 6 | 2–6 weeks | **Partial.** Personal-account posting (`w_member_social`, Share on LinkedIn product) works on the standard dev tier without MDP. MDP / Community Management API gates **org- and company-page** posting only. ~60–70% of Phase 6 (personal posts, preflight suite, version-pinning layer, person-URN validation) is buildable day 0; the org-post codepath waits on approval. |
+| **Pinterest developer account + trial access** | Needed by Phase 11 | 1–2 weeks | **Yes.** Trial Access is the sandbox — all endpoints exposed, pins private to creator until Standard approval (requires a video of the OAuth flow). |
 
 Also Day 0 (non-gating, cheap): register `letmepost` GitHub org, reserve `@letmepost` npm scope, reserve `letmepost` on PyPI, create empty `letmepost/sdk-python` and `letmepost/sdk-go` repos.
 

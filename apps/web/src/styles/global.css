@@ -40,8 +40,8 @@
   --http-delete: hsl(0 70% 50%);
 
   /* Typography */
-  --font-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular",
-    "Menlo", "Consolas", monospace;
+  --font-mono: "Commit Mono", ui-monospace, "SFMono-Regular", "Menlo",
+    "Consolas", monospace;
   --font-serif: "Instrument Serif", ui-serif, Georgia, "Times New Roman", serif;
 
   /* ONE max-width */

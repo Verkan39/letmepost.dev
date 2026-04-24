@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.2.1",
-    "@fontsource-variable/jetbrains-mono": "^5.1.1",
+    "@fontsource/commit-mono": "^5.2.5",
     "@fontsource/instrument-serif": "^5.2.8",
     "@iconify-json/ph": "^1.2.2",
     "@resvg/resvg-js": "^2.6.2",

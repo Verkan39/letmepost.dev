@@ -12,11 +12,7 @@ import { apiKeyAuth } from "../middleware/api-key.js";
 import { idempotency } from "../middleware/idempotency.js";
 import { assertKeyCanAccessProfile } from "../middleware/profile-scope.js";
 import { rateLimit } from "../middleware/rate-limit.js";
-import { blueskyPublisher } from "../platforms/bluesky/publisher.js";
-import { linkedinPublisher } from "../platforms/linkedin/publisher.js";
-import { pinterestPublisher } from "../platforms/pinterest/publisher.js";
-import { twitterPublisher } from "../platforms/twitter/publisher.js";
-import type { DecryptedPlatformAccount } from "../repositories/platform-accounts.js";
+import { publishForAccount } from "../platforms/_shared/dispatch.js";
 import { DrizzlePlatformAccountsRepository } from "../repositories/platform-accounts.js";
 
 export const posts = new Hono();
@@ -189,7 +185,7 @@ posts.post(
     }
 
     try {
-      const result = await publishFor(account, {
+      const result = await publishForAccount(account, {
         text,
         ...(media !== undefined ? { media } : {}),
         ...(firstComment !== undefined ? { firstComment } : {}),
@@ -312,100 +308,3 @@ function letmepostErrorToRecord(err: unknown): Record<string, unknown> {
   };
 }
 
-/**
- * Platform-dispatch. Each platform has its own `Publisher` implementation
- * with a platform-specific input shape — the switch here unpacks the generic
- * post body into the shape each publisher wants. Kept hand-rolled (not
- * registry-driven) because the per-platform input shapes are load-bearing
- * on types.
- *
- * Pinterest MVP: boardId/destinationUrl/imageUrl are pulled from the
- * account's tokenMetadata (populated at connect time or via a direct DB
- * write). The per-post pinterest shape is a Phase 11 follow-up.
- */
-type PostPublishInput = {
-  text: string;
-  media?: Parameters<typeof blueskyPublisher.publish>[1]["media"];
-  firstComment?: Parameters<typeof blueskyPublisher.publish>[1]["firstComment"];
-};
-
-async function publishFor(
-  account: DecryptedPlatformAccount,
-  input: PostPublishInput,
-): Promise<CreatePostResponse> {
-  switch (account.platform) {
-    case "bluesky": {
-      const blueskyInput: Parameters<typeof blueskyPublisher.publish>[1] = {
-        text: input.text,
-      };
-      if (input.media !== undefined) blueskyInput.media = input.media;
-      if (input.firstComment !== undefined) {
-        blueskyInput.firstComment = input.firstComment;
-      }
-      return blueskyPublisher.publish(
-        { handle: account.platformAccountId, appPassword: account.token },
-        blueskyInput,
-      );
-    }
-    case "linkedin": {
-      const meta = (account.tokenMetadata ?? {}) as Record<string, unknown>;
-      const authorUrn =
-        typeof meta.authorUrn === "string" && meta.authorUrn.length > 0
-          ? meta.authorUrn
-          : `urn:li:person:${account.platformAccountId}`;
-      return linkedinPublisher.publish(
-        { accessToken: account.token, authorUrn },
-        { text: input.text, authorUrn },
-      );
-    }
-    case "twitter":
-      return twitterPublisher.publish(
-        {
-          accessToken: account.token,
-          userId: account.platformAccountId,
-        },
-        {
-          text: input.text,
-          ...(input.media !== undefined ? { media: input.media } : {}),
-        },
-      );
-    case "pinterest": {
-      const meta = (account.tokenMetadata ?? {}) as Record<string, unknown>;
-      const boardId = pickString(meta.boardId) ?? pickString(meta.board_id);
-      const destinationUrl =
-        pickString(meta.destinationUrl) ?? pickString(meta.destination_url);
-      const imageUrl =
-        pickString(meta.imageUrl) ?? pickString(meta.image_url);
-      if (!boardId || !destinationUrl || !imageUrl) {
-        throw new LetmepostError({
-          code: "validation_failed",
-          status: 400,
-          message:
-            "Pinterest posts need boardId, destinationUrl, and imageUrl set on the account metadata (MVP).",
-          rule: "pinterest.account_metadata.required",
-          remediation:
-            "Populate boardId/destinationUrl/imageUrl on platformAccount.tokenMetadata or wait for the Phase 11 per-post media slice.",
-        });
-      }
-      return pinterestPublisher.publish(
-        { accessToken: account.token },
-        {
-          boardId,
-          destinationUrl,
-          imageUrl,
-          ...(input.text !== undefined ? { text: input.text } : {}),
-        },
-      );
-    }
-    default:
-      throw new LetmepostError({
-        code: "validation_failed",
-        status: 400,
-        message: `Unknown platform: ${account.platform}.`,
-      });
-  }
-}
-
-function pickString(v: unknown): string | undefined {
-  return typeof v === "string" && v.length > 0 ? v : undefined;
-}

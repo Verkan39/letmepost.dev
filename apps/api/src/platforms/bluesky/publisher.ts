@@ -1,5 +1,8 @@
 import type { CreatePostResponse, MediaInput } from "@letmepost/schemas";
-import { LetmepostError } from "../../errors.js";
+import {
+  loadMediaItem as sharedLoadMediaItem,
+  type LoadedMediaItem as SharedLoadedMediaItem,
+} from "../_shared/media.js";
 import type { Publisher } from "../_shared/publisher.js";
 import {
   BlueskyClient,
@@ -33,68 +36,14 @@ export type BlueskyPublishInput = {
   firstComment?: { text: string };
 };
 
-/**
- * A media item with bytes + mime type resolved, ready for preflight + upload.
- */
-interface LoadedMediaItem extends ResolvedMediaItem {
-  bytes: Uint8Array;
-}
+/** A media item with bytes resolved, ready for preflight + upload. */
+type LoadedMediaItem = SharedLoadedMediaItem;
 
-async function loadMediaItem(item: MediaInput): Promise<LoadedMediaItem> {
-  let bytes: Uint8Array;
-  let mimeType: string;
-
-  if (item.bytesBase64) {
-    bytes = Uint8Array.from(Buffer.from(item.bytesBase64, "base64"));
-    mimeType = item.kind === "image" ? "image/jpeg" : "video/mp4";
-  } else if (item.url) {
-    let res: Response;
-    try {
-      res = await fetch(item.url);
-    } catch {
-      throw new LetmepostError({
-        code: "platform_unavailable",
-        status: 503,
-        message: `Failed to fetch media from ${item.url}.`,
-        remediation:
-          "Verify the media URL is publicly reachable. letmepost fetches synchronously in Phase 3.5.",
-      });
-    }
-    if (!res.ok) {
-      throw new LetmepostError({
-        code: "validation_failed",
-        status: 400,
-        message: `Media URL returned ${res.status}: ${item.url}`,
-        remediation:
-          "Ensure the URL is public and returns 200. Consider inlining bytesBase64 for authenticated sources.",
-      });
-    }
-    const buf = await res.arrayBuffer();
-    bytes = new Uint8Array(buf);
-    const contentType = res.headers.get("content-type");
-    if (contentType && contentType.length > 0) {
-      // Strip parameters (e.g. "image/jpeg; charset=binary").
-      mimeType = contentType.split(";")[0]!.trim().toLowerCase();
-    } else {
-      mimeType = item.kind === "image" ? "image/jpeg" : "video/mp4";
-    }
-  } else {
-    // Zod refinement should prevent this, but keep a loud fallback.
-    throw new LetmepostError({
-      code: "validation_failed",
-      status: 400,
-      message: "Media item must provide either 'url' or 'bytesBase64'.",
-    });
-  }
-
-  const resolved: LoadedMediaItem = {
-    kind: item.kind,
-    mimeType,
-    byteLength: bytes.byteLength,
-    bytes,
-  };
-  if (item.altText !== undefined) resolved.altText = item.altText;
-  return resolved;
+function loadMediaItem(item: MediaInput): Promise<LoadedMediaItem> {
+  return sharedLoadMediaItem(item, {
+    platform: "bluesky",
+    reachableRule: "bluesky.media.reachable",
+  });
 }
 
 function buildEmbed(

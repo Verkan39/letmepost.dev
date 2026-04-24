@@ -2,7 +2,9 @@ import { z } from "zod";
 
 export const Platform = z.enum([
   "bluesky",
-  // Future: "linkedin", "twitter", "instagram", "facebook", "threads", "tiktok", "pinterest"
+  "pinterest",
+  "twitter",
+  // Future: "linkedin", "instagram", "facebook", "threads", "tiktok"
 ]);
 export type Platform = z.infer<typeof Platform>;
 

@@ -13,6 +13,8 @@ import {
   shouldEmitExpiringNotice,
 } from "../platforms/_shared/refresh.js";
 import { blueskyPublisher } from "../platforms/bluesky/publisher.js";
+import { pinterestPublisher } from "../platforms/pinterest/publisher.js";
+import { twitterPublisher } from "../platforms/twitter/publisher.js";
 import { DrizzlePlatformAccountsRepository } from "../repositories/platform-accounts.js";
 import { deliverWebhook } from "../webhooks/deliver.js";
 import { createDefaultWebhookDispatcher } from "../webhooks/dispatch.js";
@@ -89,6 +91,35 @@ const publishWorker = new Worker<PublishJobData>(
             { text: post.text },
           );
           break;
+        case "twitter":
+          result = await twitterPublisher.publish(
+            { accessToken: account.token, userId: account.platformAccountId },
+            { text: post.text },
+          );
+          break;
+        case "pinterest": {
+          const meta = (account.tokenMetadata ?? {}) as Record<string, unknown>;
+          const boardId = pickString(meta.boardId) ?? pickString(meta.board_id);
+          const destinationUrl =
+            pickString(meta.destinationUrl) ?? pickString(meta.destination_url);
+          const imageUrl =
+            pickString(meta.imageUrl) ?? pickString(meta.image_url);
+          if (!boardId || !destinationUrl || !imageUrl) {
+            throw new LetmepostError({
+              code: "validation_failed",
+              status: 400,
+              platform: "pinterest",
+              message:
+                "Pinterest scheduled post needs boardId/destinationUrl/imageUrl on tokenMetadata (MVP).",
+              rule: "pinterest.account_metadata.required",
+            });
+          }
+          result = await pinterestPublisher.publish(
+            { accessToken: account.token },
+            { boardId, destinationUrl, imageUrl, text: post.text },
+          );
+          break;
+        }
         default:
           throw new LetmepostError({
             code: "validation_failed",
@@ -367,6 +398,10 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
+
+function pickString(v: unknown): string | undefined {
+  return typeof v === "string" && v.length > 0 ? v : undefined;
+}
 
 console.log(
   `[worker] started — queues: ${Object.values(QUEUE_NAMES).join(", ")}`,

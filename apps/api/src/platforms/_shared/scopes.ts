@@ -29,6 +29,22 @@ const SCOPES: Record<Platform, PlatformScopeSet> = {
     write: [],
     extended: [],
   },
+  pinterest: {
+    kind: "oauth",
+    // MVP scope for Pinterest publish: read the caller's boards, read/write
+    // pins. Pinterest requires `pins:read` alongside `pins:write` because
+    // some endpoints echo the pin back on create.
+    write: ["boards:read", "pins:read", "pins:write"],
+    extended: ["user_accounts:read", "pins:read_secret"],
+  },
+  twitter: {
+    kind: "oauth",
+    // X OAuth 2.0 scopes: posting needs `tweet.write`; `tweet.read` +
+    // `users.read` are required to mint the token at all; `offline.access`
+    // is what makes X issue a refresh token.
+    write: ["tweet.write", "tweet.read", "users.read", "offline.access"],
+    extended: ["like.read", "follows.read"],
+  },
 };
 
 export function writeScopesFor(platform: Platform): readonly string[] {

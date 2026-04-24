@@ -17,6 +17,18 @@ export type ConnectDescriptor =
       authorizationUrl: string;
       state: string;
       scopes: readonly string[];
+      /**
+       * Absolute redirect URI the provider baked into `authorizationUrl`.
+       * The client must echo it back on completeConnect so we sign the same
+       * exchange we advertised.
+       */
+      redirectUri: string;
+      /**
+       * PKCE code verifier for providers that use it (Twitter). The client
+       * must stash this across the redirect round-trip and send it back to
+       * completeConnect. Undefined for non-PKCE providers.
+       */
+      codeVerifier?: string;
     }
   | {
       kind: "credentials";

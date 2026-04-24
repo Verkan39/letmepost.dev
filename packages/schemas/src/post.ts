@@ -8,6 +8,18 @@ export const BLUESKY_IMAGE_MAX_BYTES = 1_000_000;
 export const BLUESKY_VIDEO_MAX_BYTES = 100_000_000;
 export const BLUESKY_ALT_TEXT_MAX_GRAPHEMES = 2000;
 
+// Pinterest (v5 API, OAuth 2.0). MVP: single-image pin from URL only.
+export const PINTEREST_IMAGE_MAX_BYTES = 20_000_000;
+
+// Twitter / X (v2 API, OAuth 2.0 PKCE).
+// t.co wraps every URL to a fixed length regardless of the real URL length —
+// the counter subtracts the real URL length and adds this constant.
+export const TWITTER_MAX_GRAPHEMES = 280;
+export const TWITTER_TCO_URL_LENGTH = 23;
+export const TWITTER_IMAGE_MAX_BYTES = 5_000_000;
+export const TWITTER_GIF_MAX_BYTES = 15_000_000;
+export const TWITTER_VIDEO_MAX_BYTES = 512_000_000;
+
 /**
  * A single media item on a post. The caller provides bytes either inline
  * (`bytesBase64`) or by URL (`url`) — the publisher resolves to bytes before

@@ -1,8 +1,13 @@
 import { Worker, UnrecoverableError } from "bullmq";
 import { and, eq, isNull } from "drizzle-orm";
+import { LetmepostError } from "../errors.js";
 import { db } from "../db/instance.js";
+import { posts as postsTable } from "../db/schema/posts.js";
 import { webhookEndpoints } from "../db/schema/webhook_endpoints.js";
+import { blueskyPublisher } from "../platforms/bluesky/publisher.js";
+import { DrizzlePlatformAccountsRepository } from "../repositories/platform-accounts.js";
 import { deliverWebhook } from "../webhooks/deliver.js";
+import { createDefaultWebhookDispatcher } from "../webhooks/dispatch.js";
 import { createRedisConnection } from "./connection.js";
 import {
   QUEUE_NAMES,
@@ -17,28 +22,180 @@ import {
  * Worker entrypoint — `pnpm worker` starts this file. Boots one Worker per
  * queue against the shared Redis connection.
  *
- * The `publish`, `validate`, and `refresh-token` processors are stubs for this
- * slice; they'll be filled in when the publisher is wired onto the queue on
- * main. The `webhook-deliver` processor IS implemented — see below.
+ * The `publish` worker processes scheduled posts: re-reads the posts row,
+ * decrypts the platform token, publishes, updates the row, and dispatches
+ * the appropriate lifecycle event. Immediate posts don't touch this worker
+ * — the request handler publishes inline.
  */
 
 const connection = createRedisConnection();
+const dispatcher = createDefaultWebhookDispatcher(db);
 
 const publishWorker = new Worker<PublishJobData>(
   QUEUE_NAMES.publish,
-  async (_job) => {
-    throw new Error(
-      "publish worker not implemented — integration step on main will wire this up",
-    );
+  async (job) => {
+    const { postId, organizationId, requestId } = job.data;
+
+    const [post] = await db
+      .select()
+      .from(postsTable)
+      .where(eq(postsTable.id, postId))
+      .limit(1);
+    if (!post) {
+      throw new UnrecoverableError(
+        `publish worker: posts row ${postId} not found — likely deleted between enqueue and run`,
+      );
+    }
+    if (post.status === "published") {
+      // Idempotent replay — someone already finalised this post.
+      return { skipped: true, reason: "already-published" };
+    }
+
+    await db
+      .update(postsTable)
+      .set({ status: "publishing" })
+      .where(eq(postsTable.id, post.id));
+
+    const repo = new DrizzlePlatformAccountsRepository(db);
+    const account = await repo.findById(post.accountId);
+    if (!account) {
+      const err = new LetmepostError({
+        code: "internal_error",
+        status: 500,
+        message: "Platform account no longer exists — scheduled post cannot run.",
+      });
+      await finaliseFailure(post.id, err, account, organizationId, requestId);
+      throw new UnrecoverableError(err.message);
+    }
+
+    try {
+      let result;
+      switch (account.platform) {
+        case "bluesky":
+          result = await blueskyPublisher.publish(
+            {
+              handle: account.platformAccountId,
+              appPassword: account.token,
+            },
+            { text: post.text },
+          );
+          break;
+        default:
+          throw new LetmepostError({
+            code: "validation_failed",
+            status: 400,
+            message: `Unknown platform: ${account.platform}.`,
+          });
+      }
+
+      const publishedAt = new Date();
+      await db
+        .update(postsTable)
+        .set({
+          status: "published",
+          platformUri: result.uri ?? null,
+          platformCid: result.cid ?? null,
+          publishedAt,
+        })
+        .where(eq(postsTable.id, post.id));
+
+      await dispatcher.dispatch({
+        organizationId,
+        type: "post.published",
+        data: {
+          id: post.id,
+          platform: account.platform,
+          accountId: account.id,
+          uri: result.uri,
+          cid: result.cid,
+          publishedAt: publishedAt.toISOString(),
+        },
+        ...(requestId ? { requestId } : {}),
+      });
+
+      return { ok: true, uri: result.uri, cid: result.cid };
+    } catch (err) {
+      await finaliseFailure(post.id, err, account, organizationId, requestId);
+      // 4xx-family errors → don't retry (preflight / platform_rejected /
+      // platform_auth_failed). Transient errors bubble up so BullMQ retries.
+      if (err instanceof LetmepostError) {
+        const permanent =
+          err.code === "preflight_failed" ||
+          err.code === "platform_rejected" ||
+          err.code === "platform_auth_failed" ||
+          err.code === "validation_failed";
+        if (permanent) {
+          throw new UnrecoverableError(err.message);
+        }
+      }
+      throw err;
+    }
   },
   { connection },
 );
+
+async function finaliseFailure(
+  postId: string,
+  err: unknown,
+  account: { id: string; platform: string } | null,
+  organizationId: string,
+  requestId: string | undefined,
+): Promise<void> {
+  const status =
+    err instanceof LetmepostError &&
+    (err.code === "preflight_failed" ||
+      err.code === "platform_rejected" ||
+      err.code === "platform_auth_failed")
+      ? "rejected"
+      : "failed";
+  const eventType = status === "rejected" ? "post.rejected" : "post.failed";
+
+  const errorRecord =
+    err instanceof LetmepostError
+      ? {
+          code: err.code,
+          message: err.message,
+          ...(err.rule ? { rule: err.rule } : {}),
+          ...(err.platform ? { platform: err.platform } : {}),
+          ...(err.platformResponse !== undefined
+            ? { platformResponse: err.platformResponse }
+            : {}),
+          ...(err.remediation ? { remediation: err.remediation } : {}),
+        }
+      : {
+          code: "internal_error",
+          message: err instanceof Error ? err.message : String(err),
+        };
+
+  await db
+    .update(postsTable)
+    .set({ status, error: errorRecord })
+    .where(eq(postsTable.id, postId));
+
+  if (!account) return;
+  await dispatcher
+    .dispatch({
+      organizationId,
+      type: eventType,
+      data: {
+        id: postId,
+        platform: account.platform,
+        accountId: account.id,
+        error: errorRecord,
+        rejectedAt: new Date().toISOString(),
+      },
+      ...(requestId ? { requestId } : {}),
+    })
+    .catch((e: unknown) => {
+      console.error("[worker] failure-event dispatch failed", e);
+    });
+}
 
 const validateWorker = new Worker<ValidateJobData>(
   QUEUE_NAMES.validate,
   async (_job) => {
     throw new Error(
-      "validate worker not implemented — integration step on main will wire this up",
+      "validate worker not implemented — standalone validate endpoint lands in Phase 6",
     );
   },
   { connection },
@@ -71,7 +228,6 @@ const webhookDeliverWorker = new Worker<WebhookDeliverJobData>(
       .limit(1);
 
     if (!endpoint) {
-      // Endpoint deleted/disabled between enqueue and delivery — don't retry.
       throw new UnrecoverableError(
         `webhook endpoint ${endpointId} not found or disabled`,
       );
@@ -91,17 +247,12 @@ const webhookDeliverWorker = new Worker<WebhookDeliverJobData>(
 
     if (result.ok) return result;
 
-    // 4xx → permanent. Use UnrecoverableError so BullMQ skips the remaining
-    // attempts and parks the job in the failed set immediately.
     if (result.nonRetryable) {
       throw new UnrecoverableError(
         `webhook delivery rejected with ${result.status} (non-retryable)`,
       );
     }
 
-    // 5xx / network → plain throw so BullMQ schedules the next exponential
-    // backoff attempt. After `attempts` is exhausted the job lands in the
-    // failed set — our DLQ.
     throw new Error(
       `webhook delivery failed with status ${result.status}${
         result.errorName ? ` (${result.errorName})` : ""

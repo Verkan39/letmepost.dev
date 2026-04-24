@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AccountRef } from "./platforms.js";
+import { PostStatus } from "./post-status.js";
 
 export const BLUESKY_MAX_GRAPHEMES = 300;
 export const BLUESKY_MAX_IMAGES = 4;
@@ -52,15 +53,29 @@ export const CreatePostRequest = z.object({
   text: z.string().min(1),
   media: z.array(MediaInput).optional(),
   firstComment: FirstComment.optional(),
+  /**
+   * ISO-8601 datetime. If set and in the future, the post is persisted with
+   * status="queued" and a delayed job is scheduled on the publish queue —
+   * the endpoint returns 202 immediately. If absent, the post runs
+   * synchronously and returns 201.
+   */
+  scheduledAt: z.string().datetime().optional(),
 });
 export type CreatePostRequest = z.infer<typeof CreatePostRequest>;
 
 export const CreatePostResponse = z.object({
   id: z.string(),
   platform: z.string(),
+  /**
+   * Lifecycle state — "queued" for scheduled posts (returned with 202),
+   * "published" for successful immediate posts (returned with 201).
+   */
+  status: PostStatus.optional(),
   uri: z.string().optional(),
   cid: z.string().optional(),
   createdAt: z.string(),
+  /** Echoed back on scheduled posts so callers can confirm the parse. */
+  scheduledAt: z.string().optional(),
   firstCommentUri: z.string().optional(),
   firstCommentCid: z.string().optional(),
   /**

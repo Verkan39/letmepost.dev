@@ -24,12 +24,16 @@ export const QUEUE_NAMES = {
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 
-/** Publish a queued post. Stubbed — integration step fills this in. */
+/**
+ * Publish a queued post. The worker re-reads the `posts` row by id to pick
+ * up text, media, first-comment, and the account reference — we don't
+ * serialize credentials through Redis.
+ */
 export type PublishJobData = {
   postId: string;
   organizationId: string;
-  // Additional fields land when the publisher is wired onto the queue.
-  [extra: string]: unknown;
+  /** Correlates back to the inbound request that enqueued this. */
+  requestId?: string;
 };
 
 /** Run preflight validation without publishing. Stubbed. */

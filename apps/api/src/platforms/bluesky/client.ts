@@ -90,6 +90,36 @@ export class BlueskyClient {
   }
 
   /**
+   * Rotate an existing session using its `refreshJwt`. Returns new access +
+   * refresh JWTs. Throws `platform_auth_failed` if the refresh JWT is
+   * revoked or the PDS is unreachable — caller typically falls back to a
+   * full `createSession` with stored credentials.
+   *
+   * See: https://docs.bsky.app/docs/api/com-atproto-server-refresh-session
+   */
+  static async refreshSession(
+    refreshJwt: string,
+    pdsUrl: string = DEFAULT_PDS,
+  ): Promise<BlueskySession> {
+    const res = await platformFetch<BlueskySession>({
+      method: "POST",
+      url: `${pdsUrl}/xrpc/com.atproto.server.refreshSession`,
+      headers: { Authorization: `Bearer ${refreshJwt}` },
+      platform: PLATFORM,
+    });
+    if (!res.ok || !res.body) {
+      throw authFailed({
+        platform: PLATFORM,
+        platformResponse: res.body ?? res.raw ?? undefined,
+        message: "Bluesky refresh failed — refresh JWT may be revoked or expired.",
+        remediation:
+          "Re-authenticate with the stored app password to obtain a fresh session.",
+      });
+    }
+    return res.body;
+  }
+
+  /**
    * Upload raw bytes to the PDS. The returned `BlobRef` is what you embed in
    * a record's `embed.images[].image` or `embed.video` field.
    */

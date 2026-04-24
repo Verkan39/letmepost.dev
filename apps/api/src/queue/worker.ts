@@ -4,6 +4,14 @@ import { LetmepostError } from "../errors.js";
 import { db } from "../db/instance.js";
 import { posts as postsTable } from "../db/schema/posts.js";
 import { webhookEndpoints } from "../db/schema/webhook_endpoints.js";
+// Side-effect import: register every platform's AccountProvider so the
+// refresh-token worker can look up providers for stored accounts.
+import "../platforms/index.js";
+import { getProvider } from "../platforms/index.js";
+import {
+  computeRefreshDelayMs,
+  shouldEmitExpiringNotice,
+} from "../platforms/_shared/refresh.js";
 import { blueskyPublisher } from "../platforms/bluesky/publisher.js";
 import { DrizzlePlatformAccountsRepository } from "../repositories/platform-accounts.js";
 import { deliverWebhook } from "../webhooks/deliver.js";
@@ -17,6 +25,7 @@ import {
   type WebhookDeliverJobData,
   closeAllQueues,
 } from "./queues.js";
+import { createDefaultTokenRefreshEnqueuer } from "./refresh-enqueue.js";
 
 /**
  * Worker entrypoint — `pnpm worker` starts this file. Boots one Worker per
@@ -201,12 +210,91 @@ const validateWorker = new Worker<ValidateJobData>(
   { connection },
 );
 
+const refreshEnqueuer = createDefaultTokenRefreshEnqueuer();
+
 const refreshTokenWorker = new Worker<RefreshTokenJobData>(
   QUEUE_NAMES.refreshToken,
-  async (_job) => {
-    throw new Error(
-      "refresh-token worker not implemented — Phase 5 (OAuth) wires this up",
-    );
+  async (job) => {
+    const { platformAccountId, organizationId } = job.data;
+    const repo = new DrizzlePlatformAccountsRepository(db);
+    const account = await repo.findById(platformAccountId);
+    if (!account) {
+      // Account deleted between enqueue and run — nothing to refresh.
+      throw new UnrecoverableError(
+        `refresh-token: platform account ${platformAccountId} not found`,
+      );
+    }
+
+    const provider = getProvider(account.platform);
+
+    // Give integrators a heads-up *before* we try to silently refresh — only
+    // for OAuth platforms. Bluesky (credentials) refreshes silently until
+    // revocation.
+    if (shouldEmitExpiringNotice(account.platform)) {
+      await dispatcher
+        .dispatch({
+          organizationId,
+          type: "token.expiring",
+          data: {
+            platform: account.platform,
+            accountId: account.id,
+            platformAccountId: account.platformAccountId,
+            displayName: account.displayName,
+            tokenExpiresAt: account.tokenExpiresAt?.toISOString() ?? null,
+          },
+        })
+        .catch((e: unknown) => {
+          console.error("[refresh] token.expiring dispatch failed", e);
+        });
+    }
+
+    try {
+      const refreshed = await provider.refreshToken({
+        token: account.token,
+        tokenMetadata: account.tokenMetadata,
+      });
+      await repo.updateToken(account.id, {
+        token: refreshed.token,
+        tokenMetadata: refreshed.tokenMetadata,
+        tokenExpiresAt: refreshed.tokenExpiresAt,
+      });
+
+      // Re-schedule the next refresh based on the fresh expiry.
+      const nextDelay = computeRefreshDelayMs(
+        { tokenExpiresAt: refreshed.tokenExpiresAt },
+        provider.expiringHorizonMs,
+      );
+      if (nextDelay !== null) {
+        await refreshEnqueuer.enqueue(
+          { platformAccountId: account.id, organizationId },
+          { delayMs: nextDelay },
+        );
+      }
+      return { ok: true };
+    } catch (err) {
+      // Emit `token.revoked` on auth failure — this is what the integrator
+      // needs to know to kick off human action (reconnect).
+      const isAuthFailure =
+        err instanceof LetmepostError && err.code === "platform_auth_failed";
+      if (isAuthFailure) {
+        await dispatcher
+          .dispatch({
+            organizationId,
+            type: "token.revoked",
+            data: {
+              platform: account.platform,
+              accountId: account.id,
+              platformAccountId: account.platformAccountId,
+              reason: err.message,
+            },
+          })
+          .catch((e: unknown) => {
+            console.error("[refresh] token.revoked dispatch failed", e);
+          });
+        throw new UnrecoverableError(err.message);
+      }
+      throw err;
+    }
   },
   { connection },
 );

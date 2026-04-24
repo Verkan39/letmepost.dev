@@ -4,10 +4,17 @@ import type { DrizzleClient } from "./db/index.js";
 import { db as defaultDb } from "./db/instance.js";
 import { onError } from "./errors.js";
 import type { SessionContext } from "./middleware/session.js";
+// Side-effect import: registers every v1 platform's AccountProvider so
+// `/v1/accounts/:platform` can look them up by name.
+import "./platforms/index.js";
 import {
   createDefaultPublishEnqueuer,
   type PublishEnqueuer,
 } from "./queue/enqueue.js";
+import {
+  accountRoutes,
+  createAccountRoutes,
+} from "./routes/accounts.js";
 import { apiKeyRoutes } from "./routes/api-keys.js";
 import { authRoutes } from "./routes/auth.js";
 import { health } from "./routes/health.js";
@@ -45,6 +52,8 @@ export type AppOptions = {
   webhookDispatcher?: WebhookDispatcher;
   /** Override the publish enqueuer — tests pass a capturing stub to assert delays. */
   publishEnqueuer?: PublishEnqueuer;
+  /** Override the token-refresh enqueuer — tests pass a no-op to avoid Redis. */
+  refreshEnqueuer?: import("./queue/refresh-enqueue.js").TokenRefreshEnqueuer;
 };
 
 export function createApp(options: AppOptions = {}) {
@@ -80,8 +89,25 @@ export function createApp(options: AppOptions = {}) {
       "/v1/webhook-endpoints",
       createWebhookEndpointRoutes({ sessionMiddleware: injectSession }),
     );
+    app.route(
+      "/v1/accounts",
+      createAccountRoutes({
+        sessionMiddleware: injectSession,
+        ...(options.refreshEnqueuer
+          ? { refreshEnqueuer: options.refreshEnqueuer }
+          : {}),
+      }),
+    );
   } else {
     app.route("/v1/webhook-endpoints", webhookEndpointRoutes);
+    if (options.refreshEnqueuer) {
+      app.route(
+        "/v1/accounts",
+        createAccountRoutes({ refreshEnqueuer: options.refreshEnqueuer }),
+      );
+    } else {
+      app.route("/v1/accounts", accountRoutes);
+    }
   }
 
   app.route("/health", health);

@@ -8,4 +8,4 @@ import { auth } from "../auth.js";
  */
 export const authRoutes = new Hono();
 
-authRoutes.on(["GET", "POST"], "/*", (c) => auth.handler(c.req.raw));
+authRoutes.on(["GET", "POST", "OPTIONS"], "/*", (c) => auth.handler(c.req.raw));

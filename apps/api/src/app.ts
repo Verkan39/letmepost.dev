@@ -1,4 +1,5 @@
 import { Hono, type MiddlewareHandler } from "hono";
+import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
 import type { DrizzleClient } from "./db/index.js";
 import { db as defaultDb } from "./db/instance.js";
@@ -67,6 +68,30 @@ export function createApp(options: AppOptions = {}) {
 
   // Per-request correlation id — echoed in x-request-id and stamped on error bodies.
   app.use("*", requestId());
+
+  // CORS for dashboard + future surfaces. Must allow credentials (better-auth
+  // session cookie) and echo the origin exactly (never `*` with credentials).
+  // Extra origins come from CORS_ORIGINS env, comma-separated.
+  const corsOrigins = [
+    "http://localhost:3001",
+    ...(process.env.CORS_ORIGINS?.split(",").map((s) => s.trim()).filter(Boolean) ?? []),
+  ];
+  app.use(
+    "*",
+    cors({
+      origin: (origin) => (corsOrigins.includes(origin) ? origin : null),
+      credentials: true,
+      allowHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "X-Request-Id"],
+      allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+      exposeHeaders: [
+        "X-Request-Id",
+        "RateLimit-Limit",
+        "RateLimit-Remaining",
+        "RateLimit-Reset",
+      ],
+      maxAge: 600,
+    }),
+  );
 
   // Make shared deps available to every downstream route / middleware.
   app.use("*", async (c, next) => {

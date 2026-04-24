@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { Worker, UnrecoverableError } from "bullmq";
 import { and, eq, isNull } from "drizzle-orm";
 import { LetmepostError } from "../errors.js";

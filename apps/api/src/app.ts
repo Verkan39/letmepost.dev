@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { requestId } from "hono/request-id";
 import type { DrizzleClient } from "./db/index.js";
 import { db as defaultDb } from "./db/instance.js";
 import { onError } from "./errors.js";
@@ -10,6 +11,8 @@ import { posts } from "./routes/posts.js";
 declare module "hono" {
   interface ContextVariableMap {
     db: DrizzleClient;
+    requestId: string;
+    traceId?: string;
   }
 }
 
@@ -21,6 +24,9 @@ export type AppOptions = {
 export function createApp(options: AppOptions = {}) {
   const db = options.db ?? defaultDb;
   const app = new Hono();
+
+  // Per-request correlation id — echoed in x-request-id and stamped on error bodies.
+  app.use("*", requestId());
 
   // Make the db available to every downstream route / middleware.
   app.use("*", async (c, next) => {

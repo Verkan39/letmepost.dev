@@ -10,6 +10,8 @@ export const ErrorCode = z.enum([
   "unauthenticated",
   "unauthorized",
   "not_found",
+  "idempotency_conflict",
+  "rate_limited",
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
 
@@ -19,8 +21,11 @@ export const ErrorResponse = z.object({
     message: z.string(),
     rule: z.string().optional().describe("The specific preflight rule or validator that failed"),
     platform: z.string().optional(),
+    platformVersion: z.string().optional().describe("Pinned upstream API version the call targeted"),
     platformResponse: z.unknown().optional().describe("Raw upstream platform response, when available"),
     remediation: z.string().optional().describe("Actionable next step for the caller"),
+    requestId: z.string().optional().describe("Per-request correlation id, echoed in the x-request-id response header"),
+    traceId: z.string().optional().describe("OTel trace id, when tracing is active"),
   }),
 });
 export type ErrorResponse = z.infer<typeof ErrorResponse>;

@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { Account } from "./platforms.js";
+import { AccountRef } from "./platforms.js";
 
 export const BLUESKY_MAX_GRAPHEMES = 300;
 
 export const CreatePostRequest = z.object({
-  account: Account,
+  account: AccountRef,
   text: z.string().min(1),
 });
 export type CreatePostRequest = z.infer<typeof CreatePostRequest>;

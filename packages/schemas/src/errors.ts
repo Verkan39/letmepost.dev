@@ -7,6 +7,9 @@ export const ErrorCode = z.enum([
   "platform_rejected",
   "platform_unavailable",
   "internal_error",
+  "unauthenticated",
+  "unauthorized",
+  "not_found",
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
 

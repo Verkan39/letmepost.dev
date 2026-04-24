@@ -10,7 +10,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 import { idColumn, timestamps } from "./_shared.js";
-import { organizations } from "./organizations.js";
+import { organization } from "./auth.js";
 
 export const apiKeyPrefix = pgEnum("api_key_prefix", [
   "lmp_live_",
@@ -23,7 +23,7 @@ export const apiKeys = pgTable(
     id: idColumn(),
     organizationId: uuid("organization_id")
       .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
+      .references(() => organization.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     prefix: apiKeyPrefix("prefix").notNull(),
     hashedKey: text("hashed_key").notNull(),

@@ -9,7 +9,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { idColumn } from "./_shared.js";
-import { organizations } from "./organizations.js";
+import { organization } from "./auth.js";
 
 export const idempotencyRecords = pgTable(
   "idempotency_records",
@@ -17,7 +17,7 @@ export const idempotencyRecords = pgTable(
     id: idColumn(),
     organizationId: uuid("organization_id")
       .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
+      .references(() => organization.id, { onDelete: "cascade" }),
     key: text("key").notNull(),
     requestHash: text("request_hash").notNull(),
     responseBody: jsonb("response_body"),

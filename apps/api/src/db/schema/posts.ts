@@ -8,8 +8,8 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { idColumn, timestamps } from "./_shared.js";
-import { accounts } from "./accounts.js";
-import { organizations } from "./organizations.js";
+import { organization } from "./auth.js";
+import { platformAccounts } from "./platform_accounts.js";
 
 export const postStatus = pgEnum("post_status", [
   "queued",
@@ -26,10 +26,10 @@ export const posts = pgTable(
     id: idColumn(),
     organizationId: uuid("organization_id")
       .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
+      .references(() => organization.id, { onDelete: "cascade" }),
     accountId: uuid("account_id")
       .notNull()
-      .references(() => accounts.id, { onDelete: "cascade" }),
+      .references(() => platformAccounts.id, { onDelete: "cascade" }),
     status: postStatus("status").notNull().default("queued"),
     text: text("text").notNull(),
     mediaRefs: jsonb("media_refs").$type<unknown[]>().notNull().default([]),

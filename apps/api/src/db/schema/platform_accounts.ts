@@ -8,25 +8,28 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { idColumn, timestamps } from "./_shared.js";
-import { organizations } from "./organizations.js";
+import { organization } from "./auth.js";
 import { platform } from "./platform_versions.js";
 
 /**
- * Per-platform connected account. Tokens are stored as an AES-256-GCM envelope:
+ * Per-platform connected social media account (Bluesky, LinkedIn, etc.).
+ * Tokens are stored as an AES-256-GCM envelope:
  *   - token_ciphertext       base64 of token bytes encrypted under a fresh DEK
  *   - token_dek_ciphertext   base64 of (iv || authTag || DEK-wrapped-by-KEK)
  *   - token_iv               base64 of the 12-byte IV used for the token ciphertext
  *   - token_auth_tag         base64 of the 16-byte GCM auth tag for the token ciphertext
  *
- * Nothing outside apps/api/src/repositories/accounts.ts should read these columns.
+ * Nothing outside apps/api/src/repositories/platform-accounts.ts should read
+ * these columns. Named "platform_accounts" to avoid collision with
+ * better-auth's "account" (which holds OAuth provider links for sign-in).
  */
-export const accounts = pgTable(
-  "accounts",
+export const platformAccounts = pgTable(
+  "platform_accounts",
   {
     id: idColumn(),
     organizationId: uuid("organization_id")
       .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
+      .references(() => organization.id, { onDelete: "cascade" }),
     platform: platform("platform").notNull(),
     /** Stable per-platform identifier — e.g. Bluesky DID, LinkedIn URN. */
     platformAccountId: text("platform_account_id").notNull(),
@@ -45,14 +48,12 @@ export const accounts = pgTable(
     ...timestamps,
   },
   (t) => ({
-    byOrg: index("accounts_organization_id_idx").on(t.organizationId),
-    uniqPlatformAccount: uniqueIndex("accounts_org_platform_account_unique").on(
-      t.organizationId,
-      t.platform,
-      t.platformAccountId,
-    ),
+    byOrg: index("platform_accounts_organization_id_idx").on(t.organizationId),
+    uniqPlatformAccount: uniqueIndex(
+      "platform_accounts_org_platform_account_unique",
+    ).on(t.organizationId, t.platform, t.platformAccountId),
   }),
 );
 
-export type Account = typeof accounts.$inferSelect;
-export type NewAccount = typeof accounts.$inferInsert;
+export type PlatformAccount = typeof platformAccounts.$inferSelect;
+export type NewPlatformAccount = typeof platformAccounts.$inferInsert;

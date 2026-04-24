@@ -5,6 +5,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { apiKeys } from "../db/schema/api_keys.js";
 import { LetmepostError } from "../errors.js";
+import { idempotency } from "../middleware/idempotency.js";
 import { requireSession } from "../middleware/session.js";
 
 const CreateApiKeyRequest = z.object({
@@ -25,6 +26,7 @@ function generateKey(prefix: "lmp_live_" | "lmp_test_"): string {
 export const apiKeyRoutes = new Hono();
 
 apiKeyRoutes.use("*", requireSession());
+apiKeyRoutes.use("*", idempotency());
 
 /** POST /v1/api-keys — creates a new org-scoped API key. Plaintext is returned once. */
 apiKeyRoutes.post(

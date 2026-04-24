@@ -13,6 +13,7 @@ import { idempotency } from "../middleware/idempotency.js";
 import { assertKeyCanAccessProfile } from "../middleware/profile-scope.js";
 import { rateLimit } from "../middleware/rate-limit.js";
 import { blueskyPublisher } from "../platforms/bluesky/publisher.js";
+import { linkedinPublisher } from "../platforms/linkedin/publisher.js";
 import { pinterestPublisher } from "../platforms/pinterest/publisher.js";
 import { twitterPublisher } from "../platforms/twitter/publisher.js";
 import type { DecryptedPlatformAccount } from "../repositories/platform-accounts.js";
@@ -344,6 +345,17 @@ async function publishFor(
       return blueskyPublisher.publish(
         { handle: account.platformAccountId, appPassword: account.token },
         blueskyInput,
+      );
+    }
+    case "linkedin": {
+      const meta = (account.tokenMetadata ?? {}) as Record<string, unknown>;
+      const authorUrn =
+        typeof meta.authorUrn === "string" && meta.authorUrn.length > 0
+          ? meta.authorUrn
+          : `urn:li:person:${account.platformAccountId}`;
+      return linkedinPublisher.publish(
+        { accessToken: account.token, authorUrn },
+        { text: input.text, authorUrn },
       );
     }
     case "twitter":

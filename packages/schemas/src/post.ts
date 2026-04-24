@@ -11,6 +11,11 @@ export const BLUESKY_ALT_TEXT_MAX_GRAPHEMES = 2000;
 // Pinterest (v5 API, OAuth 2.0). MVP: single-image pin from URL only.
 export const PINTEREST_IMAGE_MAX_BYTES = 20_000_000;
 
+// LinkedIn (Versioned REST API, OAuth 2.0 3-legged).
+// LinkedIn's "ugcPost" / "/rest/posts" commentary cap is 3,000 graphemes.
+// Emoji + ZWJ sequences count as 1 grapheme — same counter we use elsewhere.
+export const LINKEDIN_MAX_GRAPHEMES = 3000;
+
 // Twitter / X (v2 API, OAuth 2.0 PKCE).
 // t.co wraps every URL to a fixed length regardless of the real URL length —
 // the counter subtracts the real URL length and adds this constant.

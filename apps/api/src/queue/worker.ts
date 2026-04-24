@@ -14,6 +14,7 @@ import {
   shouldEmitExpiringNotice,
 } from "../platforms/_shared/refresh.js";
 import { blueskyPublisher } from "../platforms/bluesky/publisher.js";
+import { linkedinPublisher } from "../platforms/linkedin/publisher.js";
 import { pinterestPublisher } from "../platforms/pinterest/publisher.js";
 import { twitterPublisher } from "../platforms/twitter/publisher.js";
 import { DrizzlePlatformAccountsRepository } from "../repositories/platform-accounts.js";
@@ -92,6 +93,18 @@ const publishWorker = new Worker<PublishJobData>(
             { text: post.text },
           );
           break;
+        case "linkedin": {
+          const meta = (account.tokenMetadata ?? {}) as Record<string, unknown>;
+          const authorUrn =
+            typeof meta.authorUrn === "string" && meta.authorUrn.length > 0
+              ? meta.authorUrn
+              : `urn:li:person:${account.platformAccountId}`;
+          result = await linkedinPublisher.publish(
+            { accessToken: account.token, authorUrn },
+            { text: post.text, authorUrn },
+          );
+          break;
+        }
         case "twitter":
           result = await twitterPublisher.publish(
             { accessToken: account.token, userId: account.platformAccountId },

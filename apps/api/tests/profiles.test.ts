@@ -155,13 +155,12 @@ describeIfDb("/v1/profiles (CRUD + isolation)", () => {
         testSession: { userId, organizationId },
       });
 
-      const a = await app
-        .request("/v1/profiles", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: "Alpha", slug: "alpha" }),
-        })
-        .then((r) => r.json() as Promise<{ id: string }>);
+      const aRes = await app.request("/v1/profiles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Alpha", slug: "alpha" }),
+      });
+      const a = (await aRes.json()) as { id: string };
       await app.request("/v1/profiles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -229,13 +228,12 @@ describeIfDb("/v1/profiles (CRUD + isolation)", () => {
         testSession: { userId, organizationId },
       });
 
-      const created = await app
-        .request("/v1/profiles", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: "Empty" }),
-        })
-        .then((r) => r.json() as Promise<{ id: string }>);
+      const createdRes = await app.request("/v1/profiles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Empty" }),
+      });
+      const created = (await createdRes.json()) as { id: string };
 
       const del = await app.request(`/v1/profiles/${created.id}`, {
         method: "DELETE",

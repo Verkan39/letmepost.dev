@@ -29,6 +29,17 @@ const SCOPES: Record<Platform, PlatformScopeSet> = {
     write: [],
     extended: [],
   },
+  linkedin: {
+    kind: "oauth",
+    // MVP — personal posting only. `w_member_social` is the Sign-In-with-
+    // LinkedIn product scope; available on the standard dev tier without
+    // MDP. `openid` + `profile` are needed to mint a stable identifier so
+    // completeConnect can resolve the `urn:li:person:*` URN.
+    write: ["w_member_social", "openid", "profile"],
+    // Org/Company posts and `w_organization_social` require MDP — they ship
+    // in the post-approval Phase 6 follow-up slice.
+    extended: ["email", "r_organization_social", "w_organization_social"],
+  },
   pinterest: {
     kind: "oauth",
     // MVP scope for Pinterest publish: read the caller's boards, read/write

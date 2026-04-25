@@ -60,16 +60,23 @@ export function OnboardingChecklist({ steps }: { steps: ChecklistStep[] }) {
         </span>
       </div>
       <div className="divide-y divide-foreground/10">
-        {steps.map((step) => (
-          <ChecklistItem
-            key={step.id}
-            step={step}
-            isOpen={open === step.id}
-            onToggle={() =>
-              setOpen((prev) => (prev === step.id ? "" : step.id))
-            }
-          />
-        ))}
+        {steps.map((step, i) => {
+          // Blocked when any earlier step is still incomplete — locks the
+          // user into a forward-only flow (otherwise the curl in step 3
+          // can't be filled in until step 1's key + step 2's account exist).
+          const blocked = steps.slice(0, i).some((s) => !s.done);
+          return (
+            <ChecklistItem
+              key={step.id}
+              step={step}
+              isOpen={open === step.id && !blocked}
+              blocked={blocked}
+              onToggle={() =>
+                setOpen((prev) => (prev === step.id ? "" : step.id))
+              }
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -78,10 +85,12 @@ export function OnboardingChecklist({ steps }: { steps: ChecklistStep[] }) {
 function ChecklistItem({
   step,
   isOpen,
+  blocked,
   onToggle,
 }: {
   step: ChecklistStep;
   isOpen: boolean;
+  blocked: boolean;
   onToggle: () => void;
 }) {
   return (
@@ -89,8 +98,15 @@ function ChecklistItem({
       <button
         type="button"
         onClick={onToggle}
+        disabled={blocked}
         aria-expanded={isOpen}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/50 transition-colors"
+        aria-disabled={blocked}
+        className={cn(
+          "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
+          blocked
+            ? "cursor-not-allowed opacity-50"
+            : "hover:bg-muted/50",
+        )}
       >
         {step.done ? (
           <CheckCircle
@@ -111,20 +127,22 @@ function ChecklistItem({
           </div>
           {!step.done ? (
             <div className="text-xs text-muted-foreground truncate">
-              {step.description}
+              {blocked ? "Finish the previous step first." : step.description}
             </div>
           ) : null}
         </div>
-        <motion.span
-          animate={{ rotate: isOpen ? 180 : 0 }}
-          transition={{ duration: 0.2, ease: EASE_OUT }}
-          className="text-muted-foreground"
-        >
-          <CaretDown className="size-4" />
-        </motion.span>
+        {!blocked ? (
+          <motion.span
+            animate={{ rotate: isOpen ? 180 : 0 }}
+            transition={{ duration: 0.2, ease: EASE_OUT }}
+            className="text-muted-foreground"
+          >
+            <CaretDown className="size-4" />
+          </motion.span>
+        ) : null}
       </button>
       <AnimatePresence initial={false}>
-        {isOpen ? (
+        {isOpen && !blocked ? (
           <motion.div
             key="content"
             initial={{ height: 0, opacity: 0, filter: "blur(6px)" }}

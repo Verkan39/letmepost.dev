@@ -2,9 +2,15 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Copy, Rocket } from "@phosphor-icons/react";
+import {
+  ArrowRight,
+  Copy,
+  Lightning,
+  Rocket,
+} from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { API_URL } from "@/lib/env";
@@ -31,6 +37,7 @@ type Counts = {
   accounts: number | null;
   apiKeys: number | null;
   webhooks: number | null;
+  posts: number | null;
 };
 
 export default function DashboardHome() {
@@ -39,8 +46,10 @@ export default function DashboardHome() {
     accounts: null,
     apiKeys: null,
     webhooks: null,
+    posts: null,
   });
   const [latestKey, setLatestKey] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   async function refresh() {
     async function load(path: string): Promise<number | null> {
@@ -51,12 +60,15 @@ export default function DashboardHome() {
         return null;
       }
     }
-    const [accounts, apiKeys, webhooks] = await Promise.all([
+    const [accounts, apiKeys, webhooks, posts] = await Promise.all([
       load("/v1/accounts"),
       load("/v1/api-keys"),
       load("/v1/webhook-endpoints"),
+      // limit=1 — we only need a "any?" check, not the full list.
+      load("/v1/posts?limit=1"),
     ]);
-    setCounts({ accounts, apiKeys, webhooks });
+    setCounts({ accounts, apiKeys, webhooks, posts });
+    setLoaded(true);
   }
 
   useEffect(() => {
@@ -65,7 +77,8 @@ export default function DashboardHome() {
 
   const hasKey = (counts.apiKeys ?? 0) > 0 || latestKey !== null;
   const hasAccount = (counts.accounts ?? 0) > 0;
-  const setupComplete = hasKey && hasAccount;
+  const hasPost = (counts.posts ?? 0) > 0;
+  const setupComplete = hasKey && hasAccount && hasPost;
 
   const steps: ChecklistStep[] = [
     {
@@ -77,6 +90,7 @@ export default function DashboardHome() {
       body: (
         <ApiKeyStepBody
           latestKey={latestKey}
+          alreadyHasKey={(counts.apiKeys ?? 0) > 0}
           onCreated={(plain) => {
             setLatestKey(plain);
             refresh();
@@ -95,8 +109,8 @@ export default function DashboardHome() {
       id: "quick-start",
       title: "Send your first post",
       description: "Curl + post log. End-to-end in under a minute.",
-      done: false,
-      body: <QuickStartBody apiKey={latestKey} />,
+      done: hasPost,
+      body: <QuickStartBody apiKey={latestKey} onSent={refresh} />,
     },
   ];
 
@@ -114,7 +128,20 @@ export default function DashboardHome() {
       </FadeIn>
 
       <AnimatePresence mode="wait" initial={false}>
-        {!setupComplete ? (
+        {!loaded ? (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-2"
+          >
+            <Skeleton className="h-12" />
+            <Skeleton className="h-12" />
+            <Skeleton className="h-12" />
+          </motion.div>
+        ) : !setupComplete ? (
           <motion.div
             key="checklist"
             initial={{ opacity: 0, y: 6, filter: "blur(6px)" }}
@@ -205,9 +232,11 @@ function CountCard(props: {
 
 function ApiKeyStepBody({
   latestKey,
+  alreadyHasKey,
   onCreated,
 }: {
   latestKey: string | null;
+  alreadyHasKey: boolean;
   onCreated: (plaintext: string) => void;
 }) {
   const [creating, setCreating] = useState(false);
@@ -262,6 +291,23 @@ function ApiKeyStepBody({
     );
   }
 
+  if (alreadyHasKey) {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          You already have an API key on file. Plaintext is only shown once at
+          creation — to rotate or add another, head to the API keys page.
+        </p>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/api-keys">
+            Open API keys
+            <ArrowRight className="size-4" />
+          </Link>
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
@@ -276,31 +322,141 @@ function ApiKeyStepBody({
   );
 }
 
-function QuickStartBody({ apiKey }: { apiKey: string | null }) {
+type FirstAccount = {
+  id: string;
+  platform: string;
+  displayName?: string | null;
+  handle?: string | null;
+};
+
+function QuickStartBody({
+  apiKey,
+  onSent,
+}: {
+  apiKey: string | null;
+  onSent: () => void;
+}) {
+  const router = useRouter();
+  const [account, setAccount] = useState<FirstAccount | null>(null);
+  const [sending, setSending] = useState(false);
+
+  // Pull the first connected account so the curl example carries a real
+  // accountId/platform — saves the user a copy-paste back-and-forth.
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<{ data: FirstAccount[] }>("/v1/accounts")
+      .then((res) => {
+        if (!cancelled && Array.isArray(res?.data) && res.data.length > 0) {
+          setAccount(res.data[0]);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const accountId = account?.id ?? "<your-account-id>";
+  const platform = account?.platform ?? "bluesky";
   const example = `curl -X POST ${API_URL}/v1/posts \\
   -H "Authorization: Bearer ${apiKey ?? "lmp_live_…"}" \\
   -H "Content-Type: application/json" \\
+  -H "Idempotency-Key: $(uuidgen)" \\
   -d '{
-    "platform": "bluesky",
-    "accountId": "<your-account-id>",
+    "platform": "${platform}",
+    "accountId": "${accountId}",
     "text": "Hello from letmepost.dev"
   }'`;
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(example);
+      toast.success("Copied to clipboard.");
+    } catch {
+      toast.error("Clipboard access denied.");
+    }
+  }
+
+  async function handleSend() {
+    if (!apiKey || !account) return;
+    setSending(true);
+    try {
+      const res = await fetch(`${API_URL}/v1/posts`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          platform: account.platform,
+          accountId: account.id,
+          text: "Hello from letmepost.dev",
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as {
+          message?: string;
+        };
+        throw new Error(body.message ?? `Request failed (${res.status})`);
+      }
+      toast.success("Post queued — opening the log.");
+      onSent();
+      router.push("/posts");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Send failed.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  // Live-send needs the in-session plaintext key (POST /v1/posts is strict
+  // Bearer-auth). If the user already had a key from a prior session and
+  // hasn't created a new one here, we can only offer Copy.
+  const canSend = apiKey !== null && account !== null;
 
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Once a platform is connected, paste this into your terminal. Whether it
-        publishes or fails, the post log captures every attempt.
+        Paste this into your terminal, or fire it now from this page. Either
+        way, the result lands in the post log — published or failed.
       </p>
       <pre className="bg-muted px-3 py-3 text-xs font-mono overflow-x-auto whitespace-pre">
         {example}
       </pre>
-      <Button asChild variant="outline" size="sm">
-        <Link href="/posts">
-          Open the post log
-          <ArrowRight className="size-4" />
-        </Link>
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={handleCopy}>
+          <Copy className="size-4" />
+          Copy curl
+        </Button>
+        <Button
+          size="sm"
+          onClick={handleSend}
+          disabled={!canSend || sending}
+          title={
+            !apiKey
+              ? "Create a key in step 1 to enable live send."
+              : !account
+                ? "Loading your account…"
+                : undefined
+          }
+        >
+          <Lightning className="size-4" />
+          {sending ? "Sending…" : "Send test post"}
+        </Button>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/posts">
+            Open the post log
+            <ArrowRight className="size-4" />
+          </Link>
+        </Button>
+      </div>
+      {!apiKey ? (
+        <p className="text-xs text-muted-foreground">
+          Live send uses the API key from step 1. If you've already created a
+          key in a prior session, copy this curl and run it instead.
+        </p>
+      ) : null}
     </div>
   );
 }

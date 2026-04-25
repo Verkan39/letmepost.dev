@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
+import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
 
 type ApiKey = {
   id: string;
@@ -128,13 +129,13 @@ export default function ApiKeysPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <FadeIn>
         <h1 className="text-lg font-semibold">API keys</h1>
         <p className="text-xs text-muted-foreground">
           Bearer tokens. Plaintext is shown once, right after creation — store
           it somewhere safe.
         </p>
-      </div>
+      </FadeIn>
 
       <Card>
         <CardHeader>
@@ -151,6 +152,7 @@ export default function ApiKeysPage() {
               <Input
                 id="key-name"
                 required
+                className="h-9"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="production-web"
@@ -164,7 +166,7 @@ export default function ApiKeysPage() {
                   setPrefix(v as "lmp_live_" | "lmp_test_")
                 }
               >
-                <SelectTrigger id="key-prefix">
+                <SelectTrigger id="key-prefix" className="h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -173,10 +175,17 @@ export default function ApiKeysPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" disabled={creating}>
-              <Plus className="size-4" />
-              {creating ? "Creating…" : "Create key"}
-            </Button>
+            <div className="space-y-2">
+              {/* Invisible label keeps the button aligned with the labelled
+                  inputs to its left rather than floating mid-row. */}
+              <Label aria-hidden="true" className="invisible">
+                Action
+              </Label>
+              <Button type="submit" disabled={creating} className="w-full h-9">
+                <Plus className="size-4" />
+                {creating ? "Creating…" : "Create key"}
+              </Button>
+            </div>
           </CardContent>
         </form>
       </Card>
@@ -198,9 +207,10 @@ export default function ApiKeysPage() {
         ) : keys.length === 0 ? (
           <p className="text-xs text-muted-foreground">No keys yet.</p>
         ) : (
-          <div className="space-y-2">
+          <StaggerList className="space-y-2">
             {keys.map((k) => (
-              <Card key={k.id} size="sm">
+              <StaggerItem key={k.id}>
+              <Card size="sm">
                 <CardContent className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -231,8 +241,9 @@ export default function ApiKeysPage() {
                   ) : null}
                 </CardContent>
               </Card>
+              </StaggerItem>
             ))}
-          </div>
+          </StaggerList>
         )}
       </div>
 

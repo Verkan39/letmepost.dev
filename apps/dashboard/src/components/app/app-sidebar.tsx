@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -16,6 +17,7 @@ import {
 } from "@phosphor-icons/react";
 
 import { authClient } from "@/lib/auth-client";
+import { NewOrgDialog } from "@/components/app/new-org-dialog";
 import {
   Sidebar,
   SidebarContent,
@@ -52,6 +54,7 @@ export function AppSidebar() {
   const { data: session } = authClient.useSession();
   const { data: organizations } = authClient.useListOrganizations();
   const activeOrg = authClient.useActiveOrganization().data;
+  const [newOrgOpen, setNewOrgOpen] = useState(false);
 
   const initials = (session?.user.name ?? session?.user.email ?? "?")
     .split(/\s+/)
@@ -117,29 +120,9 @@ export function AppSidebar() {
             ) : null}
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onSelect={() => {
-                const name = window.prompt("New organization name?");
-                if (!name) return;
-                const slug =
-                  name
-                    .toLowerCase()
-                    .trim()
-                    .replace(/[^a-z0-9]+/g, "-")
-                    .replace(/^-+|-+$/g, "")
-                    .slice(0, 60) ||
-                  `org-${Math.random().toString(36).slice(2, 8)}`;
-                authClient.organization
-                  .create({ name, slug })
-                  .then(async ({ data, error }) => {
-                    if (error || !data) {
-                      toast.error(error?.message ?? "Create org failed.");
-                      return;
-                    }
-                    await authClient.organization.setActive({
-                      organizationId: data.id,
-                    });
-                    router.refresh();
-                  });
+              onSelect={(e) => {
+                e.preventDefault();
+                setNewOrgOpen(true);
               }}
             >
               <Plus className="size-4" />
@@ -205,6 +188,8 @@ export function AppSidebar() {
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarFooter>
+
+      <NewOrgDialog open={newOrgOpen} onOpenChange={setNewOrgOpen} />
     </Sidebar>
   );
 }

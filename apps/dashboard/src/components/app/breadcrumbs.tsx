@@ -18,6 +18,7 @@ const LABELS: Record<string, string> = {
   new: "New",
   "api-keys": "API keys",
   webhooks: "Webhooks",
+  posts: "Post log",
 };
 
 function labelFor(segment: string): string {

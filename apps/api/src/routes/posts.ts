@@ -1,12 +1,15 @@
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import {
   CreatePostRequest,
+  Platform,
+  PostStatus,
   type CreatePostResponse,
   type WebhookEventType,
 } from "@letmepost/schemas";
-import { posts as postsTable } from "../db/schema/posts.js";
+import { posts as postsTable, type Post } from "../db/schema/posts.js";
 import { LetmepostError } from "../errors.js";
 import { apiKeyAuth } from "../middleware/api-key.js";
 import { idempotency } from "../middleware/idempotency.js";
@@ -14,6 +17,11 @@ import { assertKeyCanAccessProfile } from "../middleware/profile-scope.js";
 import { rateLimit } from "../middleware/rate-limit.js";
 import { publishForAccount } from "../platforms/_shared/dispatch.js";
 import { DrizzlePlatformAccountsRepository } from "../repositories/platform-accounts.js";
+import {
+  DrizzlePostsReadRepository,
+  type PostListFilters,
+  type PostWithAccount,
+} from "../repositories/posts.js";
 
 export const posts = new Hono();
 
@@ -264,6 +272,157 @@ posts.post(
     }
   },
 );
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Post Log — read endpoints
+ * Both inherit the route's API-key auth + rate limit; idempotency only
+ * matters on writes, so we don't double-charge reads against the replay
+ * cache.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+const ListPostsQuery = z.object({
+  profileId: z.string().uuid().optional(),
+  platform: z.array(Platform).optional(),
+  status: z.array(PostStatus).optional(),
+  errorCode: z.array(z.string().min(1)).optional(),
+  after: z.string().datetime().optional(),
+  before: z.string().datetime().optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  cursor: z.string().min(1).optional(),
+});
+
+function publicView(post: PostWithAccount) {
+  return {
+    id: post.id,
+    profileId: post.account.profileId,
+    accountId: post.accountId,
+    account: {
+      id: post.account.id,
+      platform: post.account.platform,
+      platformAccountId: post.account.platformAccountId,
+      displayName: post.account.displayName,
+    },
+    platform: post.account.platform,
+    status: post.status,
+    text: post.text,
+    mediaRefs: post.mediaRefs,
+    scheduledAt: post.scheduledAt,
+    publishedAt: post.publishedAt,
+    platformUri: post.platformUri,
+    platformCid: post.platformCid,
+    error: post.error,
+    createdAt: post.createdAt,
+    updatedAt: post.updatedAt,
+  };
+}
+
+/**
+ * Coerce repeated query params (`?platform=a&platform=b`) into an array.
+ * Also accepts comma-separated single values (`?platform=a,b`) — both are
+ * common conventions and integrators shouldn't have to remember which.
+ */
+function readArrayQuery(
+  c: { req: { queries: (k: string) => string[] | undefined } },
+  key: string,
+): string[] | undefined {
+  const values = c.req.queries(key);
+  if (!values || values.length === 0) return undefined;
+  const flat = values.flatMap((v) => v.split(",")).map((v) => v.trim()).filter(Boolean);
+  return flat.length > 0 ? flat : undefined;
+}
+
+posts.get("/", async (c) => {
+  const rawQuery = {
+    profileId: c.req.query("profileId"),
+    platform: readArrayQuery(c, "platform"),
+    status: readArrayQuery(c, "status"),
+    errorCode: readArrayQuery(c, "errorCode"),
+    after: c.req.query("after"),
+    before: c.req.query("before"),
+    limit: c.req.query("limit"),
+    cursor: c.req.query("cursor"),
+  };
+  const parsed = ListPostsQuery.safeParse(rawQuery);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    throw new LetmepostError({
+      code: "validation_failed",
+      status: 400,
+      message: issue?.message ?? "Invalid query parameters.",
+      rule: issue?.path.join(".") || "query",
+      platformResponse: parsed.error.issues,
+    });
+  }
+  const q = parsed.data;
+  const { organizationId, profileId: keyProfileId } = c.var.apiKey;
+
+  // Profile-scope enforcement on list:
+  //   - org-wide key (NULL) — caller's ?profileId is honored as-is
+  //   - profile-scoped key — must match (or omit) ?profileId; otherwise 404
+  let effectiveProfileId: string | null | undefined = keyProfileId ?? undefined;
+  if (q.profileId !== undefined) {
+    if (keyProfileId !== null && keyProfileId !== q.profileId) {
+      throw new LetmepostError({
+        code: "not_found",
+        status: 404,
+        message: "Profile not found.",
+        rule: "api_key.profile_scope",
+      });
+    }
+    effectiveProfileId = q.profileId;
+  }
+
+  const filters: PostListFilters = { organizationId };
+  if (effectiveProfileId) filters.profileId = effectiveProfileId;
+  if (q.platform) filters.platforms = q.platform;
+  if (q.status) filters.statuses = q.status as Post["status"][];
+  if (q.errorCode) filters.errorCodes = q.errorCode;
+  if (q.after) filters.after = new Date(q.after);
+  if (q.before) filters.before = new Date(q.before);
+
+  const repo = new DrizzlePostsReadRepository(c.var.db);
+  const result = await repo.list(filters, {
+    limit: q.limit ?? 50,
+    ...(q.cursor ? { cursor: q.cursor } : {}),
+  });
+
+  return c.json({
+    data: result.data.map(publicView),
+    nextCursor: result.nextCursor,
+  });
+});
+
+posts.get("/:id", async (c) => {
+  const id = c.req.param("id");
+  const { organizationId } = c.var.apiKey;
+  const repo = new DrizzlePostsReadRepository(c.var.db);
+  const post = await repo.findByIdWithAccount(id);
+  if (!post || post.organizationId !== organizationId) {
+    throw new LetmepostError({
+      code: "not_found",
+      status: 404,
+      message: "Post not found.",
+    });
+  }
+  // Profile scope: same 404-not-403 contract as POST /v1/posts.
+  assertKeyCanAccessProfile(c.var.apiKey, post.account);
+
+  const attempts = await repo.attemptsFor(id);
+
+  return c.json({
+    ...publicView(post),
+    attempts: attempts.map((a) => ({
+      id: a.id,
+      attemptNumber: a.attemptNumber,
+      startedAt: a.startedAt,
+      finishedAt: a.finishedAt,
+      succeeded: a.succeeded,
+      errorCode: a.errorCode,
+      errorMessage: a.errorMessage,
+      platformResponse: a.platformResponse,
+    })),
+  });
+});
 
 function classifyError(err: unknown): {
   status: "rejected" | "failed";

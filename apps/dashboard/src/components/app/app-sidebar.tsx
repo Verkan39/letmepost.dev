@@ -18,6 +18,7 @@ import {
 
 import { authClient } from "@/lib/auth-client";
 import { NewOrgDialog } from "@/components/app/new-org-dialog";
+import { LogoMark } from "@/components/app/logo";
 import {
   Sidebar,
   SidebarContent,
@@ -88,9 +89,8 @@ export function AppSidebar() {
               size="lg"
               className="data-[state=open]:bg-sidebar-accent"
             >
-              <div className="flex size-8 shrink-0 items-center justify-center bg-primary text-primary-foreground text-xs font-semibold">
-                LM
-              </div>
+              <LogoMark size={28} />
+
               <div className="flex flex-col leading-none text-left min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
                 <span className="text-sm font-semibold truncate">
                   {activeOrg?.name ?? "No organization"}

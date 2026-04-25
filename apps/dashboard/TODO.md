@@ -8,7 +8,7 @@ Persistent backlog for `apps/dashboard`. Resume from here after `/compact`.
 
 **Working:** sign-in/up, org creation on sign-up, sidebar nav (Dashboard / Post log / Accounts / API keys / Webhooks), accounts connect (oauth + credentials), api-keys CRUD, webhooks CRUD, post log list + detail.
 
-**Theme:** matches landing — paper cream + forest green + Commit Mono, sharp corners.
+**Theme:** matches landing — paper cream + forest green + Commit Mono, sharp corners. (Not Really)
 
 **Auth:** session cookies cross-origin (api on :3000, dashboard on :3001). `apiKeyOrSession()` middleware lets `/v1/posts` GET accept either auth.
 
@@ -39,6 +39,17 @@ Persistent backlog for `apps/dashboard`. Resume from here after `/compact`.
 **File:** `apps/dashboard/src/components/app/app-sidebar.tsx`
 **Issue:** the "New organization" item in the org switcher uses `window.prompt()` — ugly, no validation, no slug preview.
 **Fix:** swap to a shadcn `Dialog` with name + slug fields, mirror the sign-up flow.
+
+### 5. The divider in the header (the breadcrumb header) between the sidebar collapse icon and the workspace name is not rendered correctly
+
+### 6. API Key creation form - Enviorment dropdown is not aligned with the form input
+
+### 7. webhook creation form: the parent div of the CTA doesn't have top margins, so so it is looks weird with the form inputs.
+
+### 8. There is no onboarding, these are the steps for the onboarding
+- Copy your api key
+- Conenct your first platform 
+- go to dashboard with a quick start guide button as the main thing
 
 ---
 

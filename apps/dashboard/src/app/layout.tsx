@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "@fontsource/commit-mono/400.css";
 import "@fontsource/commit-mono/600.css";
 import "@fontsource/commit-mono/700.css";
+import "@fontsource/instrument-serif/400.css";
+import "@fontsource/instrument-serif/400-italic.css";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/sonner";

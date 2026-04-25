@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
+import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
 
 export default function AccountsListPage() {
   const [accounts, setAccounts] = useState<Account[] | null>(null);
@@ -64,7 +65,7 @@ export default function AccountsListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <FadeIn className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-lg font-semibold">Accounts</h1>
           <p className="text-xs text-muted-foreground">
@@ -77,7 +78,7 @@ export default function AccountsListPage() {
             Connect account
           </Link>
         </Button>
-      </div>
+      </FadeIn>
 
       {error ? (
         <Card>
@@ -106,9 +107,10 @@ export default function AccountsListPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <StaggerList className="grid gap-4 md:grid-cols-2">
           {accounts.map((acc) => (
-            <Card key={acc.id}>
+            <StaggerItem key={acc.id}>
+            <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="uppercase tracking-wide">
@@ -138,8 +140,9 @@ export default function AccountsListPage() {
                 </Button>
               </CardContent>
             </Card>
+            </StaggerItem>
           ))}
-        </div>
+        </StaggerList>
       )}
 
       <ConfirmDialog

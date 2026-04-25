@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
 
 type Counts = {
   accounts: number | null;
@@ -58,7 +59,7 @@ export default function DashboardHome() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <FadeIn>
         <h1 className="text-lg font-semibold">
           {activeOrg?.name ?? "Dashboard"}
         </h1>
@@ -66,31 +67,37 @@ export default function DashboardHome() {
           Your operator surface — connect accounts, mint API keys, subscribe to
           webhooks.
         </p>
-      </div>
+      </FadeIn>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <CountCard
-          title="Connected accounts"
-          description="Social platform accounts available to the API."
-          count={counts.accounts}
-          href="/accounts"
-          cta="Manage accounts"
-        />
-        <CountCard
-          title="API keys"
-          description="Bearer tokens for programmatic API access."
-          count={counts.apiKeys}
-          href="/api-keys"
-          cta="Manage keys"
-        />
-        <CountCard
-          title="Webhook endpoints"
-          description="Delivery targets for post / token lifecycle events."
-          count={counts.webhooks}
-          href="/webhooks"
-          cta="Manage webhooks"
-        />
-      </div>
+      <StaggerList className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <StaggerItem>
+          <CountCard
+            title="Connected accounts"
+            description="Social platform accounts available to the API."
+            count={counts.accounts}
+            href="/accounts"
+            cta="Manage accounts"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <CountCard
+            title="API keys"
+            description="Bearer tokens for programmatic API access."
+            count={counts.apiKeys}
+            href="/api-keys"
+            cta="Manage keys"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <CountCard
+            title="Webhook endpoints"
+            description="Delivery targets for post / token lifecycle events."
+            count={counts.webhooks}
+            href="/webhooks"
+            cta="Manage webhooks"
+          />
+        </StaggerItem>
+      </StaggerList>
     </div>
   );
 }

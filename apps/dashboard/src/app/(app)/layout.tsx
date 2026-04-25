@@ -1,6 +1,7 @@
 import { AppSidebar } from "@/components/app/app-sidebar";
 import { AuthGuard } from "@/components/app/auth-guard";
 import { Breadcrumbs } from "@/components/app/breadcrumbs";
+import { PageTransition } from "@/components/app/motion";
 import {
   SidebarInset,
   SidebarProvider,
@@ -20,10 +21,11 @@ export default function AppLayout({
         <SidebarInset>
           <header className="flex h-12 items-center gap-2 border-b px-4">
             <SidebarTrigger />
-            <Separator orientation="vertical" className="h-4" />
             <Breadcrumbs />
           </header>
-          <div className="flex-1 p-6 md:p-8">{children}</div>
+          <div className="flex-1 p-6 md:p-8 max-w-5xl">
+            <PageTransition>{children}</PageTransition>
+          </div>
         </SidebarInset>
       </SidebarProvider>
     </AuthGuard>

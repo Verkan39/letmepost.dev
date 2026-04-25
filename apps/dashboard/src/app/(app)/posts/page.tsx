@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
 
 /**
  * Post Log — the operator's "where did my post go?" screen.
@@ -98,14 +99,14 @@ export default function PostsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <FadeIn>
         <h1 className="text-lg font-semibold">Post log</h1>
         <p className="text-xs text-muted-foreground">
           Every post your org has sent through letmepost. When something fails,
           this is where you see the rule, the upstream response, and the
           remediation.
         </p>
-      </div>
+      </FadeIn>
 
       <div className="flex items-center gap-2 flex-wrap">
         <FunnelSimple className="size-4 text-muted-foreground" />
@@ -126,7 +127,6 @@ export default function PostsPage() {
                 {p}
               </SelectItem>
             ))}
-            <SelectItem value="linkedin">linkedin</SelectItem>
           </SelectContent>
         </Select>
         <Select
@@ -181,11 +181,13 @@ export default function PostsPage() {
           </CardHeader>
         </Card>
       ) : (
-        <div className="space-y-2">
+        <StaggerList className="space-y-2">
           {items.map((post) => (
-            <PostRow key={post.id} post={post} />
+            <StaggerItem key={post.id}>
+              <PostRow post={post} />
+            </StaggerItem>
           ))}
-        </div>
+        </StaggerList>
       )}
 
       {(items?.length ?? 0) > 0 && (nextCursor || !onFirstPage) ? (

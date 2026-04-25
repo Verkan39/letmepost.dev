@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Copy, Plus, Trash } from "@phosphor-icons/react";
+import { Copy, Plus, Trash, Check } from "@phosphor-icons/react";
 import { apiFetch, ApiRequestError } from "@/lib/api";
+import { WEBHOOK_EVENT_TYPES, type WebhookEventType } from "@/lib/webhooks";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -26,6 +27,8 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
+import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
+import { cn } from "@/lib/utils";
 
 type Endpoint = {
   id: string;
@@ -46,8 +49,17 @@ export default function WebhooksPage() {
   const [error, setError] = useState<string | null>(null);
   const [url, setUrl] = useState("");
   const [description, setDescription] = useState("");
-  const [events, setEvents] = useState("");
+  const [events, setEvents] = useState<Set<WebhookEventType>>(new Set());
   const [creating, setCreating] = useState(false);
+
+  function toggleEvent(ev: WebhookEventType) {
+    setEvents((prev) => {
+      const next = new Set(prev);
+      if (next.has(ev)) next.delete(ev);
+      else next.add(ev);
+      return next;
+    });
+  }
   const [secretReveal, setSecretReveal] = useState<CreateResponse | null>(
     null,
   );
@@ -80,23 +92,18 @@ export default function WebhooksPage() {
     e.preventDefault();
     setCreating(true);
     try {
-      const parsedEvents = events
-        .split(/[\s,]+/)
-        .map((v) => v.trim())
-        .filter(Boolean);
-
       const res = await apiFetch<CreateResponse>("/v1/webhook-endpoints", {
         method: "POST",
         body: {
           url,
-          events: parsedEvents,
+          events: Array.from(events),
           description: description.length > 0 ? description : undefined,
         },
       });
       setSecretReveal(res);
       setUrl("");
       setDescription("");
-      setEvents("");
+      setEvents(new Set());
       refresh();
     } catch (err) {
       toast.error(
@@ -139,21 +146,20 @@ export default function WebhooksPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <FadeIn>
         <h1 className="text-lg font-semibold">Webhooks</h1>
         <p className="text-xs text-muted-foreground">
           Subscribe to post lifecycle events. Payloads are HMAC-SHA256 signed
           with a per-endpoint secret shown once at creation.
         </p>
-      </div>
+      </FadeIn>
 
       <Card>
         <CardHeader>
           <CardTitle>New endpoint</CardTitle>
           <CardDescription>
-            Leave <code>events</code> empty to receive everything. Comma- or
-            space-separated filter otherwise (e.g.{" "}
-            <code>post.published, post.failed</code>).
+            Pick the events you want delivered to this URL. Leave all
+            unselected to receive every event.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleCreate}>
@@ -169,28 +175,51 @@ export default function WebhooksPage() {
                 onChange={(e) => setUrl(e.target.value)}
               />
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="hook-events">Events filter (optional)</Label>
-                <Input
-                  id="hook-events"
-                  placeholder="post.published, post.failed"
-                  value={events}
-                  onChange={(e) => setEvents(e.target.value)}
-                />
+            <div className="space-y-1.5">
+              <Label htmlFor="hook-desc">Description (optional)</Label>
+              <Input
+                id="hook-desc"
+                placeholder="Prod Slack alerter"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-baseline justify-between">
+                <Label>Events</Label>
+                <span className="text-xs text-muted-foreground">
+                  {events.size === 0
+                    ? "all events"
+                    : `${events.size} selected`}
+                </span>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="hook-desc">Description (optional)</Label>
-                <Input
-                  id="hook-desc"
-                  placeholder="Prod Slack alerter"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
+              <div className="flex flex-wrap gap-1.5">
+                {WEBHOOK_EVENT_TYPES.map((ev) => {
+                  const on = events.has(ev);
+                  return (
+                    <button
+                      type="button"
+                      key={ev}
+                      onClick={() => toggleEvent(ev)}
+                      aria-pressed={on}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono ring-1 transition-colors",
+                        on
+                          ? "bg-primary text-primary-foreground ring-primary"
+                          : "bg-transparent text-foreground ring-foreground/15 hover:ring-foreground/40 hover:bg-muted/50",
+                      )}
+                    >
+                      {on ? (
+                        <Check className="size-3" weight="bold" />
+                      ) : null}
+                      {ev}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </CardContent>
-          <CardFooter className="justify-end">
+          <CardFooter className="justify-end border-t mt-6">
             <Button type="submit" disabled={creating}>
               <Plus className="size-4" />
               {creating ? "Creating…" : "Create endpoint"}
@@ -216,9 +245,10 @@ export default function WebhooksPage() {
         ) : endpoints.length === 0 ? (
           <p className="text-xs text-muted-foreground">No endpoints yet.</p>
         ) : (
-          <div className="space-y-2">
+          <StaggerList className="space-y-2">
             {endpoints.map((ep) => (
-              <Card key={ep.id} size="sm">
+              <StaggerItem key={ep.id}>
+              <Card size="sm">
                 <CardContent className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -262,8 +292,9 @@ export default function WebhooksPage() {
                   </Button>
                 </CardContent>
               </Card>
+              </StaggerItem>
             ))}
-          </div>
+          </StaggerList>
         )}
       </div>
 

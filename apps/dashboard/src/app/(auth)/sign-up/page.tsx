@@ -63,14 +63,20 @@ export default function SignUpPage() {
       const { data: org, error: orgError } =
         await authClient.organization.create({ name: orgName, slug });
       if (orgError || !org) {
-        toast.error(
-          orgError?.message ??
-            "Account created but organization setup failed — contact support.",
-        );
+        // Account exists but org didn't land — kick to /onboarding rather
+        // than leaving the user stuck on sign-up with a half-state session.
+        toast.error(orgError?.message ?? "Finish setting up your organization.");
+        router.push("/onboarding");
         return;
       }
 
-      await authClient.organization.setActive({ organizationId: org.id });
+      try {
+        await authClient.organization.setActive({ organizationId: org.id });
+      } catch {
+        toast.error("Created your org but couldn't activate it — pick it now.");
+        router.push("/onboarding");
+        return;
+      }
       toast.success("Welcome to letmepost.");
       router.push("/");
     } catch (err) {

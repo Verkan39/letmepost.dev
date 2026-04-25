@@ -1,26 +1,37 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
 /**
- * Client-side redirect to /sign-in when no session is present. The dashboard
- * is a pure SPA shell — all real data lives behind the API's Bearer/session
- * auth, so the worst-case consequence of a stale guard is a short flash of
- * empty UI before the redirect kicks in. Good enough for MVP; a proper
- * server-side session check would need us to proxy cookies through a Next.js
- * route handler (out of scope here).
+ * Client-side gate for `(app)` routes:
+ *   - no session             → /sign-in
+ *   - session but no org     → /onboarding (orphaned-session recovery)
+ *   - session + active org   → render
+ *
+ * Better-auth's session payload has `session.activeOrganizationId` populated
+ * once `organization.setActive` succeeds. If something between sign-up's
+ * create-org and set-active steps fails, the user lands here without one;
+ * /onboarding lets them complete it without signing out.
  */
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { data: session, isPending } = authClient.useSession();
 
+  const orgId = session?.session?.activeOrganizationId ?? null;
+
   useEffect(() => {
-    if (!isPending && !session) {
+    if (isPending) return;
+    if (!session) {
       router.replace("/sign-in");
+      return;
     }
-  }, [isPending, session, router]);
+    if (!orgId && pathname !== "/onboarding") {
+      router.replace("/onboarding");
+    }
+  }, [isPending, session, orgId, pathname, router]);
 
   if (isPending) {
     return (
@@ -29,8 +40,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (!session) {
-    return null;
-  }
+  if (!session) return null;
+  if (!orgId) return null;
   return <>{children}</>;
 }

@@ -7,8 +7,12 @@ import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
-  title: "letmepost dashboard",
-  description: "Operator surface for letmepost.dev",
+  title: {
+    default: "letmepost.dev",
+    template: "%s · letmepost.dev",
+  },
+  description:
+    "Open-source social media publishing API for developers and agents. Failures are loud, preventable, and documented.",
 };
 
 export default function RootLayout({

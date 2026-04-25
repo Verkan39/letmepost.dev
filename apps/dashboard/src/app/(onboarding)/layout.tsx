@@ -1,3 +1,5 @@
+import { Logo } from "@/components/app/logo";
+
 export default function OnboardingLayout({
   children,
 }: {
@@ -5,7 +7,10 @@ export default function OnboardingLayout({
 }) {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
-      {children}
+      <div className="flex flex-col items-center gap-6">
+        <Logo size={40} />
+        {children}
+      </div>
     </div>
   );
 }

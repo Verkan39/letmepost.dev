@@ -1,29 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { authClient } from "@/lib/auth-client";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 /**
- * Recovery surface for sessions that lack an active organization. Reached
- * either as a first-run path (sign-up's org-create step failed mid-flight)
- * or when a user has been removed from every org they belonged to.
+ * Silent recovery for sessions without an `activeOrganizationId`. The
+ * happy-path sign-up sets one, but a stale `useSession` cache after redirect,
+ * an interrupted sign-up, or a user removed from every org all land here.
  *
- * If the user already has orgs, we list them and let `setActive` resume
- * normal navigation; otherwise the form creates one.
+ * No UI: pick the first existing org if there is one, otherwise create one
+ * named after the user, set it active, and bounce to /. The "Setting up…"
+ * line only renders if we're still here after 250ms — fast paths flash
+ * nothing.
  */
 function deriveSlug(input: string): string {
   return (
@@ -39,158 +30,77 @@ function deriveSlug(input: string): string {
 export default function OnboardingPage() {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
-  const { data: organizations } = authClient.useListOrganizations();
+  const { data: orgs, isPending: orgsPending } =
+    authClient.useListOrganizations();
 
-  const [orgName, setOrgName] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const orgId = session?.session?.activeOrganizationId ?? null;
+  const [showSpinner, setShowSpinner] = useState(false);
+  const ranRef = useRef(false);
 
   useEffect(() => {
-    if (isPending) return;
+    const t = setTimeout(() => setShowSpinner(true), 250);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (isPending || orgsPending) return;
+    if (ranRef.current) return;
+
     if (!session) {
       router.replace("/sign-in");
       return;
     }
+
+    const orgId = session.session?.activeOrganizationId;
     if (orgId) {
       router.replace("/");
+      return;
     }
-  }, [isPending, session, orgId, router]);
 
-  const slugPreview = useMemo(() => deriveSlug(orgName), [orgName]);
+    ranRef.current = true;
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      const { data, error } = await authClient.organization.create({
-        name: orgName,
-        slug: slugPreview,
-      });
-      if (error || !data) {
-        toast.error(error?.message ?? "Couldn't create the organization.");
-        return;
+    (async () => {
+      try {
+        if (orgs && orgs.length > 0) {
+          await authClient.organization.setActive({
+            organizationId: orgs[0].id,
+          });
+          router.replace("/");
+          return;
+        }
+        const fallback =
+          session.user?.name?.trim() ||
+          session.user?.email?.split("@")[0] ||
+          "My workspace";
+        const { data, error } = await authClient.organization.create({
+          name: fallback,
+          slug: deriveSlug(fallback),
+        });
+        if (error || !data) {
+          toast.error(error?.message ?? "Couldn't set up your workspace.");
+          ranRef.current = false;
+          return;
+        }
+        await authClient.organization.setActive({ organizationId: data.id });
+        router.replace("/");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Setup failed.");
+        ranRef.current = false;
       }
-      await authClient.organization.setActive({ organizationId: data.id });
-      toast.success(`Welcome to ${data.name}.`);
-      router.replace("/");
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Onboarding request failed.",
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function pickExisting(id: string) {
-    try {
-      await authClient.organization.setActive({ organizationId: id });
-      router.replace("/");
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Couldn't switch organization.",
-      );
-    }
-  }
-
-  async function handleSignOut() {
-    await authClient.signOut();
-    router.replace("/sign-in");
-  }
-
-  if (isPending || orgId) {
-    return (
-      <div className="text-center text-sm text-muted-foreground">Loading…</div>
-    );
-  }
-
-  const hasExisting = (organizations?.length ?? 0) > 0;
+    })();
+  }, [isPending, orgsPending, session, orgs, router]);
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className="space-y-4"
+      initial={{ opacity: 0, filter: "blur(6px)" }}
+      animate={
+        showSpinner
+          ? { opacity: 1, filter: "blur(0px)" }
+          : { opacity: 0, filter: "blur(6px)" }
+      }
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      className="text-sm text-muted-foreground"
     >
-      {hasExisting ? (
-        <Card className="py-6 gap-4">
-          <CardHeader className="gap-1.5 px-6">
-            <CardTitle className="text-base font-semibold">
-              Pick an organization
-            </CardTitle>
-            <CardDescription>
-              Your session lost its active workspace. Resume into one of these,
-              or create a new one below.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-6 space-y-2">
-            {organizations?.map((org) => (
-              <Button
-                key={org.id}
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() => pickExisting(org.id)}
-              >
-                {org.name}
-              </Button>
-            ))}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <form onSubmit={handleCreate}>
-        <Card className="py-6 gap-6">
-          <CardHeader className="gap-1.5 px-6">
-            <CardTitle className="text-base font-semibold">
-              {hasExisting ? "Or create a new one" : "Create an organization"}
-            </CardTitle>
-            <CardDescription>
-              Every API key, account, and post you create lives inside an
-              organization. You can rename or invite teammates later.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-6 space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="orgName">Organization name</Label>
-              <Input
-                id="orgName"
-                required
-                placeholder="Acme Robotics"
-                className="h-9 text-sm"
-                value={orgName}
-                onChange={(e) => setOrgName(e.target.value)}
-                autoFocus
-              />
-              {orgName.trim().length > 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  slug:{" "}
-                  <span className="font-mono text-foreground/80">
-                    {slugPreview}
-                  </span>
-                </p>
-              ) : null}
-            </div>
-          </CardContent>
-          <CardFooter className="px-6 py-4 flex-col items-stretch gap-3">
-            <Button
-              type="submit"
-              size="lg"
-              className="w-full"
-              disabled={submitting || orgName.trim().length === 0}
-            >
-              {submitting ? "Creating…" : "Create organization"}
-            </Button>
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
-            >
-              Sign out instead
-            </button>
-          </CardFooter>
-        </Card>
-      </form>
+      Setting up your workspace…
     </motion.div>
   );
 }

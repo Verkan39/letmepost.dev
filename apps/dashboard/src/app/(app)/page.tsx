@@ -230,6 +230,8 @@ function CountCard(props: {
   );
 }
 
+type ExistingKey = { prefix: string; last4: string };
+
 function ApiKeyStepBody({
   latestKey,
   alreadyHasKey,
@@ -240,6 +242,26 @@ function ApiKeyStepBody({
   onCreated: (plaintext: string) => void;
 }) {
   const [creating, setCreating] = useState(false);
+  const [existing, setExisting] = useState<ExistingKey | null>(null);
+
+  // When a key already exists but we don't have the plaintext (created in
+  // a prior session), pull the masked form from the list endpoint so we can
+  // show *something* shaped like a key in the same muted block.
+  useEffect(() => {
+    if (!alreadyHasKey || latestKey || existing) return;
+    let cancelled = false;
+    apiFetch<{ data: ExistingKey[] }>("/v1/api-keys")
+      .then((res) => {
+        const first = res?.data?.[0];
+        if (!cancelled && first) {
+          setExisting({ prefix: first.prefix, last4: first.last4 });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [alreadyHasKey, latestKey, existing]);
 
   async function handleCreate() {
     setCreating(true);
@@ -263,10 +285,9 @@ function ApiKeyStepBody({
     }
   }
 
-  async function handleCopy() {
-    if (!latestKey) return;
+  async function handleCopy(value: string) {
     try {
-      await navigator.clipboard.writeText(latestKey);
+      await navigator.clipboard.writeText(value);
       toast.success("Copied to clipboard.");
     } catch {
       toast.error("Clipboard access denied.");
@@ -283,7 +304,11 @@ function ApiKeyStepBody({
         <div className="break-all bg-muted px-3 py-2 font-mono text-xs">
           {latestKey}
         </div>
-        <Button variant="outline" size="sm" onClick={handleCopy}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleCopy(latestKey)}
+        >
           <Copy className="size-4" />
           Copy to clipboard
         </Button>
@@ -292,17 +317,30 @@ function ApiKeyStepBody({
   }
 
   if (alreadyHasKey) {
+    const masked = existing
+      ? `${existing.prefix}${"•".repeat(20)}${existing.last4}`
+      : "";
     return (
       <div className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          You already have an API key on file. Plaintext is only shown once at
-          creation — to rotate or add another, head to the API keys page.
+          Plaintext is only shown at creation — this is the masked form on
+          file. Rotate or add another from the API keys page.
         </p>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/api-keys">
-            Open API keys
-            <ArrowRight className="size-4" />
-          </Link>
+        <div className="break-all bg-muted px-3 py-2 font-mono text-xs min-h-[2rem]">
+          {existing ? (
+            masked
+          ) : (
+            <Skeleton className="h-4 w-48 inline-block" />
+          )}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleCopy(masked)}
+          disabled={!existing}
+        >
+          <Copy className="size-4" />
+          Copy to clipboard
         </Button>
       </div>
     );

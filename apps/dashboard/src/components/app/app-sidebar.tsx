@@ -43,7 +43,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: House },
-  { href: "/posts", label: "Post log", icon: ListBullets },
+  { href: "/posts", label: "Logs", icon: ListBullets },
   { href: "/accounts", label: "Accounts", icon: Plug },
   { href: "/api-keys", label: "API keys", icon: Key },
   { href: "/webhooks", label: "Webhooks", icon: Broadcast },

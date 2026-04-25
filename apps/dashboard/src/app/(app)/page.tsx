@@ -112,7 +112,7 @@ export default function DashboardHome() {
         </p>
       </FadeIn>
 
-      <AnimatePresence initial={false}>
+      <AnimatePresence mode="wait" initial={false}>
         {!setupComplete ? (
           <motion.div
             key="checklist"
@@ -128,38 +128,45 @@ export default function DashboardHome() {
           >
             <OnboardingChecklist steps={steps} />
           </motion.div>
-        ) : null}
+        ) : (
+          <motion.div
+            key="counts"
+            initial={{ opacity: 0, y: 6, filter: "blur(6px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            transition={{ duration: 0.32, ease: EASE_OUT }}
+          >
+            <StaggerList className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <StaggerItem>
+                <CountCard
+                  title="Connected accounts"
+                  description="Social platform accounts available to the API."
+                  count={counts.accounts}
+                  href="/accounts"
+                  cta="Manage accounts"
+                />
+              </StaggerItem>
+              <StaggerItem>
+                <CountCard
+                  title="API keys"
+                  description="Bearer tokens for programmatic API access."
+                  count={counts.apiKeys}
+                  href="/api-keys"
+                  cta="Manage keys"
+                />
+              </StaggerItem>
+              <StaggerItem>
+                <CountCard
+                  title="Webhook endpoints"
+                  description="Delivery targets for post / token lifecycle events."
+                  count={counts.webhooks}
+                  href="/webhooks"
+                  cta="Manage webhooks"
+                />
+              </StaggerItem>
+            </StaggerList>
+          </motion.div>
+        )}
       </AnimatePresence>
-
-      <StaggerList className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <StaggerItem>
-          <CountCard
-            title="Connected accounts"
-            description="Social platform accounts available to the API."
-            count={counts.accounts}
-            href="/accounts"
-            cta="Manage accounts"
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <CountCard
-            title="API keys"
-            description="Bearer tokens for programmatic API access."
-            count={counts.apiKeys}
-            href="/api-keys"
-            cta="Manage keys"
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <CountCard
-            title="Webhook endpoints"
-            description="Delivery targets for post / token lifecycle events."
-            count={counts.webhooks}
-            href="/webhooks"
-            cta="Manage webhooks"
-          />
-        </StaggerItem>
-      </StaggerList>
     </div>
   );
 }

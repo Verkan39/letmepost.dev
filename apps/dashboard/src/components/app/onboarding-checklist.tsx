@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CaretDown, CheckCircle, Circle } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,27 @@ export function OnboardingChecklist({ steps }: { steps: ChecklistStep[] }) {
   const [open, setOpen] = useState<string>(
     firstIncomplete >= 0 ? steps[firstIncomplete].id : "",
   );
+
+  // Auto-advance: when a step transitions from done:false → done:true,
+  // collapse it and open the next incomplete one. Tracks per-id done state
+  // so adding/reordering steps doesn't misfire.
+  const prevDone = useRef<Record<string, boolean>>(
+    Object.fromEntries(steps.map((s) => [s.id, s.done])),
+  );
+  const doneKey = steps.map((s) => `${s.id}:${s.done}`).join("|");
+  useEffect(() => {
+    for (const s of steps) {
+      const was = prevDone.current[s.id];
+      if (was === false && s.done) {
+        const idx = steps.findIndex((x) => x.id === s.id);
+        const next = steps.slice(idx + 1).find((x) => !x.done);
+        setOpen(next ? next.id : "");
+        break;
+      }
+    }
+    prevDone.current = Object.fromEntries(steps.map((s) => [s.id, s.done]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doneKey]);
 
   const completed = steps.filter((s) => s.done).length;
   const total = steps.length;

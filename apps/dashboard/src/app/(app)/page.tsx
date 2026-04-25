@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Copy, Plug, Rocket } from "@phosphor-icons/react";
+import { ArrowRight, Copy, Rocket } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { API_URL } from "@/lib/env";
@@ -23,6 +23,7 @@ import {
   OnboardingChecklist,
   type ChecklistStep,
 } from "@/components/app/onboarding-checklist";
+import { OnboardingConnect } from "@/components/app/onboarding-connect";
 
 const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -88,7 +89,7 @@ export default function DashboardHome() {
       title: "Connect your first platform",
       description: "Bluesky, LinkedIn, Pinterest, or Twitter / X.",
       done: hasAccount,
-      body: <ConnectStepBody />,
+      body: <OnboardingConnect onConnected={refresh} />,
     },
     {
       id: "quick-start",
@@ -270,23 +271,6 @@ function ApiKeyStepBody({
       <Button onClick={handleCreate} disabled={creating}>
         <Rocket className="size-4" />
         {creating ? "Creating…" : "Create my first key"}
-      </Button>
-    </div>
-  );
-}
-
-function ConnectStepBody() {
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        Bluesky takes an app password; LinkedIn, Pinterest, and Twitter/X go
-        through OAuth. Tokens are encrypted at rest with per-row data-keys.
-      </p>
-      <Button asChild>
-        <Link href="/accounts/new">
-          <Plug className="size-4" />
-          Connect a platform
-        </Link>
       </Button>
     </div>
   );

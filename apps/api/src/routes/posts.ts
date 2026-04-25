@@ -12,6 +12,7 @@ import {
 import { posts as postsTable, type Post } from "../db/schema/posts.js";
 import { LetmepostError } from "../errors.js";
 import { apiKeyAuth } from "../middleware/api-key.js";
+import { apiKeyOrSession } from "../middleware/api-key-or-session.js";
 import { idempotency } from "../middleware/idempotency.js";
 import { assertKeyCanAccessProfile } from "../middleware/profile-scope.js";
 import { rateLimit } from "../middleware/rate-limit.js";
@@ -25,9 +26,14 @@ import {
 
 export const posts = new Hono();
 
-posts.use("*", apiKeyAuth());
-posts.use("*", rateLimit());
-posts.use("*", idempotency());
+// Per-route middleware chains:
+//   POST /v1/posts          → strict API key + rate limit + idempotency
+//   GET  /v1/posts          → API key OR dashboard session (read-only)
+//   GET  /v1/posts/:id      → same as list
+//
+// Reads accept session because the dashboard talks to the same endpoint;
+// writes stay strict-key only because idempotency / audit / billing are
+// keyed on the api_keys row.
 
 /**
  * Minimum future-delay before we accept a scheduled post, to avoid races
@@ -49,6 +55,9 @@ const MIN_FUTURE_DELAY_MS = 1_000;
  */
 posts.post(
   "/",
+  apiKeyAuth(),
+  rateLimit(),
+  idempotency(),
   zValidator("json", CreatePostRequest, (result) => {
     if (!result.success) {
       const issue = result.error.issues[0];
@@ -331,7 +340,7 @@ function readArrayQuery(
   return flat.length > 0 ? flat : undefined;
 }
 
-posts.get("/", async (c) => {
+posts.get("/", apiKeyOrSession(), async (c) => {
   const rawQuery = {
     profileId: c.req.query("profileId"),
     platform: readArrayQuery(c, "platform"),
@@ -392,7 +401,7 @@ posts.get("/", async (c) => {
   });
 });
 
-posts.get("/:id", async (c) => {
+posts.get("/:id", apiKeyOrSession(), async (c) => {
   const id = c.req.param("id");
   const { organizationId } = c.var.apiKey;
   const repo = new DrizzlePostsReadRepository(c.var.db);

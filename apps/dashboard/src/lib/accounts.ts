@@ -48,13 +48,13 @@ export type Account = {
 };
 
 /**
- * MVP allowlist. The Platform enum in @letmepost/schemas only lists bluesky
- * today; Pinterest + Twitter are being added in a sibling worktree. Keeping
- * this hardcoded buys predictable UI without a cross-package build coupling.
- * Revisit once those providers land in packages/schemas.
+ * Connectable platforms surfaced in the dashboard. Mirrors the Platform enum
+ * in @letmepost/schemas; kept local so the dashboard build doesn't pull in
+ * schemas' zod transitive. Adding a platform = update both places.
  */
 export const CONNECTABLE_PLATFORMS = [
   "bluesky",
+  "linkedin",
   "pinterest",
   "twitter",
 ] as const;

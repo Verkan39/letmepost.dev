@@ -32,6 +32,7 @@ import {
 
 const LABELS: Record<ConnectablePlatform, string> = {
   bluesky: "Bluesky",
+  linkedin: "LinkedIn",
   pinterest: "Pinterest",
   twitter: "Twitter / X",
 };

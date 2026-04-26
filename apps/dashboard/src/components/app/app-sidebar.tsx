@@ -10,6 +10,7 @@ import {
   Key,
   Broadcast,
   ListBullets,
+  Folders,
   SignOut,
   CaretUpDown,
   Check,
@@ -19,6 +20,7 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { NewOrgDialog } from "@/components/app/new-org-dialog";
 import { LogoMark } from "@/components/app/logo";
+import { useActiveProfile } from "@/lib/profiles";
 import {
   Sidebar,
   SidebarContent,
@@ -45,6 +47,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: House },
   { href: "/posts", label: "Logs", icon: ListBullets },
   { href: "/accounts", label: "Accounts", icon: Plug },
+  { href: "/profiles", label: "Profiles", icon: Folders },
   { href: "/api-keys", label: "API keys", icon: Key },
   { href: "/webhooks", label: "Webhooks", icon: Broadcast },
 ] as const;
@@ -56,6 +59,12 @@ export function AppSidebar() {
   const { data: organizations } = authClient.useListOrganizations();
   const activeOrg = authClient.useActiveOrganization().data;
   const [newOrgOpen, setNewOrgOpen] = useState(false);
+  const {
+    profiles,
+    activeProfile,
+    setActiveProfile,
+    isLoading: profilesLoading,
+  } = useActiveProfile();
 
   const initials = (session?.user.name ?? session?.user.email ?? "?")
     .split(/\s+/)
@@ -133,6 +142,53 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
+        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+          <SidebarGroupLabel>Working in</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarMenuButton
+                      className="data-[state=open]:bg-sidebar-accent"
+                      disabled={profilesLoading || profiles.length === 0}
+                    >
+                      <Folders className="size-4" />
+                      <span className="truncate flex-1 text-left">
+                        {profilesLoading
+                          ? "Loading…"
+                          : activeProfile?.name ?? "No profile"}
+                      </span>
+                      {profiles.length > 1 ? (
+                        <CaretUpDown className="ml-auto size-4 shrink-0" />
+                      ) : null}
+                    </SidebarMenuButton>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56">
+                    <DropdownMenuLabel>Profiles</DropdownMenuLabel>
+                    {profiles.map((p) => (
+                      <DropdownMenuItem
+                        key={p.id}
+                        onSelect={() => setActiveProfile(p.id)}
+                      >
+                        <span className="truncate flex-1">{p.name}</span>
+                        {activeProfile?.id === p.id ? (
+                          <Check className="size-4 text-muted-foreground" />
+                        ) : null}
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => router.push("/profiles")}>
+                      <Plus className="size-4" />
+                      <span>Manage profiles</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
         <SidebarGroup>
           <SidebarGroupLabel>Operate</SidebarGroupLabel>
           <SidebarGroupContent>

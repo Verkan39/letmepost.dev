@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "./api";
 import { authClient } from "./auth-client";
+import { queryKeys } from "./query-keys";
 
 /**
  * Client mirror of the `/v1/profiles` contract. Profiles are org sub-units
@@ -98,52 +100,43 @@ export type UseActiveProfileResult = {
 };
 
 /**
- * Hook fetching the active org's profiles and tracking which one the user
- * is "working in". Active profile is purely a client-side concept (the API
- * has no notion of per-session profile scope — callers always pass
- * `?profileId=` explicitly). Returns null until the org and first list
- * arrive so callers can render a skeleton.
+ * Hook fetching the active org's profiles via TanStack Query and tracking
+ * which one the user is "working in". Active profile is purely a
+ * client-side concept (the API has no notion of per-session profile
+ * scope — callers always pass `?profileId=` explicitly). Returns null until
+ * the org and first list arrive so callers can render a skeleton.
  */
 export function useActiveProfile(): UseActiveProfileResult {
   const { data: session } = authClient.useSession();
   const orgId = session?.session?.activeOrganizationId ?? null;
 
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const query = useQuery({
+    queryKey: queryKeys.profiles.list(),
+    queryFn: () => listProfiles().then((r) => r.data ?? []),
+    enabled: !!orgId,
+  });
+
+  const profiles = query.data ?? [];
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [isLoading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await listProfiles();
-      const list = res.data ?? [];
-      setProfiles(list);
-      // Reconcile localStorage selection against the fresh list.
-      const stored = readActiveProfileId(orgId);
-      const valid = stored && list.some((p) => p.id === stored) ? stored : null;
-      const next = valid ?? list[0]?.id ?? null;
-      setActiveId(next);
-      if (orgId) writeActiveProfileId(orgId, next);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load profiles.");
-      setProfiles([]);
-      setActiveId(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [orgId]);
-
+  // Reconcile the stored active profile id against the live list whenever
+  // the list comes back or the org changes. Falls back to the first profile
+  // when the stored id is missing / invalid.
   useEffect(() => {
     if (!orgId) {
-      setProfiles([]);
       setActiveId(null);
-      setLoading(false);
       return;
     }
-    refresh();
-  }, [orgId, refresh]);
+    const stored = readActiveProfileId(orgId);
+    const valid =
+      stored && profiles.some((p) => p.id === stored) ? stored : null;
+    const next = valid ?? profiles[0]?.id ?? null;
+    setActiveId(next);
+    writeActiveProfileId(orgId, next);
+    // We intentionally depend on the joined list of ids rather than the
+    // array reference, so a refetch returning identical data is a no-op.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId, profiles.map((p) => p.id).join("|")]);
 
   const setActiveProfile = useCallback(
     (id: string | null) => {
@@ -153,15 +146,22 @@ export function useActiveProfile(): UseActiveProfileResult {
     [orgId],
   );
 
-  const activeProfile =
-    profiles.find((p) => p.id === activeId) ?? null;
+  const refresh = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
+
+  const activeProfile = profiles.find((p) => p.id === activeId) ?? null;
 
   return {
     profiles,
     activeProfile,
     setActiveProfile,
     refresh,
-    isLoading,
-    error,
+    isLoading: query.isLoading,
+    error: query.error
+      ? query.error instanceof Error
+        ? query.error.message
+        : "Failed to load profiles."
+      : null,
   };
 }

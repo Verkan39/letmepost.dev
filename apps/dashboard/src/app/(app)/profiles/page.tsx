@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { PencilSimple, Plus, Trash } from "@phosphor-icons/react";
 import { ApiRequestError } from "@/lib/api";
@@ -12,6 +13,7 @@ import {
   slugify,
   type Profile,
 } from "@/lib/profiles";
+import { queryKeys } from "@/lib/query-keys";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,41 +46,33 @@ import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
  * stays open with the error visible).
  */
 export default function ProfilesPage() {
-  const [profiles, setProfiles] = useState<Profile[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<Profile | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Profile | null>(null);
 
-  async function refresh() {
-    setError(null);
-    try {
-      const res = await listProfiles();
-      setProfiles(res.data ?? []);
-    } catch (err) {
-      setError(
-        err instanceof ApiRequestError
-          ? err.payload.message
-          : err instanceof Error
-            ? err.message
-            : "Failed to load.",
-      );
-      setProfiles([]);
-    }
-  }
+  const query = useQuery({
+    queryKey: queryKeys.profiles.list(),
+    queryFn: () => listProfiles().then((r) => r.data ?? []),
+  });
+  const profiles = query.data ?? null;
+  const error = query.error
+    ? query.error instanceof ApiRequestError
+      ? query.error.payload.message
+      : query.error instanceof Error
+        ? query.error.message
+        : "Failed to load."
+    : null;
 
-  useEffect(() => {
-    refresh();
-  }, []);
-
-  async function handleDelete(id: string) {
-    try {
-      await deleteProfile(id);
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteProfile(id),
+    onSuccess: () => {
       toast.success("Profile deleted.");
-      refresh();
-    } catch (err) {
-      // Re-throw so the ConfirmDialog stays open; we render the error via
-      // toast and let the user back out manually.
+      queryClient.invalidateQueries({ queryKey: queryKeys.profiles.list() });
+    },
+    onError: (err: unknown) => {
+      // Surface the API's 409 not-empty rule via toast; the ConfirmDialog
+      // re-throws so it stays open and the user can back out manually.
       toast.error(
         err instanceof ApiRequestError
           ? err.payload.message
@@ -86,9 +80,8 @@ export default function ProfilesPage() {
             ? err.message
             : "Delete failed.",
       );
-      throw err;
-    }
-  }
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -179,7 +172,6 @@ export default function ProfilesPage() {
       <CreateProfileDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        onCreated={refresh}
       />
 
       <RenameProfileDialog
@@ -187,7 +179,6 @@ export default function ProfilesPage() {
         onOpenChange={(open) => {
           if (!open) setRenameTarget(null);
         }}
-        onRenamed={refresh}
       />
 
       <ConfirmDialog
@@ -210,7 +201,7 @@ export default function ProfilesPage() {
         confirmLabel="Delete profile"
         variant="destructive"
         onConfirm={async () => {
-          if (pendingDelete) await handleDelete(pendingDelete.id);
+          if (pendingDelete) await deleteMutation.mutateAsync(pendingDelete.id);
         }}
       />
     </div>
@@ -220,31 +211,27 @@ export default function ProfilesPage() {
 function CreateProfileDialog({
   open,
   onOpenChange,
-  onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: () => void;
 }) {
+  const queryClient = useQueryClient();
   const [name, setName] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const slug = useMemo(() => slugify(name), [name]);
 
   function reset() {
     setName("");
-    setSubmitting(false);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      await createProfile({ name, slug });
-      toast.success(`Created "${name}".`);
+  const mutation = useMutation({
+    mutationFn: () => createProfile({ name, slug }),
+    onSuccess: (data) => {
+      toast.success(`Created "${data.name}".`);
+      queryClient.invalidateQueries({ queryKey: queryKeys.profiles.list() });
       onOpenChange(false);
       reset();
-      onCreated();
-    } catch (err) {
+    },
+    onError: (err: unknown) => {
       toast.error(
         err instanceof ApiRequestError
           ? err.payload.message
@@ -252,9 +239,13 @@ function CreateProfileDialog({
             ? err.message
             : "Create failed.",
       );
-    } finally {
-      setSubmitting(false);
-    }
+    },
+  });
+  const submitting = mutation.isPending;
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    mutation.mutate();
   }
 
   return (
@@ -319,29 +310,28 @@ function CreateProfileDialog({
 function RenameProfileDialog({
   target,
   onOpenChange,
-  onRenamed,
 }: {
   target: Profile | null;
   onOpenChange: (open: boolean) => void;
-  onRenamed: () => void;
 }) {
+  const queryClient = useQueryClient();
   const [name, setName] = useState("");
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     setName(target?.name ?? "");
   }, [target]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!target) return;
-    setSubmitting(true);
-    try {
-      await renameProfile(target.id, { name });
+  const mutation = useMutation({
+    mutationFn: () => {
+      if (!target) throw new Error("No target");
+      return renameProfile(target.id, { name });
+    },
+    onSuccess: () => {
       toast.success("Profile renamed.");
+      queryClient.invalidateQueries({ queryKey: queryKeys.profiles.list() });
       onOpenChange(false);
-      onRenamed();
-    } catch (err) {
+    },
+    onError: (err: unknown) => {
       toast.error(
         err instanceof ApiRequestError
           ? err.payload.message
@@ -349,9 +339,14 @@ function RenameProfileDialog({
             ? err.message
             : "Rename failed.",
       );
-    } finally {
-      setSubmitting(false);
-    }
+    },
+  });
+  const submitting = mutation.isPending;
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!target) return;
+    mutation.mutate();
   }
 
   return (

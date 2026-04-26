@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Copy, Plus, Trash, Check } from "@phosphor-icons/react";
+import { Copy, Plus, Trash, Check, Lightning } from "@phosphor-icons/react";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { WEBHOOK_EVENT_TYPES, type WebhookEventType } from "@/lib/webhooks";
+import { WebhookTestDialog } from "@/components/app/webhook-test-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -64,6 +65,7 @@ export default function WebhooksPage() {
     null,
   );
   const [pendingDelete, setPendingDelete] = useState<Endpoint | null>(null);
+  const [testTarget, setTestTarget] = useState<Endpoint | null>(null);
 
   async function refresh() {
     setError(null);
@@ -285,6 +287,14 @@ export default function WebhooksPage() {
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={() => setTestTarget(ep)}
+                  >
+                    <Lightning className="size-4" />
+                    Test
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setPendingDelete(ep)}
                   >
                     <Trash className="size-4" />
@@ -328,6 +338,15 @@ export default function WebhooksPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <WebhookTestDialog
+        open={testTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setTestTarget(null);
+        }}
+        endpointId={testTarget?.id ?? null}
+        endpointUrl={testTarget?.url ?? null}
+      />
 
       <ConfirmDialog
         open={pendingDelete !== null}

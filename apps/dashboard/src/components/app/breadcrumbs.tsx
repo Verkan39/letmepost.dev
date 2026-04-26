@@ -19,6 +19,7 @@ const LABELS: Record<string, string> = {
   "api-keys": "API keys",
   webhooks: "Webhooks",
   posts: "Post log",
+  profiles: "Profiles",
 };
 
 function labelFor(segment: string): string {

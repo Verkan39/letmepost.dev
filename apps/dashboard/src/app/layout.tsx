@@ -7,6 +7,7 @@ import "@fontsource/instrument-serif/400-italic.css";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/sonner";
+import { Providers } from "@/components/app/providers";
 
 export const metadata: Metadata = {
   title: {
@@ -23,8 +24,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={cn("h-full antialiased")}>
       <body className="min-h-full flex flex-col">
-        {children}
-        <Toaster richColors closeButton position="top-right" />
+        <Providers>
+          {children}
+          <Toaster richColors closeButton position="top-right" />
+        </Providers>
       </body>
     </html>
   );

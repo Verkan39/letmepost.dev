@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -14,6 +15,7 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { API_URL } from "@/lib/env";
+import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -40,40 +42,55 @@ type Counts = {
   posts: number | null;
 };
 
+async function loadList<T>(path: string): Promise<T[]> {
+  const res = await apiFetch<{ data?: T[] }>(path);
+  return Array.isArray(res?.data) ? res.data : [];
+}
+
 export default function DashboardHome() {
   const activeOrg = authClient.useActiveOrganization().data;
-  const [counts, setCounts] = useState<Counts>({
-    accounts: null,
-    apiKeys: null,
-    webhooks: null,
-    posts: null,
-  });
+  const queryClient = useQueryClient();
   const [latestKey, setLatestKey] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
 
-  async function refresh() {
-    async function load(path: string): Promise<number | null> {
-      try {
-        const res = await apiFetch<{ data?: unknown[] }>(path);
-        return Array.isArray(res?.data) ? res.data.length : 0;
-      } catch {
-        return null;
-      }
-    }
-    const [accounts, apiKeys, webhooks, posts] = await Promise.all([
-      load("/v1/accounts"),
-      load("/v1/api-keys"),
-      load("/v1/webhook-endpoints"),
-      // limit=1 — we only need a "any?" check, not the full list.
-      load("/v1/posts?limit=1"),
-    ]);
-    setCounts({ accounts, apiKeys, webhooks, posts });
-    setLoaded(true);
+  // Fetch the full lists; the count cards derive their numbers from
+  // `.length`. Sharing the same queryKey as the dedicated list pages means
+  // navigating from /accounts back home doesn't refetch.
+  const accountsQ = useQuery({
+    queryKey: queryKeys.accounts.list(),
+    queryFn: () => loadList<FirstAccount>("/v1/accounts"),
+  });
+  const apiKeysQ = useQuery({
+    queryKey: queryKeys.apiKeys.list(),
+    queryFn: () => loadList<unknown>("/v1/api-keys"),
+  });
+  const webhooksQ = useQuery({
+    queryKey: queryKeys.webhooks.list(),
+    queryFn: () => loadList<unknown>("/v1/webhook-endpoints"),
+  });
+  // Posts uses limit=1 — we only need a "any?" boolean, not full data.
+  const postsQ = useQuery({
+    queryKey: queryKeys.posts.list({ limit: 1, _purpose: "count" }),
+    queryFn: () => loadList<unknown>("/v1/posts?limit=1"),
+  });
+
+  const counts: Counts = {
+    accounts: accountsQ.data?.length ?? null,
+    apiKeys: apiKeysQ.data?.length ?? null,
+    webhooks: webhooksQ.data?.length ?? null,
+    posts: postsQ.data?.length ?? null,
+  };
+  const loaded =
+    !accountsQ.isLoading &&
+    !apiKeysQ.isLoading &&
+    !webhooksQ.isLoading &&
+    !postsQ.isLoading;
+
+  function refresh() {
+    queryClient.invalidateQueries({ queryKey: queryKeys.accounts.list() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.list() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.webhooks.list() });
+    queryClient.invalidateQueries({ queryKey: ["posts"] });
   }
-
-  useEffect(() => {
-    refresh();
-  }, []);
 
   const hasKey = (counts.apiKeys ?? 0) > 0 || latestKey !== null;
   const hasAccount = (counts.accounts ?? 0) > 0;
@@ -241,38 +258,34 @@ function ApiKeyStepBody({
   alreadyHasKey: boolean;
   onCreated: (plaintext: string) => void;
 }) {
-  const [creating, setCreating] = useState(false);
-  const [existing, setExisting] = useState<ExistingKey | null>(null);
+  const queryClient = useQueryClient();
+  // Reuse the apiKeys list cache (already populated by the home page) — when
+  // a key already exists but we don't have the plaintext, we pull the masked
+  // form from the same query and show it in the muted block.
+  const keysQuery = useQuery({
+    queryKey: queryKeys.apiKeys.list(),
+    queryFn: () => loadList<ExistingKey>("/v1/api-keys"),
+    enabled: alreadyHasKey && !latestKey,
+  });
+  const existing = keysQuery.data?.[0]
+    ? {
+        prefix: keysQuery.data[0].prefix,
+        last4: keysQuery.data[0].last4,
+      }
+    : null;
 
-  // When a key already exists but we don't have the plaintext (created in
-  // a prior session), pull the masked form from the list endpoint so we can
-  // show *something* shaped like a key in the same muted block.
-  useEffect(() => {
-    if (!alreadyHasKey || latestKey || existing) return;
-    let cancelled = false;
-    apiFetch<{ data: ExistingKey[] }>("/v1/api-keys")
-      .then((res) => {
-        const first = res?.data?.[0];
-        if (!cancelled && first) {
-          setExisting({ prefix: first.prefix, last4: first.last4 });
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [alreadyHasKey, latestKey, existing]);
-
-  async function handleCreate() {
-    setCreating(true);
-    try {
-      const res = await apiFetch<{ key: string }>("/v1/api-keys", {
+  const createMutation = useMutation({
+    mutationFn: () =>
+      apiFetch<{ key: string }>("/v1/api-keys", {
         method: "POST",
         body: { name: "primary", prefix: "lmp_live_", scopes: [] },
-      });
+      }),
+    onSuccess: (res) => {
       onCreated(res.key);
+      queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.list() });
       toast.success("Copy it now — we won't show it again.");
-    } catch (err) {
+    },
+    onError: (err: unknown) => {
       toast.error(
         err instanceof ApiRequestError
           ? err.payload.message
@@ -280,9 +293,12 @@ function ApiKeyStepBody({
             ? err.message
             : "Couldn't create the key.",
       );
-    } finally {
-      setCreating(false);
-    }
+    },
+  });
+  const creating = createMutation.isPending;
+
+  function handleCreate() {
+    createMutation.mutate();
   }
 
   async function handleCopy(value: string) {
@@ -375,24 +391,15 @@ function QuickStartBody({
   onSent: () => void;
 }) {
   const router = useRouter();
-  const [account, setAccount] = useState<FirstAccount | null>(null);
   const [sending, setSending] = useState(false);
 
-  // Pull the first connected account so the curl example carries a real
-  // accountId/platform — saves the user a copy-paste back-and-forth.
-  useEffect(() => {
-    let cancelled = false;
-    apiFetch<{ data: FirstAccount[] }>("/v1/accounts")
-      .then((res) => {
-        if (!cancelled && Array.isArray(res?.data) && res.data.length > 0) {
-          setAccount(res.data[0]);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Same queryKey as the dashboard's accounts list — the data's already in
+  // cache by the time the user reaches step 3, so this hits the cache.
+  const accountsQuery = useQuery({
+    queryKey: queryKeys.accounts.list(),
+    queryFn: () => loadList<FirstAccount>("/v1/accounts"),
+  });
+  const account = accountsQuery.data?.[0] ?? null;
 
   const accountId = account?.id ?? "<your-account-id>";
   const platform = account?.platform ?? "bluesky";

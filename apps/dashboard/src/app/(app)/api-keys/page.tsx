@@ -33,6 +33,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
+import { useActiveProfile } from "@/lib/profiles";
 
 type ApiKey = {
   id: string;
@@ -40,6 +41,7 @@ type ApiKey = {
   prefix: string;
   last4: string;
   scopes: string[];
+  profileId?: string | null;
   createdAt: string;
   lastUsedAt?: string | null;
   revokedAt?: string | null;
@@ -48,10 +50,13 @@ type ApiKey = {
 type CreateResponse = ApiKey & { key: string };
 
 export default function ApiKeysPage() {
+  const { profiles } = useActiveProfile();
   const [keys, setKeys] = useState<ApiKey[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [prefix, setPrefix] = useState<"lmp_live_" | "lmp_test_">("lmp_live_");
+  // "" sentinel = org-wide; otherwise a profile id.
+  const [scope, setScope] = useState<string>("");
   const [creating, setCreating] = useState(false);
   const [plaintext, setPlaintext] = useState<CreateResponse | null>(null);
   const [pendingRevoke, setPendingRevoke] = useState<ApiKey | null>(null);
@@ -83,10 +88,16 @@ export default function ApiKeysPage() {
     try {
       const res = await apiFetch<CreateResponse>("/v1/api-keys", {
         method: "POST",
-        body: { name, prefix, scopes: [] },
+        body: {
+          name,
+          prefix,
+          scopes: [],
+          profileId: scope === "" ? null : scope,
+        },
       });
       setPlaintext(res);
       setName("");
+      setScope("");
       refresh();
     } catch (err) {
       toast.error(
@@ -146,7 +157,13 @@ export default function ApiKeysPage() {
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleCreate}>
-          <CardContent className="grid gap-4 md:grid-cols-[1fr_180px_auto] md:items-end">
+          <CardContent
+            className={
+              profiles.length > 0
+                ? "grid gap-4 md:grid-cols-[1fr_140px_180px_auto] md:items-end"
+                : "grid gap-4 md:grid-cols-[1fr_180px_auto] md:items-end"
+            }
+          >
             <div className="space-y-2">
               <Label htmlFor="key-name">Name</Label>
               <Input
@@ -175,6 +192,27 @@ export default function ApiKeysPage() {
                 </SelectContent>
               </Select>
             </div>
+            {profiles.length > 0 ? (
+              <div className="space-y-2">
+                <Label htmlFor="key-scope">Scope</Label>
+                <Select
+                  value={scope === "" ? "__org" : scope}
+                  onValueChange={(v) => setScope(v === "__org" ? "" : v)}
+                >
+                  <SelectTrigger id="key-scope" className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__org">Org-wide</SelectItem>
+                    {profiles.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
             <div className="space-y-2">
               {/* Invisible label keeps the button aligned with the labelled
                   inputs to its left rather than floating mid-row. */}
@@ -213,12 +251,18 @@ export default function ApiKeysPage() {
               <Card size="sm">
                 <CardContent className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm truncate">
                         {k.name}
                       </span>
                       <Badge variant="outline" className="text-[10px]">
                         {k.prefix.replace(/_$/, "")}
+                      </Badge>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {k.profileId
+                          ? profiles.find((p) => p.id === k.profileId)?.name ??
+                            "profile"
+                          : "org-wide"}
                       </Badge>
                       {k.revokedAt ? (
                         <Badge variant="destructive">revoked</Badge>

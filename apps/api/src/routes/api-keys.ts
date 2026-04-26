@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { apiKeys } from "../db/schema/api_keys.js";
+import { profiles as profilesTable } from "../db/schema/profiles.js";
 import { LetmepostError } from "../errors.js";
 import { idempotency } from "../middleware/idempotency.js";
 import { rateLimit } from "../middleware/rate-limit.js";
@@ -13,6 +14,11 @@ const CreateApiKeyRequest = z.object({
   name: z.string().min(1).max(100),
   prefix: z.enum(["lmp_live_", "lmp_test_"]).default("lmp_live_"),
   scopes: z.array(z.string()).default([]),
+  /**
+   * Optional profile scope. When set, the key only authenticates requests
+   * targeting that profile; cross-profile reads/writes 404. NULL = org-wide.
+   */
+  profileId: z.string().uuid().nullable().optional(),
 });
 
 function hashKey(plaintext: string): string {
@@ -46,8 +52,27 @@ apiKeyRoutes.post(
     }
   }),
   async (c) => {
-    const { name, prefix, scopes } = c.req.valid("json");
+    const { name, prefix, scopes, profileId } = c.req.valid("json");
     const { organizationId } = c.var.session;
+
+    // Validate the profile scope if one was supplied — cross-org IDs would
+    // otherwise create a dangling reference (the FK CASCADE would still
+    // protect us from leaks, but a friendly 404 is the right surface).
+    if (profileId) {
+      const [profile] = await c.var.db
+        .select({ organizationId: profilesTable.organizationId })
+        .from(profilesTable)
+        .where(eq(profilesTable.id, profileId))
+        .limit(1);
+      if (!profile || profile.organizationId !== organizationId) {
+        throw new LetmepostError({
+          code: "not_found",
+          status: 404,
+          message: "Profile not found.",
+          rule: "profile.unknown",
+        });
+      }
+    }
 
     const plaintext = generateKey(prefix);
     const last4 = plaintext.slice(-4);
@@ -56,6 +81,7 @@ apiKeyRoutes.post(
       .insert(apiKeys)
       .values({
         organizationId,
+        profileId: profileId ?? null,
         name,
         prefix,
         hashedKey: hashKey(plaintext),
@@ -78,6 +104,7 @@ apiKeyRoutes.post(
         prefix: row.prefix,
         last4: row.last4,
         scopes: row.scopes,
+        profileId: row.profileId,
         key: plaintext,
         createdAt: row.createdAt,
       },
@@ -96,6 +123,7 @@ apiKeyRoutes.get("/", async (c) => {
       prefix: apiKeys.prefix,
       last4: apiKeys.last4,
       scopes: apiKeys.scopes,
+      profileId: apiKeys.profileId,
       createdAt: apiKeys.createdAt,
       lastUsedAt: apiKeys.lastUsedAt,
       revokedAt: apiKeys.revokedAt,

@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Trash } from "@phosphor-icons/react";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import type { Account } from "@/lib/accounts";
+import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,39 +22,33 @@ import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
 
 export default function AccountsListPage() {
-  const [accounts, setAccounts] = useState<Account[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [pendingDisconnect, setPendingDisconnect] = useState<Account | null>(
     null,
   );
 
-  async function refresh() {
-    setError(null);
-    try {
-      const res = await apiFetch<{ data: Account[] }>("/v1/accounts");
-      setAccounts(res.data ?? []);
-    } catch (err) {
-      if (err instanceof ApiRequestError) {
-        setError(err.payload.message);
-      } else {
-        setError(err instanceof Error ? err.message : "Failed to load.");
-      }
-      setAccounts([]);
-    }
-  }
+  const query = useQuery({
+    queryKey: queryKeys.accounts.list(),
+    queryFn: () =>
+      apiFetch<{ data: Account[] }>("/v1/accounts").then((r) => r.data ?? []),
+  });
+  const accounts = query.data ?? null;
+  const error = query.error
+    ? query.error instanceof ApiRequestError
+      ? query.error.payload.message
+      : query.error instanceof Error
+        ? query.error.message
+        : "Failed to load."
+    : null;
 
-  useEffect(() => {
-    refresh();
-  }, []);
-
-  async function handleDelete(id: string) {
-    try {
-      await apiFetch<{ id: string }>(`/v1/accounts/${id}`, {
-        method: "DELETE",
-      });
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ id: string }>(`/v1/accounts/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
       toast.success("Account disconnected.");
-      refresh();
-    } catch (err) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.list() });
+    },
+    onError: (err: unknown) => {
       toast.error(
         err instanceof ApiRequestError
           ? err.payload.message
@@ -60,8 +56,8 @@ export default function AccountsListPage() {
             ? err.message
             : "Delete failed.",
       );
-    }
-  }
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -167,7 +163,8 @@ export default function AccountsListPage() {
         confirmLabel="Disconnect"
         variant="destructive"
         onConfirm={async () => {
-          if (pendingDisconnect) await handleDelete(pendingDisconnect.id);
+          if (pendingDisconnect)
+            await deleteMutation.mutateAsync(pendingDisconnect.id);
         }}
       />
     </div>

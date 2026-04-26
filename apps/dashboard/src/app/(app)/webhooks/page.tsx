@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Copy, Plus, Trash, Check, Lightning } from "@phosphor-icons/react";
 import { apiFetch, ApiRequestError } from "@/lib/api";
+import { queryKeys } from "@/lib/query-keys";
 import { WEBHOOK_EVENT_TYPES, type WebhookEventType } from "@/lib/webhooks";
 import { WebhookTestDialog } from "@/components/app/webhook-test-dialog";
 import { Button } from "@/components/ui/button";
@@ -46,12 +48,10 @@ type Endpoint = {
 type CreateResponse = Endpoint & { signingSecret: string };
 
 export default function WebhooksPage() {
-  const [endpoints, setEndpoints] = useState<Endpoint[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [url, setUrl] = useState("");
   const [description, setDescription] = useState("");
   const [events, setEvents] = useState<Set<WebhookEventType>>(new Set());
-  const [creating, setCreating] = useState(false);
 
   function toggleEvent(ev: WebhookEventType) {
     setEvents((prev) => {
@@ -67,47 +67,40 @@ export default function WebhooksPage() {
   const [pendingDelete, setPendingDelete] = useState<Endpoint | null>(null);
   const [testTarget, setTestTarget] = useState<Endpoint | null>(null);
 
-  async function refresh() {
-    setError(null);
-    try {
-      const res = await apiFetch<{ data: Endpoint[] }>(
-        "/v1/webhook-endpoints",
-      );
-      setEndpoints(res.data ?? []);
-    } catch (err) {
-      setError(
-        err instanceof ApiRequestError
-          ? err.payload.message
-          : err instanceof Error
-            ? err.message
-            : "Failed to load.",
-      );
-      setEndpoints([]);
-    }
-  }
+  const query = useQuery({
+    queryKey: queryKeys.webhooks.list(),
+    queryFn: () =>
+      apiFetch<{ data: Endpoint[] }>("/v1/webhook-endpoints").then(
+        (r) => r.data ?? [],
+      ),
+  });
+  const endpoints = query.data ?? null;
+  const error = query.error
+    ? query.error instanceof ApiRequestError
+      ? query.error.payload.message
+      : query.error instanceof Error
+        ? query.error.message
+        : "Failed to load."
+    : null;
 
-  useEffect(() => {
-    refresh();
-  }, []);
-
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setCreating(true);
-    try {
-      const res = await apiFetch<CreateResponse>("/v1/webhook-endpoints", {
+  const createMutation = useMutation({
+    mutationFn: () =>
+      apiFetch<CreateResponse>("/v1/webhook-endpoints", {
         method: "POST",
         body: {
           url,
           events: Array.from(events),
           description: description.length > 0 ? description : undefined,
         },
-      });
+      }),
+    onSuccess: (res) => {
       setSecretReveal(res);
       setUrl("");
       setDescription("");
       setEvents(new Set());
-      refresh();
-    } catch (err) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.webhooks.list() });
+    },
+    onError: (err: unknown) => {
       toast.error(
         err instanceof ApiRequestError
           ? err.payload.message
@@ -115,17 +108,18 @@ export default function WebhooksPage() {
             ? err.message
             : "Create failed.",
       );
-    } finally {
-      setCreating(false);
-    }
-  }
+    },
+  });
+  const creating = createMutation.isPending;
 
-  async function handleDelete(id: string) {
-    try {
-      await apiFetch(`/v1/webhook-endpoints/${id}`, { method: "DELETE" });
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiFetch(`/v1/webhook-endpoints/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
       toast.success("Endpoint deleted.");
-      refresh();
-    } catch (err) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.webhooks.list() });
+    },
+    onError: (err: unknown) => {
       toast.error(
         err instanceof ApiRequestError
           ? err.payload.message
@@ -133,7 +127,12 @@ export default function WebhooksPage() {
             ? err.message
             : "Delete failed.",
       );
-    }
+    },
+  });
+
+  function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    createMutation.mutate();
   }
 
   async function copySecret() {
@@ -368,7 +367,7 @@ export default function WebhooksPage() {
         confirmLabel="Delete endpoint"
         variant="destructive"
         onConfirm={async () => {
-          if (pendingDelete) await handleDelete(pendingDelete.id);
+          if (pendingDelete) await deleteMutation.mutateAsync(pendingDelete.id);
         }}
       />
     </div>

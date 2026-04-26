@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Copy, Plus, Trash } from "@phosphor-icons/react";
 import { apiFetch, ApiRequestError } from "@/lib/api";
+import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -50,43 +52,32 @@ type ApiKey = {
 type CreateResponse = ApiKey & { key: string };
 
 export default function ApiKeysPage() {
+  const queryClient = useQueryClient();
   const { profiles } = useActiveProfile();
-  const [keys, setKeys] = useState<ApiKey[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [prefix, setPrefix] = useState<"lmp_live_" | "lmp_test_">("lmp_live_");
   // "" sentinel = org-wide; otherwise a profile id.
   const [scope, setScope] = useState<string>("");
-  const [creating, setCreating] = useState(false);
   const [plaintext, setPlaintext] = useState<CreateResponse | null>(null);
   const [pendingRevoke, setPendingRevoke] = useState<ApiKey | null>(null);
 
-  async function refresh() {
-    setError(null);
-    try {
-      const res = await apiFetch<{ data: ApiKey[] }>("/v1/api-keys");
-      setKeys(res.data ?? []);
-    } catch (err) {
-      setError(
-        err instanceof ApiRequestError
-          ? err.payload.message
-          : err instanceof Error
-            ? err.message
-            : "Failed to load.",
-      );
-      setKeys([]);
-    }
-  }
+  const query = useQuery({
+    queryKey: queryKeys.apiKeys.list(),
+    queryFn: () =>
+      apiFetch<{ data: ApiKey[] }>("/v1/api-keys").then((r) => r.data ?? []),
+  });
+  const keys = query.data ?? null;
+  const error = query.error
+    ? query.error instanceof ApiRequestError
+      ? query.error.payload.message
+      : query.error instanceof Error
+        ? query.error.message
+        : "Failed to load."
+    : null;
 
-  useEffect(() => {
-    refresh();
-  }, []);
-
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setCreating(true);
-    try {
-      const res = await apiFetch<CreateResponse>("/v1/api-keys", {
+  const createMutation = useMutation({
+    mutationFn: () =>
+      apiFetch<CreateResponse>("/v1/api-keys", {
         method: "POST",
         body: {
           name,
@@ -94,12 +85,14 @@ export default function ApiKeysPage() {
           scopes: [],
           profileId: scope === "" ? null : scope,
         },
-      });
+      }),
+    onSuccess: (res) => {
       setPlaintext(res);
       setName("");
       setScope("");
-      refresh();
-    } catch (err) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.list() });
+    },
+    onError: (err: unknown) => {
       toast.error(
         err instanceof ApiRequestError
           ? err.payload.message
@@ -107,17 +100,18 @@ export default function ApiKeysPage() {
             ? err.message
             : "Create failed.",
       );
-    } finally {
-      setCreating(false);
-    }
-  }
+    },
+  });
+  const creating = createMutation.isPending;
 
-  async function handleRevoke(id: string) {
-    try {
-      await apiFetch(`/v1/api-keys/${id}`, { method: "DELETE" });
+  const revokeMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiFetch(`/v1/api-keys/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
       toast.success("Key revoked.");
-      refresh();
-    } catch (err) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.list() });
+    },
+    onError: (err: unknown) => {
       toast.error(
         err instanceof ApiRequestError
           ? err.payload.message
@@ -125,7 +119,12 @@ export default function ApiKeysPage() {
             ? err.message
             : "Revoke failed.",
       );
-    }
+    },
+  });
+
+  function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    createMutation.mutate();
   }
 
   async function copyKey() {
@@ -341,7 +340,7 @@ export default function ApiKeysPage() {
         confirmLabel="Revoke key"
         variant="destructive"
         onConfirm={async () => {
-          if (pendingRevoke) await handleRevoke(pendingRevoke.id);
+          if (pendingRevoke) await revokeMutation.mutateAsync(pendingRevoke.id);
         }}
       />
     </div>

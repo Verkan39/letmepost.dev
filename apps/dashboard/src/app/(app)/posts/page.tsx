@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowsClockwise,
   Check,
@@ -16,11 +17,11 @@ import {
   POST_STATUSES,
   type ListPostsFilters,
   type PostErrorCode,
-  type PostListItem,
   type PostStatus,
 } from "@/lib/posts";
 import { CONNECTABLE_PLATFORMS } from "@/lib/accounts";
 import { useActiveProfile } from "@/lib/profiles";
+import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -98,8 +99,6 @@ function presetToAfter(preset: RangePreset): string | undefined {
 
 export default function PostsPage() {
   const { profiles, activeProfile } = useActiveProfile();
-  const [items, setItems] = useState<PostListItem[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const [platform, setPlatform] = useState<string>("");
   const [status, setStatus] = useState<string>("");
@@ -114,7 +113,6 @@ export default function PostsPage() {
   const [cursorStack, setCursorStack] = useState<(string | undefined)[]>([
     undefined,
   ]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
 
   // Snap profile filter to the sidebar's active profile until the user
   // explicitly changes the dropdown.
@@ -151,49 +149,23 @@ export default function PostsPage() {
     cursorStack,
   ]);
 
-  // Load + refresh logic. `refresh()` re-runs the latest filter set; the
-  // useEffect bound to `filters` handles filter-change reloads.
-  const [refreshKey, setRefreshKey] = useState(0);
-  const cancelRef = useRef(false);
+  // Filter object goes into the queryKey so each filter combination caches
+  // independently; navigating Newer/Older keeps the prior page warm.
+  const query = useQuery({
+    queryKey: queryKeys.posts.list(filters),
+    queryFn: () => listPosts(filters),
+  });
+  const items = query.data?.data ?? null;
+  const nextCursor = query.data?.nextCursor ?? null;
+  const error = query.error
+    ? query.error instanceof ApiRequestError
+      ? query.error.payload.message
+      : query.error instanceof Error
+        ? query.error.message
+        : "Failed to load posts."
+    : null;
 
-  useEffect(() => {
-    cancelRef.current = false;
-    setError(null);
-    setItems(null);
-    listPosts(filters)
-      .then((res) => {
-        if (cancelRef.current) return;
-        setItems(res.data);
-        setNextCursor(res.nextCursor);
-      })
-      .catch((err) => {
-        if (cancelRef.current) return;
-        setError(
-          err instanceof ApiRequestError
-            ? err.payload.message
-            : err instanceof Error
-              ? err.message
-              : "Failed to load posts.",
-        );
-        setItems([]);
-      });
-    return () => {
-      cancelRef.current = true;
-    };
-  }, [filters, refreshKey]);
-
-  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
-
-  // Refetch when the tab comes back into focus — operators flip away to
-  // tail logs in another tab and come back wanting fresh data.
-  useEffect(() => {
-    function onVisibility() {
-      if (document.visibilityState === "visible") refresh();
-    }
-    document.addEventListener("visibilitychange", onVisibility);
-    return () =>
-      document.removeEventListener("visibilitychange", onVisibility);
-  }, [refresh]);
+  const refresh = () => query.refetch();
 
   function resetCursor() {
     setCursorStack([undefined]);
@@ -228,7 +200,7 @@ export default function PostsPage() {
     errorCodes.size > 0 ||
     range !== "30d";
   const onFirstPage = cursorStack.length === 1;
-  const isLoading = items === null;
+  const isLoading = query.isLoading && items === null;
 
   return (
     <div className="space-y-4">
@@ -243,7 +215,7 @@ export default function PostsPage() {
         </div>
         <Button variant="outline" size="sm" onClick={refresh}>
           <ArrowsClockwise
-            className={isLoading ? "size-4 animate-spin" : "size-4"}
+            className={query.isFetching ? "size-4 animate-spin" : "size-4"}
           />
           Refresh
         </Button>
@@ -404,7 +376,7 @@ export default function PostsPage() {
           <Skeleton className="h-12" />
           <Skeleton className="h-12" />
         </div>
-      ) : items.length === 0 ? (
+      ) : !items || items.length === 0 ? (
         <Card>
           <CardHeader>
             <CardTitle>No posts in range</CardTitle>

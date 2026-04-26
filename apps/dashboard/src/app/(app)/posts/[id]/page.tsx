@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Clipboard } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { getPost, statusTone, type PostDetail } from "@/lib/posts";
 import { API_URL } from "@/lib/env";
+import { queryKeys } from "@/lib/query-keys";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,30 +37,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function PostDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
-  const [post, setPost] = useState<PostDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setError(null);
-    getPost(id)
-      .then((p) => {
-        if (!cancelled) setPost(p);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(
-          err instanceof ApiRequestError
-            ? err.payload.message
-            : err instanceof Error
-              ? err.message
-              : "Failed to load post.",
-        );
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
+  const query = useQuery({
+    queryKey: queryKeys.posts.detail(id),
+    queryFn: () => getPost(id),
+    enabled: !!id,
+  });
+  const post = query.data ?? null;
+  const error = query.error
+    ? query.error instanceof ApiRequestError
+      ? query.error.payload.message
+      : query.error instanceof Error
+        ? query.error.message
+        : "Failed to load post."
+    : null;
 
   return (
     <div className="space-y-6">
@@ -297,27 +288,24 @@ type ApiKeyRow = {
 };
 
 function CopyAsCurl({ post }: { post: PostDetail }) {
-  const [keys, setKeys] = useState<ApiKeyRow[]>([]);
   const [pickedKeyId, setPickedKeyId] = useState<string>("");
 
   // Pull the user's keys so we can pre-fill the curl with a redacted form
   // of one of their actual keys (prefix…last4). They still need to swap in
   // the plaintext before running, but the placeholder concretely points at
   // a key in their account rather than a generic stub.
+  const keysQuery = useQuery({
+    queryKey: queryKeys.apiKeys.list(),
+    queryFn: () =>
+      apiFetch<{ data: ApiKeyRow[] }>("/v1/api-keys").then((r) =>
+        (r?.data ?? []).filter((k) => !k.revokedAt),
+      ),
+  });
+  const keys = keysQuery.data ?? [];
+  // Default-select the first live key as soon as the list arrives.
   useEffect(() => {
-    let cancelled = false;
-    apiFetch<{ data: ApiKeyRow[] }>("/v1/api-keys")
-      .then((res) => {
-        if (cancelled) return;
-        const live = (res?.data ?? []).filter((k) => !k.revokedAt);
-        setKeys(live);
-        if (live[0]) setPickedKeyId(live[0].id);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (!pickedKeyId && keys[0]) setPickedKeyId(keys[0].id);
+  }, [pickedKeyId, keys]);
 
   const pickedKey = keys.find((k) => k.id === pickedKeyId);
   const keyPlaceholder = pickedKey

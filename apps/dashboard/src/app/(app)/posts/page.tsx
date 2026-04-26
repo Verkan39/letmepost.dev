@@ -1,20 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { ArrowRight, FunnelSimple, X } from "@phosphor-icons/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowsClockwise,
+  Check,
+  Clock,
+  FunnelSimple,
+  WarningCircle,
+  X,
+} from "@phosphor-icons/react";
 import { ApiRequestError } from "@/lib/api";
 import {
   listPosts,
+  POST_ERROR_CODES,
   POST_STATUSES,
-  statusTone,
   type ListPostsFilters,
+  type PostErrorCode,
   type PostListItem,
   type PostStatus,
 } from "@/lib/posts";
 import { CONNECTABLE_PLATFORMS } from "@/lib/accounts";
 import { useActiveProfile } from "@/lib/profiles";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,7 +29,24 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -31,32 +54,70 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
+import { Skeleton } from "@/components/ui/skeleton";
+import { FadeIn } from "@/components/app/motion";
+import { PostsTable } from "@/components/app/posts-table";
 
 /**
  * Post Log — the operator's "where did my post go?" screen.
  *
- * Filters: platform × status. (Profile filter and time range come in a
- * follow-up once the dashboard has a profile switcher.) Pagination via the
- * opaque cursor returned by the API; we keep a stack so "back" works.
+ * Filters (all server-side via `?` params on /v1/posts):
+ *   - profile (defaults to active profile from sidebar)
+ *   - platform
+ *   - status
+ *   - time range (presets + custom)
+ *   - error code (multi-select)
+ *
+ * Pagination via the opaque cursor returned by the API; we keep a stack so
+ * "back" works. Refetch fires on tab focus + manual Refresh.
  */
+
+type RangePreset = "24h" | "7d" | "30d" | "all" | "custom";
+
+const RANGE_PRESET_LABELS: Record<RangePreset, string> = {
+  "24h": "Last 24h",
+  "7d": "Last 7 days",
+  "30d": "Last 30 days",
+  all: "All time",
+  custom: "Custom range",
+};
+
+function presetToAfter(preset: RangePreset): string | undefined {
+  const now = Date.now();
+  switch (preset) {
+    case "24h":
+      return new Date(now - 24 * 60 * 60 * 1000).toISOString();
+    case "7d":
+      return new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
+    case "30d":
+      return new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
+    default:
+      return undefined;
+  }
+}
+
 export default function PostsPage() {
   const { profiles, activeProfile } = useActiveProfile();
   const [items, setItems] = useState<PostListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
   const [platform, setPlatform] = useState<string>("");
   const [status, setStatus] = useState<string>("");
-  // "" sentinel = "all profiles". Defaults to the active profile from the
-  // sidebar so the post log narrows naturally to whatever the user is
-  // currently working in. They can widen back to "all" with the dropdown.
   const [profileId, setProfileId] = useState<string>("");
+  const [errorCodes, setErrorCodes] = useState<Set<PostErrorCode>>(new Set());
+
+  const [range, setRange] = useState<RangePreset>("30d");
+  const [customAfter, setCustomAfter] = useState<string>("");
+  const [customBefore, setCustomBefore] = useState<string>("");
+  const [customDialogOpen, setCustomDialogOpen] = useState(false);
+
   const [cursorStack, setCursorStack] = useState<(string | undefined)[]>([
     undefined,
   ]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
 
-  // When the active profile in the sidebar changes, snap the filter to it
-  // unless the user has explicitly chosen "all profiles".
+  // Snap profile filter to the sidebar's active profile until the user
+  // explicitly changes the dropdown.
   const [profileTouched, setProfileTouched] = useState(false);
   useEffect(() => {
     if (profileTouched) return;
@@ -68,23 +129,45 @@ export default function PostsPage() {
     if (platform) f.platform = [platform];
     if (status) f.status = [status as PostStatus];
     if (profileId) f.profileId = profileId;
+    if (errorCodes.size > 0) f.errorCode = Array.from(errorCodes);
+    if (range === "custom") {
+      if (customAfter) f.after = new Date(customAfter).toISOString();
+      if (customBefore) f.before = new Date(customBefore).toISOString();
+    } else {
+      const after = presetToAfter(range);
+      if (after) f.after = after;
+    }
     const cur = cursorStack[cursorStack.length - 1];
     if (cur) f.cursor = cur;
     return f;
-  }, [platform, status, profileId, cursorStack]);
+  }, [
+    platform,
+    status,
+    profileId,
+    errorCodes,
+    range,
+    customAfter,
+    customBefore,
+    cursorStack,
+  ]);
+
+  // Load + refresh logic. `refresh()` re-runs the latest filter set; the
+  // useEffect bound to `filters` handles filter-change reloads.
+  const [refreshKey, setRefreshKey] = useState(0);
+  const cancelRef = useRef(false);
 
   useEffect(() => {
-    let cancelled = false;
+    cancelRef.current = false;
     setError(null);
     setItems(null);
     listPosts(filters)
       .then((res) => {
-        if (cancelled) return;
+        if (cancelRef.current) return;
         setItems(res.data);
         setNextCursor(res.nextCursor);
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (cancelRef.current) return;
         setError(
           err instanceof ApiRequestError
             ? err.payload.message
@@ -95,9 +178,22 @@ export default function PostsPage() {
         setItems([]);
       });
     return () => {
-      cancelled = true;
+      cancelRef.current = true;
     };
-  }, [filters]);
+  }, [filters, refreshKey]);
+
+  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+
+  // Refetch when the tab comes back into focus — operators flip away to
+  // tail logs in another tab and come back wanting fresh data.
+  useEffect(() => {
+    function onVisibility() {
+      if (document.visibilityState === "visible") refresh();
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () =>
+      document.removeEventListener("visibilitychange", onVisibility);
+  }, [refresh]);
 
   function resetCursor() {
     setCursorStack([undefined]);
@@ -108,26 +204,54 @@ export default function PostsPage() {
     setStatus("");
     setProfileId("");
     setProfileTouched(true);
+    setErrorCodes(new Set());
+    setRange("30d");
+    setCustomAfter("");
+    setCustomBefore("");
+    resetCursor();
+  }
+
+  function toggleErrorCode(code: PostErrorCode) {
+    setErrorCodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
     resetCursor();
   }
 
   const hasActiveFilters =
-    platform !== "" || status !== "" || profileId !== "";
+    platform !== "" ||
+    status !== "" ||
+    profileId !== "" ||
+    errorCodes.size > 0 ||
+    range !== "30d";
   const onFirstPage = cursorStack.length === 1;
+  const isLoading = items === null;
 
   return (
-    <div className="space-y-6">
-      <FadeIn>
-        <h1 className="text-lg font-semibold">Post log</h1>
-        <p className="text-xs text-muted-foreground">
-          Every post your org has sent through letmepost. When something fails,
-          this is where you see the rule, the upstream response, and the
-          remediation.
-        </p>
+    <div className="space-y-4">
+      <FadeIn className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-lg font-semibold">Post log</h1>
+          <p className="text-xs text-muted-foreground">
+            Every post your org has sent through letmepost. When something
+            fails, this is where you see the rule, the upstream response, and
+            the remediation.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={refresh}>
+          <ArrowsClockwise
+            className={isLoading ? "size-4 animate-spin" : "size-4"}
+          />
+          Refresh
+        </Button>
       </FadeIn>
 
       <div className="flex items-center gap-2 flex-wrap">
         <FunnelSimple className="size-4 text-muted-foreground" />
+
         {profiles.length > 0 ? (
           <Select
             value={profileId || "all"}
@@ -137,7 +261,7 @@ export default function PostsPage() {
               resetCursor();
             }}
           >
-            <SelectTrigger className="h-8 w-[160px]">
+            <SelectTrigger className="h-8 w-[150px]">
               <SelectValue placeholder="Profile" />
             </SelectTrigger>
             <SelectContent>
@@ -150,6 +274,7 @@ export default function PostsPage() {
             </SelectContent>
           </Select>
         ) : null}
+
         <Select
           value={platform || "all"}
           onValueChange={(v) => {
@@ -157,7 +282,7 @@ export default function PostsPage() {
             resetCursor();
           }}
         >
-          <SelectTrigger className="h-8 w-[160px]">
+          <SelectTrigger className="h-8 w-[150px]">
             <SelectValue placeholder="Platform" />
           </SelectTrigger>
           <SelectContent>
@@ -169,6 +294,7 @@ export default function PostsPage() {
             ))}
           </SelectContent>
         </Select>
+
         <Select
           value={status || "all"}
           onValueChange={(v) => {
@@ -176,7 +302,7 @@ export default function PostsPage() {
             resetCursor();
           }}
         >
-          <SelectTrigger className="h-8 w-[160px]">
+          <SelectTrigger className="h-8 w-[150px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -188,6 +314,55 @@ export default function PostsPage() {
             ))}
           </SelectContent>
         </Select>
+
+        <Select
+          value={range}
+          onValueChange={(v) => {
+            const next = v as RangePreset;
+            setRange(next);
+            if (next === "custom") setCustomDialogOpen(true);
+            resetCursor();
+          }}
+        >
+          <SelectTrigger className="h-8 w-[170px]">
+            <Clock className="size-3 text-muted-foreground" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(RANGE_PRESET_LABELS) as RangePreset[]).map((p) => (
+              <SelectItem key={p} value={p}>
+                {RANGE_PRESET_LABELS[p]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8">
+              <WarningCircle className="size-3" />
+              {errorCodes.size === 0
+                ? "Error code"
+                : `${errorCodes.size} code${errorCodes.size === 1 ? "" : "s"}`}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuLabel>Filter by error code</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {POST_ERROR_CODES.map((code) => (
+              <DropdownMenuCheckboxItem
+                key={code}
+                checked={errorCodes.has(code)}
+                onCheckedChange={() => toggleErrorCode(code)}
+                onSelect={(e) => e.preventDefault()}
+                className="font-mono text-xs"
+              >
+                {code}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         {hasActiveFilters ? (
           <Button variant="ghost" size="sm" onClick={clearFilters}>
             <X className="size-3" />
@@ -196,6 +371,25 @@ export default function PostsPage() {
         ) : null}
       </div>
 
+      {/* Active error-code chips, when present — visual reinforcement of
+          what's actually filtering the table beyond the dropdown count. */}
+      {errorCodes.size > 0 ? (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {Array.from(errorCodes).map((code) => (
+            <button
+              key={code}
+              type="button"
+              onClick={() => toggleErrorCode(code)}
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-mono ring-1 ring-foreground/20 hover:ring-foreground/40 transition-colors"
+            >
+              <Check className="size-3" weight="bold" />
+              {code}
+              <X className="size-3" />
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {error ? (
         <Card>
           <CardHeader>
@@ -203,31 +397,26 @@ export default function PostsPage() {
             <CardDescription>{error}</CardDescription>
           </CardHeader>
         </Card>
-      ) : items === null ? (
+      ) : isLoading ? (
         <div className="space-y-2">
-          <Skeleton className="h-14" />
-          <Skeleton className="h-14" />
-          <Skeleton className="h-14" />
+          <Skeleton className="h-9" />
+          <Skeleton className="h-12" />
+          <Skeleton className="h-12" />
+          <Skeleton className="h-12" />
         </div>
       ) : items.length === 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>No posts yet</CardTitle>
+            <CardTitle>No posts in range</CardTitle>
             <CardDescription>
               {hasActiveFilters
-                ? "Nothing matches the current filters."
+                ? "Nothing matches the current filters. Widen the range or clear the filter chips."
                 : "Once you publish a post via the API, it shows up here — including the failures."}
             </CardDescription>
           </CardHeader>
         </Card>
       ) : (
-        <StaggerList className="space-y-2">
-          {items.map((post) => (
-            <StaggerItem key={post.id}>
-              <PostRow post={post} />
-            </StaggerItem>
-          ))}
-        </StaggerList>
+        <PostsTable posts={items} />
       )}
 
       {(items?.length ?? 0) > 0 && (nextCursor || !onFirstPage) ? (
@@ -252,40 +441,88 @@ export default function PostsPage() {
           </Button>
         </div>
       ) : null}
+
+      <CustomRangeDialog
+        open={customDialogOpen}
+        onOpenChange={setCustomDialogOpen}
+        after={customAfter}
+        before={customBefore}
+        onApply={(a, b) => {
+          setCustomAfter(a);
+          setCustomBefore(b);
+          setRange("custom");
+          resetCursor();
+          setCustomDialogOpen(false);
+        }}
+      />
     </div>
   );
 }
 
-function PostRow({ post }: { post: PostListItem }) {
-  const when = post.publishedAt ?? post.createdAt;
-  const excerpt = post.text.length > 120 ? `${post.text.slice(0, 120)}…` : post.text;
+function CustomRangeDialog({
+  open,
+  onOpenChange,
+  after,
+  before,
+  onApply,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  after: string;
+  before: string;
+  onApply: (after: string, before: string) => void;
+}) {
+  const [localAfter, setLocalAfter] = useState(after);
+  const [localBefore, setLocalBefore] = useState(before);
+
+  useEffect(() => {
+    if (open) {
+      setLocalAfter(after);
+      setLocalBefore(before);
+    }
+  }, [open, after, before]);
+
   return (
-    <Link
-      href={`/posts/${post.id}`}
-      className="block rounded-none ring-1 ring-foreground/10 hover:ring-foreground/30 hover:bg-muted/40 transition-[box-shadow,background] px-4 py-3"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1 space-y-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className="uppercase tracking-wide">
-              {post.platform}
-            </Badge>
-            <Badge variant={statusTone(post.status)}>{post.status}</Badge>
-            {post.error?.code ? (
-              <Badge variant="outline" className="font-mono">
-                {post.error.code}
-              </Badge>
-            ) : null}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Custom range</DialogTitle>
+          <DialogDescription>
+            Both ends are optional. Leave one blank to filter open-ended in
+            that direction.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="range-after">From</Label>
+            <Input
+              id="range-after"
+              type="datetime-local"
+              className="h-9"
+              value={localAfter}
+              onChange={(e) => setLocalAfter(e.target.value)}
+            />
           </div>
-          <div className="text-sm text-foreground line-clamp-2">{excerpt}</div>
-          <div className="text-xs text-muted-foreground flex items-center gap-2">
-            <span>{post.account.displayName ?? post.account.platformAccountId}</span>
-            <span aria-hidden="true">·</span>
-            <span>{new Date(when).toLocaleString()}</span>
+          <div className="space-y-1.5">
+            <Label htmlFor="range-before">To</Label>
+            <Input
+              id="range-before"
+              type="datetime-local"
+              className="h-9"
+              value={localBefore}
+              onChange={(e) => setLocalBefore(e.target.value)}
+            />
           </div>
         </div>
-        <ArrowRight className="size-4 text-muted-foreground shrink-0 mt-1" />
-      </div>
-    </Link>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={() => onApply(localAfter, localBefore)}>
+            Apply
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

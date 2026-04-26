@@ -13,6 +13,7 @@ import {
   type PostStatus,
 } from "@/lib/posts";
 import { CONNECTABLE_PLATFORMS } from "@/lib/accounts";
+import { useActiveProfile } from "@/lib/profiles";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,23 +41,37 @@ import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
  * opaque cursor returned by the API; we keep a stack so "back" works.
  */
 export default function PostsPage() {
+  const { profiles, activeProfile } = useActiveProfile();
   const [items, setItems] = useState<PostListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [platform, setPlatform] = useState<string>("");
   const [status, setStatus] = useState<string>("");
+  // "" sentinel = "all profiles". Defaults to the active profile from the
+  // sidebar so the post log narrows naturally to whatever the user is
+  // currently working in. They can widen back to "all" with the dropdown.
+  const [profileId, setProfileId] = useState<string>("");
   const [cursorStack, setCursorStack] = useState<(string | undefined)[]>([
     undefined,
   ]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
 
+  // When the active profile in the sidebar changes, snap the filter to it
+  // unless the user has explicitly chosen "all profiles".
+  const [profileTouched, setProfileTouched] = useState(false);
+  useEffect(() => {
+    if (profileTouched) return;
+    setProfileId(activeProfile?.id ?? "");
+  }, [activeProfile?.id, profileTouched]);
+
   const filters = useMemo<ListPostsFilters>(() => {
     const f: ListPostsFilters = { limit: 25 };
     if (platform) f.platform = [platform];
     if (status) f.status = [status as PostStatus];
+    if (profileId) f.profileId = profileId;
     const cur = cursorStack[cursorStack.length - 1];
     if (cur) f.cursor = cur;
     return f;
-  }, [platform, status, cursorStack]);
+  }, [platform, status, profileId, cursorStack]);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,10 +106,13 @@ export default function PostsPage() {
   function clearFilters() {
     setPlatform("");
     setStatus("");
+    setProfileId("");
+    setProfileTouched(true);
     resetCursor();
   }
 
-  const hasActiveFilters = platform !== "" || status !== "";
+  const hasActiveFilters =
+    platform !== "" || status !== "" || profileId !== "";
   const onFirstPage = cursorStack.length === 1;
 
   return (
@@ -110,6 +128,28 @@ export default function PostsPage() {
 
       <div className="flex items-center gap-2 flex-wrap">
         <FunnelSimple className="size-4 text-muted-foreground" />
+        {profiles.length > 0 ? (
+          <Select
+            value={profileId || "all"}
+            onValueChange={(v) => {
+              setProfileId(v === "all" ? "" : v);
+              setProfileTouched(true);
+              resetCursor();
+            }}
+          >
+            <SelectTrigger className="h-8 w-[160px]">
+              <SelectValue placeholder="Profile" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All profiles</SelectItem>
+              {profiles.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
         <Select
           value={platform || "all"}
           onValueChange={(v) => {

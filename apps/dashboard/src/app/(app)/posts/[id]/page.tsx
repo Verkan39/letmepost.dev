@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Clipboard } from "@phosphor-icons/react";
 import { toast } from "sonner";
-import { ApiRequestError } from "@/lib/api";
+import { apiFetch, ApiRequestError } from "@/lib/api";
 import { getPost, statusTone, type PostDetail } from "@/lib/posts";
 import { API_URL } from "@/lib/env";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -280,15 +287,65 @@ function Field({
   );
 }
 
+type ApiKeyRow = {
+  id: string;
+  name: string;
+  prefix: string;
+  last4: string;
+  profileId: string | null;
+  revokedAt?: string | null;
+};
+
 function CopyAsCurl({ post }: { post: PostDetail }) {
-  const curl = `curl -X POST '${API_URL}/v1/posts' \\
-  -H 'Authorization: Bearer lmp_live_…' \\
+  const [keys, setKeys] = useState<ApiKeyRow[]>([]);
+  const [pickedKeyId, setPickedKeyId] = useState<string>("");
+
+  // Pull the user's keys so we can pre-fill the curl with a redacted form
+  // of one of their actual keys (prefix…last4). They still need to swap in
+  // the plaintext before running, but the placeholder concretely points at
+  // a key in their account rather than a generic stub.
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<{ data: ApiKeyRow[] }>("/v1/api-keys")
+      .then((res) => {
+        if (cancelled) return;
+        const live = (res?.data ?? []).filter((k) => !k.revokedAt);
+        setKeys(live);
+        if (live[0]) setPickedKeyId(live[0].id);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const pickedKey = keys.find((k) => k.id === pickedKeyId);
+  const keyPlaceholder = pickedKey
+    ? `${pickedKey.prefix}${"•".repeat(20)}${pickedKey.last4}`
+    : "lmp_live_…";
+
+  const curl = useMemo(() => {
+    // Reconstruct what the original CreatePostRequest looked like as best
+    // as we can from what's stored. mediaRefs / scheduledAt round-trip
+    // because they're persisted on the row; firstComment doesn't (not in
+    // the response shape today — Phase 11 follow-up).
+    const body: Record<string, unknown> = {
+      platform: post.platform,
+      accountId: post.accountId,
+      text: post.text,
+    };
+    if (post.mediaRefs && post.mediaRefs.length > 0) {
+      body.media = post.mediaRefs;
+    }
+    if (post.scheduledAt) {
+      body.scheduledAt = post.scheduledAt;
+    }
+    return `curl -X POST '${API_URL}/v1/posts' \\
+  -H 'Authorization: Bearer ${keyPlaceholder}' \\
   -H 'Content-Type: application/json' \\
-  -H 'Idempotency-Key: <generate>' \\
-  -d '${JSON.stringify({
-    account: { platform: post.platform, id: post.accountId },
-    text: post.text,
-  })}'`;
+  -H "Idempotency-Key: $(uuidgen)" \\
+  -d '${JSON.stringify(body, null, 2)}'`;
+  }, [post, keyPlaceholder]);
 
   async function copy() {
     try {
@@ -304,11 +361,34 @@ function CopyAsCurl({ post }: { post: PostDetail }) {
       <CardHeader>
         <CardTitle>Reproduce</CardTitle>
         <CardDescription>
-          Same request, ready to paste — replace the API key + idempotency
-          token before running.
+          Same request, ready to paste. The Authorization header carries a
+          masked form of one of your real keys — swap in the plaintext you
+          stored at creation before running.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        {keys.length > 1 ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground shrink-0">
+              Use key
+            </span>
+            <Select value={pickedKeyId} onValueChange={setPickedKeyId}>
+              <SelectTrigger className="h-8 w-[260px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {keys.map((k) => (
+                  <SelectItem key={k.id} value={k.id}>
+                    {k.name} ·{" "}
+                    <span className="font-mono">
+                      {k.prefix}…{k.last4}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
         <pre className="bg-muted px-3 py-2 text-xs overflow-x-auto whitespace-pre-wrap break-all font-mono">
           {curl}
         </pre>

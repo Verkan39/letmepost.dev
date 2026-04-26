@@ -112,6 +112,36 @@ export const POST_STATUSES: PostStatus[] = [
   "rejected",
 ];
 
+/**
+ * Canonical error codes the API emits across platforms. Mirrors the registry
+ * in `packages/schemas/src/errors.ts`; adding a new code is a coordinated
+ * change with the docs (Phase 13).
+ */
+export const POST_ERROR_CODES = [
+  "preflight_failed",
+  "platform_auth_failed",
+  "platform_rejected",
+  "platform_unavailable",
+  "validation_failed",
+  "internal_error",
+] as const;
+
+export type PostErrorCode = (typeof POST_ERROR_CODES)[number];
+
+/** Compact relative-time formatter — "3m ago", "2h ago", "5d ago". */
+export function formatRelative(input: string | Date): string {
+  const date = typeof input === "string" ? new Date(input) : input;
+  const seconds = Math.round((Date.now() - date.getTime()) / 1000);
+  if (seconds < 45) return "just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return date.toLocaleDateString();
+}
+
 /** Status → tone for badge coloring. */
 export function statusTone(status: PostStatus):
   | "default"

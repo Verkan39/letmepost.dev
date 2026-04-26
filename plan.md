@@ -2,9 +2,9 @@
 
 ## Context
 
-**Status (April 2026):** Phases 1–5 landed; Phase 7 dashboard scaffolded with shadcn + auth + org + accounts/keys/webhooks screens; MVP slices of Phase 8 (Twitter/X) and Phase 11 (Pinterest) publishers shipped behind the AccountProvider framework. **179 API tests green.** Bluesky publishes end-to-end today; Pinterest + X are built and gated on platform review; LinkedIn, Meta, TikTok are next.
+**Status (April 2026):** Phases 1–5.5 landed; **Phase 6 LinkedIn MVP shipped** (personal-account text UGC + 3,000-grapheme preflight + URN validation + version-pinning client) with MDP-gated org/Company-Page posting deferred; **Phase 7 dashboard substantially complete** — sign-in/up, /onboarding silent recovery, 3-step accordion onboarding (API key + connect platform + send first post) with auto-advance + step-locking, brand-aligned theme (paper cream + forest green + Commit Mono + Instrument Serif wordmark), framer-motion blur transitions, full sidebar with org switcher + profile switcher + nav, /profiles CRUD, profile picker on connect flows, profile scope on API key create, profile filter + time-range + error-code multi-select + manual refresh + focus refetch on the Post Log (now a TanStack Table), inline OAuth/credentials connect (no detour), webhook chip multi-select + synchronous test-deliver dialog with editable JSON preview; MVP slices of Phase 8 (Twitter/X) and Phase 11 (Pinterest) publishers shipped behind the AccountProvider framework. **179+ API tests green.** Bluesky publishes end-to-end today; LinkedIn personal posts publish; Pinterest + X are built and gated on platform review; Meta + TikTok are next.
 
-What's still missing from the original plan: Phase 6 LinkedIn, Phase 9 Meta trio, Phase 10 TikTok, Phase 12 SDK pipeline, Phase 13 docs polish, Phase 14 obs + launch prep, Phase 15 launch. Also new work: Phase 5.5 Profiles (added after the initial plan to pick up the agency / multi-brand use case without per-profile pricing).
+What's still missing from the original plan: Phase 6 LinkedIn org/Company-Page posting (MDP-gated), Phase 9 Meta trio, Phase 10 TikTok, Phase 12 SDK pipeline, Phase 13 docs polish, Phase 14 obs + launch prep, Phase 15 launch. Phase 5.5 (Profiles) was added after the initial plan to pick up the agency / multi-brand use case without per-profile pricing — both API and dashboard are done.
 
 This plan takes us from that state to a public v1 launch. Every phase is filtered through the **seven product principles** in `PRODUCT.md` and traces to the **six research-corpus problems** we exist to solve:
 
@@ -37,7 +37,7 @@ Also Day 0 (non-gating, cheap): register `letmepost` GitHub org, reserve `@letme
 
 ---
 
-## Phase 1 — Persistence & Tenancy Foundation
+## Phase 1 — Persistence & Tenancy Foundation - DONE
 
 **Goal:** Turn the single-tenant Bluesky prototype into a multi-tenant service with real data.
 
@@ -50,7 +50,7 @@ Also Day 0 (non-gating, cheap): register `letmepost` GitHub org, reserve `@letme
 **Risks:** Drizzle relational queries vs. migration ergonomics diverge occasionally; Neon branching in CI is sharp-edged.
 **NOT in scope:** Auth, queue, webhooks, OAuth, new platforms. No user-visible endpoint changes.
 
-## Phase 2 — Auth, API Keys, and Org Model
+## Phase 2 — Auth, API Keys, and Org Model - DONE
 
 **Goal:** Authenticated multi-tenant API access.
 
@@ -63,7 +63,7 @@ Also Day 0 (non-gating, cheap): register `letmepost` GitHub org, reserve `@letme
 **Risks:** better-auth's API-keys plugin edges — if it bites for more than 2 days, fall back to a hand-rolled keys table.
 **NOT in scope:** OAuth connect flows, dashboard UI, billing, webhooks, queue.
 
-## Phase 3 — Idempotency, Rate Limiting, Error Contract
+## Phase 3 — Idempotency, Rate Limiting, Error Contract - DONE
 
 **Goal:** Make every write safe to retry, every response structurally transparent.
 
@@ -76,7 +76,7 @@ Also Day 0 (non-gating, cheap): register `letmepost` GitHub org, reserve `@letme
 **Risks:** Idempotency semantics on future multi-platform posts is subtle — design the storage shape now so Phase 6+ doesn't force a migration.
 **NOT in scope:** Per-platform error mapping (happens in each platform phase); webhooks; dashboard.
 
-## Phase 4 — Job Queue, Scheduling, Webhooks
+## Phase 4 — Job Queue, Scheduling, Webhooks - DONE
 
 **Goal:** Everything that makes "it posted" or "it failed" actually observable.
 
@@ -89,7 +89,7 @@ Also Day 0 (non-gating, cheap): register `letmepost` GitHub org, reserve `@letme
 **Risks:** Upstash connection cap on free tier; Railway worker cold-start when queue is idle. Decide "what happens on a 5xx from a webhook consumer" before coding — single most-asked integrator question.
 **NOT in scope:** Webhook replay UI, delivery logs UI (dashboard later), per-event filter subscriptions.
 
-## Phase 5 — OAuth Connect Framework + Bluesky Migration
+## Phase 5 — OAuth Connect Framework + Bluesky Migration - DONE
 
 **Goal:** Generic account-connect machinery that every platform plugs into. The framework is the product.
 
@@ -102,7 +102,7 @@ Also Day 0 (non-gating, cheap): register `letmepost` GitHub org, reserve `@letme
 **Risks:** PKCE vs. classic OAuth differences across LinkedIn/X/Meta must not become `if platform === …` soup. Invest in the abstraction.
 **NOT in scope:** LinkedIn publisher itself (next phase), dashboard UI.
 
-## Phase 5.5 — Profiles (Workspace Primitive)
+## Phase 5.5 — Profiles (Workspace Primitive) - DONE
 
 **Goal:** Zernio-style profiles — an org sub-unit that groups platform accounts. Agencies get one org with 20 profiles (one per client); a brand with multiple product lines gets multiple profiles under one org. Crucially: **profiles are free.** Per-profile pricing is research-corpus problem #5; we use profiles as a structure primitive and keep pricing flat at the org level — that's a commercial wedge against Ayrshare / Zernio in itself.
 
@@ -115,7 +115,9 @@ Also Day 0 (non-gating, cheap): register `letmepost` GitHub org, reserve `@letme
 **Risks:** API-key scope semantics is the subtle part — an org-wide key must still work against any profile's accounts; a profile-scoped key must 404 on cross-profile account IDs. Build the test matrix up front (org-key × profile-key × same-profile × cross-profile × missing-account).
 **NOT in scope:** Per-profile billing or usage meters (Phase 14); per-profile webhook endpoints (endpoints stay org-scoped; consumers filter on the `profileId` event field); per-profile custom branding; cross-profile account sharing.
 
-## Phase 6 — LinkedIn: The Wedge
+## Phase 6 — LinkedIn: The Wedge - PARTIAL
+
+**Status:** Personal-account text UGC publishes today via the AccountProvider framework. 3,000-grapheme preflight + URN validation + the `LinkedIn-Version`-pinned client are live. Org / Company-Page posting and the full media surface (image, multi-image, video, document, article preflight with OG-tag fetch) wait on MDP approval.
 
 **Goal:** Ship the platform that *demonstrates the pitch*. This is the phase that has to be visibly better than every competitor.
 
@@ -136,28 +138,30 @@ Also Day 0 (non-gating, cheap): register `letmepost` GitHub org, reserve `@letme
 **Risks:** MDP approval blocking; LinkedIn dev-tier rate limits; URN edge cases for Company Pages vs. Showcase Pages. This is the phase you'll be tempted to cut corners on — don't.
 **NOT in scope:** Carousels beyond image-multi, polls, events, analytics, comment threads, DMs.
 
-## Phase 7 — Minimal Dashboard (Operator Surface Only)
+## Phase 7 — Minimal Dashboard (Operator Surface Only) - DONE
 
 **Goal:** Get out of curl-only. Ship exactly what onboarding + debugging need — nothing else.
 
-**Ships:** `apps/dashboard` Next.js App Router with better-auth session, shadcn component system, Commit Mono + paper/forest-green theme matching the landing. Screens:
-- **Sign-in / sign-up** with org creation + default profile creation in the same flow
-- **Profile switcher** in the sidebar (primary day-to-day context); **org switcher** on a settings page (less frequent)
-- **Connect Account** — OAuth redirect or credentials form driven by the provider's `ConnectDescriptor`, scoped to the active profile
-- **Account list** — per-profile, with token-expiry badges and reconnect affordances
-- **API Keys** — list / create / revoke; scope selector (org-wide vs single profile); plaintext shown once in a modal
-- **Webhook endpoints** — create / filter events / rotate secret / delete; signing secret shown once in a modal
-- **Post Log** — the operator's "where did my post go" screen. Paginated list filterable by **profile × platform × status × error-code × time-range**. Row shows (platform icon | text excerpt | status chip | created-at | account). Detail view shows: full post record, every attempt with upstream response, the rule that failed (if any), remediation text, webhook delivery trail for that post, raw platform response JSON, copy-as-curl. **This is the screen where "fails loudly" becomes visible to the user** — the product's wedge lives here.
-- **Webhook delivery log** — per-endpoint delivery history with status codes, response bodies, retry schedule, manual redeliver button. Smaller slice; can defer to 7.5 if time-boxed.
+**Ships:** `apps/dashboard` Next.js App Router with better-auth session, shadcn component system, Commit Mono + Instrument Serif wordmark + paper/forest-green theme matching the landing, framer-motion blur+y transitions across page changes, list staggers, and accordion expansions. TanStack Table renders the Post Log; TanStack Query owns client-side data fetching. Screens shipped:
+- **Sign-in / sign-up** with org creation in the same flow; sign-up failure paths fall through to /onboarding rather than stranding the user.
+- **/onboarding** — silent recovery for sessions without an active org. No form: picks the first existing org, else creates one named after the user, then bounces. Only flashes a "Setting up workspace…" line if the redirect takes >250ms.
+- **Dashboard home** — first-run accordion checklist (Copy your API key → Connect a platform → Send your first post) with auto-advance, step locking until the prior step completes, and per-step bodies that include a real curl preview, brand-icon platform grid, and a live "Send test post" button. Once every step is done, the checklist fades out and the count cards (accounts / API keys / webhooks) fade in.
+- **Inline platform connect** — brand-icon grid (Bluesky, LinkedIn, Pinterest, X) with grayscale → color hover. OAuth platforms full-page-redirect to the provider's authorize URL; credentials platforms swap the grid for a dynamic field form (descriptor-driven). Both pass `profileId` so the resulting account lands in the right workspace.
+- **Sidebar** — brand mark + org switcher (with shadcn dialog for new-org), profile switcher ("Working in: …") with localStorage-keyed-per-org persistence, full nav (Dashboard / Logs / Accounts / Profiles / API keys / Webhooks), avatar footer with sign-out.
+- **/profiles** — CRUD with auto-derived slug preview, rename dialog, delete confirm that surfaces the API's 409 not-empty rule.
+- **Account list** — per-profile, with token-expiry timestamps and confirm-on-disconnect.
+- **/accounts/new** — same descriptor-driven flow as the inline onboarding connect, with profile picker.
+- **API Keys** — list / create / revoke. Create form has Name + Environment (live/test) + Scope (org-wide / per-profile). Each row shows env, scope, prefix, last-4. Plaintext shown once in a modal; "Copy" + "Done" buttons.
+- **Webhook endpoints** — create / filter events (chip multi-select bound to `WEBHOOK_EVENT_TYPES`) / delete. Signing secret shown once. **Send Test** button per row opens a dialog with event-type select + editable JSON payload (per-type defaults that swap intelligently when the user picks a new type without overwriting their edits) + delivery result panel showing HTTP status, latency, response body — fires `POST /v1/webhook-endpoints/:id/test` synchronously.
+- **Post Log** — the operator's "where did my post go" screen. TanStack Table with columns (When | Platform | Status | Account | Text | Error code | →). Server-side filters: **profile × platform × status × error-code × time-range** (Last 24h / 7d / 30d / All / Custom range dialog). Manual Refresh button + automatic refetch on tab focus. Keyset pagination via opaque cursor. Detail view renders the full `ErrorResponse` contract inline — code, rule, platform, platform_version, platform_response, remediation — plus the attempts timeline and a copy-as-curl reproducer that pre-fills `${prefix}…${last4}` from the user's actual keys (key picker), inlines `mediaRefs` + `scheduledAt`, and uses `$(uuidgen)` for the Idempotency-Key.
 
-Post detail renders the canonical `ErrorResponse` contract inline — code, rule, platform, platform_version, platform_response, remediation, request_id, trace_id. Destructive actions (disconnect account, revoke key, delete endpoint) confirm via shadcn modals.
+Destructive actions (disconnect account, revoke key, delete endpoint, delete profile) all confirm via shadcn modals.
 
 **Problems solved:** 1 (visibility of failure is the whole Post Log).
 **Principles served:** 7.
 **Depends on:** Phases 1–5.5, 6.
-**Effort:** 2 weeks (scaffold + theme already landed; remaining work is Post Log + webhook log + profile switcher polish).
-**Risks:** Scope creep is the only real risk. Every "just-add" is a no. Post Log detail view is where quality matters most — the error record is the product.
-**NOT in scope:** Billing, analytics dashboards, team invites beyond single-org, whitelabel, theming switcher, mobile-first layout, API call log (request-level, as opposed to post-level).
+**Effort:** Done.
+**NOT in scope:** Billing, analytics dashboards, team invites beyond single-org, whitelabel, theming switcher, mobile-first layout, API call log (request-level, as opposed to post-level), webhook delivery log (deferred — needs a backend ticket to expose BullMQ delivery history; today only the synchronous test-deliver round-trip is visible).
 
 ## Phase 8 — Twitter/X
 
@@ -302,7 +306,7 @@ The following will be asked for. The answer is "not in v1":
 - **Ads manager** across Meta/Google/TikTok/LinkedIn/Pinterest/X. Separate product line.
 - **WhatsApp Business** (templates, flows, phone numbers, groups). Separate product line.
 - **CRM-ish features** — contacts, sequences, broadcasts.
-- **YouTube, Reddit, Telegram, Discord, Snapchat, Google Business** — cut from platform scope; data doesn't justify the integration cost.
+- **YouTube, Reddit, Telegram, Discord, Snapchat, Google Business**
 - **Advanced media ops** — image editing, video trimming, auto-captioning, thumbnail generation.
 - **Team-management UI** beyond single-org multi-member.
 - **Analytics dashboards** beyond post-log + error-log.

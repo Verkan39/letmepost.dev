@@ -11,6 +11,7 @@ import {
   type ConnectDescriptor,
   type ConnectResponse,
 } from "@/lib/accounts";
+import { useActiveProfile } from "@/lib/profiles";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -54,6 +55,9 @@ const LABELS: Record<ConnectablePlatform, string> = {
  */
 export default function NewAccountPage() {
   const router = useRouter();
+  const { profiles, activeProfile } = useActiveProfile();
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const effectiveProfileId = profileId ?? activeProfile?.id ?? null;
   const [platform, setPlatform] = useState<ConnectablePlatform | "">("");
   const [descriptor, setDescriptor] = useState<ConnectDescriptor | null>(null);
   const [descriptorPlatform, setDescriptorPlatform] = useState<string | null>(
@@ -73,7 +77,10 @@ export default function NewAccountPage() {
     try {
       const res = await apiFetch<ConnectResponse>(
         `/v1/accounts/connect/${next}`,
-        { method: "POST", body: {} },
+        {
+          method: "POST",
+          body: effectiveProfileId ? { profileId: effectiveProfileId } : {},
+        },
       );
       setDescriptor(res.descriptor);
       setDescriptorPlatform(res.platform ?? next);
@@ -102,7 +109,10 @@ export default function NewAccountPage() {
     try {
       await apiFetch(`/v1/accounts/connect/${platform}/complete`, {
         method: "POST",
-        body: formValues,
+        body: {
+          ...formValues,
+          ...(effectiveProfileId ? { profileId: effectiveProfileId } : {}),
+        },
       });
       toast.success("Account connected.");
       router.push("/accounts");
@@ -128,6 +138,38 @@ export default function NewAccountPage() {
           needs — OAuth redirect, app password, whatever.
         </p>
       </div>
+
+      {profiles.length > 1 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Profile</CardTitle>
+            <CardDescription>
+              Where the account lands inside this org. Defaults to your active
+              profile from the sidebar.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <Label htmlFor="connect-profile">Profile</Label>
+              <Select
+                value={effectiveProfileId ?? ""}
+                onValueChange={(v) => setProfileId(v)}
+              >
+                <SelectTrigger id="connect-profile" className="w-full">
+                  <SelectValue placeholder="Select a profile…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {profiles.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

@@ -10,10 +10,18 @@ import {
   type ConnectDescriptor,
   type ConnectResponse,
 } from "@/lib/accounts";
+import { useActiveProfile } from "@/lib/profiles";
 import { PLATFORM_BRANDS } from "@/components/app/platform-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
@@ -37,6 +45,10 @@ export function OnboardingConnect({
 }: {
   onConnected: () => void;
 }) {
+  const { profiles, activeProfile } = useActiveProfile();
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const effectiveProfileId = profileId ?? activeProfile?.id ?? null;
+
   const [picked, setPicked] = useState<ConnectablePlatform | null>(null);
   const [descriptor, setDescriptor] = useState<ConnectDescriptor | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
@@ -58,7 +70,13 @@ export function OnboardingConnect({
     try {
       const res = await apiFetch<ConnectResponse>(
         `/v1/accounts/connect/${platform}`,
-        { method: "POST", body: {} },
+        {
+          method: "POST",
+          // Pass profileId so the OAuth state row (when wired) carries it
+          // through the redirect; for credentials flows, /complete reads it
+          // from its own body below.
+          body: effectiveProfileId ? { profileId: effectiveProfileId } : {},
+        },
       );
       if (res.descriptor.kind === "oauth") {
         // Full-page redirect — the OAuth callback finishes server-side.
@@ -90,7 +108,10 @@ export function OnboardingConnect({
     try {
       await apiFetch(`/v1/accounts/connect/${picked}/complete`, {
         method: "POST",
-        body: formValues,
+        body: {
+          ...formValues,
+          ...(effectiveProfileId ? { profileId: effectiveProfileId } : {}),
+        },
       });
       toast.success("Account connected.");
       reset();
@@ -117,6 +138,32 @@ export function OnboardingConnect({
         Pick a platform. Bluesky uses an app password; the others go through
         OAuth. Tokens are encrypted at rest with per-row data-keys.
       </p>
+
+      {profiles.length > 1 ? (
+        <div className="flex items-center gap-3">
+          <Label htmlFor="onb-profile" className="text-xs text-muted-foreground shrink-0">
+            Connect into
+          </Label>
+          <Select
+            value={effectiveProfileId ?? ""}
+            onValueChange={(v) => setProfileId(v)}
+          >
+            <SelectTrigger
+              id="onb-profile"
+              className="h-8 w-[200px] text-xs"
+            >
+              <SelectValue placeholder="Select profile" />
+            </SelectTrigger>
+            <SelectContent>
+              {profiles.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
 
       <AnimatePresence mode="wait" initial={false}>
         {showCredentialsForm ? (

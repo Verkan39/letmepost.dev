@@ -1,14 +1,15 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { WEBHOOK_EVENT_TYPES } from "@letmepost/schemas";
+import { WEBHOOK_EVENT_TYPES, type WebhookEvent } from "@letmepost/schemas";
 import { webhookEndpoints } from "../db/schema/webhook_endpoints.js";
 import { LetmepostError } from "../errors.js";
 import { idempotency } from "../middleware/idempotency.js";
 import { rateLimit } from "../middleware/rate-limit.js";
 import { requireSession } from "../middleware/session.js";
+import { deliverWebhook } from "../webhooks/deliver.js";
 
 /**
  * `/v1/webhook-endpoints` — dashboard-scoped CRUD for outbound webhook
@@ -55,6 +56,27 @@ const UpdateEndpointRequest = z
   .refine((v) => Object.keys(v).length > 0, {
     message: "At least one field must be provided.",
   });
+
+const TestDeliveryRequest = z
+  .object({
+    type: z.enum(WEBHOOK_EVENT_TYPES).default("post.published"),
+    data: z.unknown().optional(),
+  })
+  .default({ type: "post.published" });
+
+/**
+ * Sample payload used when the caller doesn't supply their own `data`. Shape
+ * loosely mirrors what a real `post.published` event carries so consumer
+ * handlers wired against it Just Work for testing.
+ */
+const SAMPLE_DATA: Record<string, unknown> = {
+  postId: "00000000-0000-0000-0000-000000000000",
+  platform: "bluesky",
+  status: "published",
+  text: "Test webhook from letmepost.dev — this is a synthetic event.",
+  publishedAt: new Date().toISOString(),
+  platformUri: "at://did:plc:test/app.bsky.feed.post/test",
+};
 
 function hashSecret(plaintext: string): string {
   return createHash("sha256").update(plaintext).digest("hex");
@@ -236,6 +258,83 @@ export function createWebhookEndpointRoutes(
       }
 
       return c.json(publicView(row));
+    },
+  );
+
+  /**
+   * POST /v1/webhook-endpoints/:id/test — fire a synthetic event at the
+   * endpoint's URL synchronously and return what the consumer responded.
+   *
+   * Bypasses BullMQ on purpose: operators want immediate feedback ("did my
+   * handler 200?") not eventual delivery semantics. The real signing secret
+   * is used so the consumer's HMAC verification path is the same one
+   * production would hit. SAMPLE_DATA is the default payload; callers can
+   * override with whatever JSON they want.
+   */
+  app.post(
+    "/:id/test",
+    zValidator("json", TestDeliveryRequest, (result) => {
+      if (!result.success) {
+        const issue = result.error.issues[0];
+        throw new LetmepostError({
+          code: "validation_failed",
+          status: 400,
+          message: issue?.message ?? "Invalid request body.",
+          rule: issue?.path.join(".") || "body",
+          platformResponse: result.error.issues,
+        });
+      }
+    }),
+    async (c) => {
+      const id = c.req.param("id");
+      const { organizationId } = c.var.session;
+      const { type, data } = c.req.valid("json");
+
+      const [row] = await c.var.db
+        .select()
+        .from(webhookEndpoints)
+        .where(
+          and(
+            eq(webhookEndpoints.id, id),
+            eq(webhookEndpoints.organizationId, organizationId),
+          ),
+        )
+        .limit(1);
+      if (!row) {
+        throw new LetmepostError({
+          code: "not_found",
+          status: 404,
+          message: "Webhook endpoint not found.",
+        });
+      }
+
+      const event: WebhookEvent = {
+        id: randomUUID(),
+        type,
+        createdAt: new Date().toISOString(),
+        organizationId,
+        data: data ?? SAMPLE_DATA,
+      };
+
+      const result = await deliverWebhook(
+        {
+          id: row.id,
+          url: row.url,
+          signingSecret: row.signingSecret,
+        },
+        event,
+      );
+
+      return c.json({
+        delivered: result.ok,
+        status: result.status,
+        durationMs: result.durationMs,
+        responseBody: result.responseBody ?? null,
+        deliveryId: result.deliveryId,
+        nonRetryable: result.nonRetryable ?? false,
+        errorName: result.errorName ?? null,
+        sentEvent: event,
+      });
     },
   );
 

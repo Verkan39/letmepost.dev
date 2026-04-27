@@ -419,8 +419,7 @@ function QuickStartBody({
   -H "Content-Type: application/json" \\
   -H "Idempotency-Key: $(uuidgen)" \\
   -d '{
-    "platform": "${platform}",
-    "accountId": "${accountId}",
+    "account": { "platform": "${platform}", "id": "${accountId}" },
     "text": "Hello from letmepost.dev"
   }'`;
 
@@ -445,8 +444,7 @@ function QuickStartBody({
           "Idempotency-Key": crypto.randomUUID(),
         },
         body: JSON.stringify({
-          platform: account.platform,
-          accountId: account.id,
+          account: { platform: account.platform, id: account.id },
           text: "Hello from letmepost.dev",
         }),
       });

@@ -318,8 +318,7 @@ function CopyAsCurl({ post }: { post: PostDetail }) {
     // because they're persisted on the row; firstComment doesn't (not in
     // the response shape today — Phase 11 follow-up).
     const body: Record<string, unknown> = {
-      platform: post.platform,
-      accountId: post.accountId,
+      account: { platform: post.platform, id: post.accountId },
       text: post.text,
     };
     if (post.mediaRefs && post.mediaRefs.length > 0) {

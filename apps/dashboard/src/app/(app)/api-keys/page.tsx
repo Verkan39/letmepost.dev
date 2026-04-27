@@ -36,6 +36,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
 import { useActiveProfile } from "@/lib/profiles";
+import { formatRelative } from "@/lib/posts";
 
 type ApiKey = {
   id: string;
@@ -270,6 +271,10 @@ export default function ApiKeysPage() {
                     <div className="text-xs text-muted-foreground">
                       {k.prefix}…{k.last4} · created{" "}
                       {new Date(k.createdAt).toLocaleDateString()}
+                      {" · "}
+                      {k.lastUsedAt
+                        ? `used ${formatRelative(k.lastUsedAt)}`
+                        : "never used"}
                     </div>
                   </div>
                   {!k.revokedAt ? (

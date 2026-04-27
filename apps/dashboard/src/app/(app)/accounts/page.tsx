@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Copy, Plug, Plus, Trash } from "@phosphor-icons/react";
@@ -23,10 +24,35 @@ import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
 
 export default function AccountsListPage() {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [pendingDisconnect, setPendingDisconnect] = useState<Account | null>(
     null,
   );
   const [connectOpen, setConnectOpen] = useState(false);
+
+  // The API's OAuth callback (GET /v1/accounts/oauth/:platform/callback)
+  // redirects here with `?connected=<platform>` on success or
+  // `?connect_error=<reason>&platform=<p>` on failure. Surface a toast
+  // and clean the query so a refresh doesn't re-fire it.
+  useEffect(() => {
+    const connected = searchParams.get("connected");
+    const error = searchParams.get("connect_error");
+    const platform = searchParams.get("platform");
+    if (!connected && !error) return;
+    if (connected) {
+      toast.success(`Connected ${connected}.`);
+      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.list() });
+    } else if (error) {
+      toast.error(
+        platform
+          ? `${platform} connect failed: ${error.replaceAll("_", " ")}`
+          : `Connect failed: ${error.replaceAll("_", " ")}`,
+      );
+    }
+    // Strip the params without scrolling.
+    router.replace("/accounts", { scroll: false });
+  }, [searchParams, router, queryClient]);
 
   const query = useQuery({
     queryKey: queryKeys.accounts.list(),

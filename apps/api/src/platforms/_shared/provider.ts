@@ -64,6 +64,15 @@ export type ConnectContext = {
   organizationId: string;
   /** Public-facing API base URL, used by OAuth providers to build redirect URIs. */
   baseUrl: string;
+  /**
+   * Pre-signed OAuth state token to embed in the authorize URL. The route
+   * generates this before calling describeConnect so the GET callback can
+   * recover org + profile context without a server-side session lookup.
+   * When unset (tests, credentials providers), providers fall back to a
+   * random UUID — fine for unit tests, but a real connect flow must pass
+   * the signed token in.
+   */
+  oauthState?: string;
 };
 
 /**

@@ -102,7 +102,7 @@ export class TwitterProvider implements AccountProvider {
 
   describeConnect(ctx: ConnectContext): ConnectDescriptor {
     const scopes = [...scopeSetFor(PLATFORM).write];
-    const state = randomUUID();
+    const state = ctx.oauthState ?? randomUUID();
     const codeVerifier = base64UrlEncode(randomBytes(32));
     const codeChallenge = base64UrlEncode(
       createHash("sha256").update(codeVerifier).digest(),

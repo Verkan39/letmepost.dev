@@ -9,6 +9,7 @@ import { apiKeyOrSession } from "../middleware/api-key-or-session.js";
 import { idempotency } from "../middleware/idempotency.js";
 import { rateLimit } from "../middleware/rate-limit.js";
 import { requireSession } from "../middleware/session.js";
+import { decodeOAuthState, encodeOAuthState } from "../oauth/state.js";
 import { getProvider } from "../platforms/index.js";
 import { computeRefreshDelayMs } from "../platforms/_shared/refresh.js";
 import { DrizzlePlatformAccountsRepository } from "../repositories/platform-accounts.js";
@@ -139,7 +140,32 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
       const provider = getProvider(platform);
       const { organizationId } = c.var.session;
 
-      const descriptor = await provider.describeConnect({ organizationId, baseUrl });
+      // Optional profile scope for OAuth → land the resulting account in
+      // this profile. Read from request body for symmetry with /complete.
+      const body = (await c.req.json().catch(() => ({}))) as
+        | { profileId?: unknown }
+        | undefined;
+      const requestedProfileId =
+        body && typeof body.profileId === "string" ? body.profileId : null;
+      // Validate the profile if supplied (cross-org / unknown → 404).
+      const profileId = requestedProfileId
+        ? await resolveProfileId(c.var.db, organizationId, requestedProfileId)
+        : null;
+
+      // Sign a state token carrying the org/profile/platform context. The
+      // GET callback recovers this from the URL after the platform redirects
+      // back, so we don't need a server-side session lookup at that point.
+      const oauthState = encodeOAuthState({
+        organizationId,
+        profileId,
+        platform,
+      });
+
+      const descriptor = await provider.describeConnect({
+        organizationId,
+        baseUrl,
+        oauthState,
+      });
       return c.json({ platform, descriptor });
     },
   );
@@ -273,6 +299,135 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
 
     return c.json({ id, deleted: true });
   });
+
+  /**
+   * GET /v1/accounts/oauth/:platform/callback — the OAuth provider's
+   * redirect target. Anonymous (no auth middleware): the org/profile
+   * context comes from the signed `state` query param that we minted in
+   * POST /connect/:platform. After the token exchange + persistence, the
+   * browser is redirected back to the dashboard with a status query.
+   *
+   * Failure modes all redirect (never JSON) — the user is in a browser
+   * tab, not a fetch call:
+   *   - provider returned ?error=…   → /accounts?connect_error=<reason>
+   *   - state malformed/expired       → /accounts?connect_error=invalid_state
+   *   - path platform ≠ state.platform → /accounts?connect_error=mismatch
+   *   - completeConnect throws        → /accounts?connect_error=<code>
+   *   - success                       → /accounts?connected=<platform>
+   */
+  app.get(
+    "/oauth/:platform/callback",
+    zValidator("param", PlatformParam, (result) => {
+      if (!result.success) {
+        throw new LetmepostError({
+          code: "validation_failed",
+          status: 400,
+          message: "Unknown platform.",
+          rule: "platform",
+        });
+      }
+    }),
+    async (c) => {
+      const { platform } = c.req.valid("param");
+      const dashboardUrl = (
+        process.env.DASHBOARD_URL ?? "http://localhost:3001"
+      ).replace(/\/$/, "");
+      const redirect = (qs: string) =>
+        c.redirect(`${dashboardUrl}/accounts?${qs}`, 302);
+
+      const url = new URL(c.req.url);
+      const code = url.searchParams.get("code");
+      const state = url.searchParams.get("state");
+      const oauthError = url.searchParams.get("error");
+      if (oauthError) {
+        return redirect(
+          `connect_error=${encodeURIComponent(oauthError)}&platform=${platform}`,
+        );
+      }
+      if (!code || !state) {
+        return redirect(`connect_error=missing_params&platform=${platform}`);
+      }
+
+      // Recover org + profile + platform from the signed state.
+      const decoded = decodeOAuthState(state);
+      if (!decoded.ok) {
+        return redirect(
+          `connect_error=invalid_state_${decoded.reason}&platform=${platform}`,
+        );
+      }
+      if (decoded.payload.platform !== platform) {
+        return redirect(`connect_error=platform_mismatch&platform=${platform}`);
+      }
+
+      const { organizationId, profileId } = decoded.payload;
+      const provider = getProvider(platform);
+      const redirectUri = new URL(
+        `/v1/accounts/oauth/${platform}/callback`,
+        baseUrl,
+      ).toString();
+
+      // Server-side token exchange. Each provider's completeConnect knows
+      // its own request shape; we just hand it { code, state, redirectUri }.
+      let connected;
+      try {
+        connected = await provider.completeConnect(
+          { organizationId, baseUrl, oauthState: state },
+          { code, state, redirectUri },
+        );
+      } catch (err) {
+        const reason =
+          err instanceof LetmepostError
+            ? err.code
+            : err instanceof Error
+              ? "exchange_failed"
+              : "exchange_failed";
+        return redirect(
+          `connect_error=${encodeURIComponent(reason)}&platform=${platform}`,
+        );
+      }
+
+      // Resolve the target profile (default if none specified, else the
+      // one the user picked at /connect time).
+      const resolvedProfileId = await resolveProfileId(
+        c.var.db,
+        organizationId,
+        profileId,
+      );
+
+      // Upsert the platform_account row — same pattern as POST /complete.
+      const repo = new DrizzlePlatformAccountsRepository(c.var.db);
+      const existing = await repo.findByOrgAndPlatform(
+        organizationId,
+        platform,
+        connected.platformAccountId,
+      );
+      const account = existing
+        ? await repo.updateToken(existing.id, {
+            token: connected.token,
+            tokenMetadata: connected.tokenMetadata,
+            tokenExpiresAt: connected.tokenExpiresAt,
+          })
+        : await repo.create({
+            organizationId,
+            profileId: resolvedProfileId,
+            platform,
+            platformAccountId: connected.platformAccountId,
+            displayName: connected.displayName,
+            token: connected.token,
+            tokenMetadata: connected.tokenMetadata,
+            tokenExpiresAt: connected.tokenExpiresAt,
+          });
+
+      await scheduleInitialRefresh({
+        accountId: account.id,
+        organizationId,
+        horizonMs: provider.expiringHorizonMs,
+        tokenExpiresAt: account.tokenExpiresAt,
+      });
+
+      return redirect(`connected=${platform}`);
+    },
+  );
 
   return app;
 }

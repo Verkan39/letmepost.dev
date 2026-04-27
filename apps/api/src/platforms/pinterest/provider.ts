@@ -107,7 +107,7 @@ export class PinterestProvider implements AccountProvider {
 
   describeConnect(ctx: ConnectContext): ConnectDescriptor {
     const scopes = [...scopeSetFor(PLATFORM).write];
-    const state = randomUUID();
+    const state = ctx.oauthState ?? randomUUID();
     const redirectUri = computeRedirectUri(ctx.baseUrl);
     const url = new URL(
       this.config.authorizeUrl ?? PINTEREST_OAUTH_AUTHORIZE_URL,

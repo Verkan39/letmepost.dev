@@ -170,7 +170,6 @@ export default function ApiKeysPage() {
               <Input
                 id="key-name"
                 required
-                className="h-9 w-full"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="production-web"
@@ -184,7 +183,7 @@ export default function ApiKeysPage() {
                   setPrefix(v as "lmp_live_" | "lmp_test_")
                 }
               >
-                <SelectTrigger id="key-prefix" className="h-9 w-full">
+                <SelectTrigger id="key-prefix" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -200,7 +199,7 @@ export default function ApiKeysPage() {
                   value={scope === "" ? "__org" : scope}
                   onValueChange={(v) => setScope(v === "__org" ? "" : v)}
                 >
-                  <SelectTrigger id="key-scope" className="h-9 w-full">
+                  <SelectTrigger id="key-scope" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

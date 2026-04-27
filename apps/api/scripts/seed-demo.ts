@@ -4,7 +4,12 @@ import { eq } from "drizzle-orm";
 import { auth } from "../src/auth.js";
 import { db } from "../src/db/instance.js";
 import { apiKeys } from "../src/db/schema/api_keys.js";
-import { member, organization, user } from "../src/db/schema/auth.js";
+import {
+  member,
+  organization,
+  session as sessionTable,
+  user,
+} from "../src/db/schema/auth.js";
 import { posts } from "../src/db/schema/posts.js";
 import { webhookEndpoints } from "../src/db/schema/webhook_endpoints.js";
 import { DrizzlePlatformAccountsRepository } from "../src/repositories/platform-accounts.js";
@@ -118,6 +123,21 @@ async function main() {
     userId: u.id,
     role: "owner",
   });
+
+  // Re-point any live sessions at the new org. Wiping the prior org dropped
+  // the FK target, so existing browser sessions would get 404s on every
+  // API call until the user signed out. Updating the session row here means
+  // a refresh just works.
+  const updatedSessions = await db
+    .update(sessionTable)
+    .set({ activeOrganizationId: orgRow.id })
+    .where(eq(sessionTable.userId, u.id))
+    .returning({ id: sessionTable.id });
+  if (updatedSessions.length > 0) {
+    console.log(
+      `  ✓ updated ${updatedSessions.length} live session(s) → new org`,
+    );
+  }
 
   // --- Profiles -----------------------------------------------------------
   const profilesRepo = new DrizzleProfilesRepository(db);

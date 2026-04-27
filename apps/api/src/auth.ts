@@ -31,6 +31,39 @@ if (!secret || secret.length < 16) {
   );
 }
 
+/**
+ * Trusted origins list. Local dev's dashboard (:3001) is always allowed;
+ * production origins come in via `TRUSTED_ORIGINS` (comma-separated) so the
+ * deploy can add `https://dashboard.letmepost.dev` without a code change.
+ */
+const trustedOrigins = [
+  "http://localhost:3001",
+  ...(process.env.TRUSTED_ORIGINS?.split(",")
+    .map((s) => s.trim())
+    .filter(Boolean) ?? []),
+];
+
+/**
+ * Cross-subdomain cookies. In production the API sits at api.letmepost.dev
+ * and the dashboard at dashboard.letmepost.dev; the session cookie needs
+ * `Domain=.letmepost.dev; SameSite=None; Secure` so both subdomains share
+ * it. The COOKIE_DOMAIN env opts in (e.g. `.letmepost.dev`); leaving it
+ * unset keeps dev behaviour single-origin (default cookie scope).
+ */
+const cookieDomain = process.env.COOKIE_DOMAIN;
+const crossSubDomainCookies = cookieDomain
+  ? {
+      crossSubDomainCookies: {
+        enabled: true,
+        domain: cookieDomain,
+      },
+      defaultCookieAttributes: {
+        sameSite: "none" as const,
+        secure: true,
+      },
+    }
+  : {};
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -48,6 +81,7 @@ export const auth = betterAuth({
     database: {
       generateId: () => uuidv7(),
     },
+    ...crossSubDomainCookies,
   },
   emailAndPassword: {
     enabled: true,
@@ -56,9 +90,7 @@ export const auth = betterAuth({
   plugins: [organization()],
   secret,
   baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
-  // The dashboard runs on :3001 in dev; better-auth blocks cross-origin
-  // cookie flows otherwise. Expand this list as other surfaces come online.
-  trustedOrigins: ["http://localhost:3001"],
+  trustedOrigins,
 });
 
 export type Auth = typeof auth;

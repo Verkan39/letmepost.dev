@@ -2,11 +2,21 @@
 
 ## Context
 
-**Status (April 2026):** Phases 1–5.5 landed; **Phase 6 LinkedIn MVP shipped** (personal-account text UGC + 3,000-grapheme preflight + URN validation + version-pinning client) with MDP-gated org/Company-Page posting deferred; **Phase 7 dashboard substantially complete** — sign-in/up, /onboarding silent recovery, 3-step accordion onboarding (API key + connect platform + send first post) with auto-advance + step-locking, brand-aligned theme (paper cream + forest green + Commit Mono + Instrument Serif wordmark), framer-motion blur transitions, full sidebar with org switcher + profile switcher + nav, /profiles CRUD, profile picker on connect flows, profile scope on API key create, profile filter + time-range + error-code multi-select + manual refresh + focus refetch on the Post Log (now a TanStack Table), inline OAuth/credentials connect (no detour), webhook chip multi-select + synchronous test-deliver dialog with editable JSON preview; MVP slices of Phase 8 (Twitter/X) and Phase 11 (Pinterest) publishers shipped behind the AccountProvider framework. **179+ API tests green.** Bluesky publishes end-to-end today; LinkedIn personal posts publish; Pinterest + X are built and gated on platform review; Meta + YouTube are next.
+**Status (April 2026):** Phases 1–5.5 landed; **Phase 6 LinkedIn MVP shipped** (personal-account text UGC + 3,000-grapheme preflight + URN validation + version-pinning client) with MDP-gated org/Company-Page posting deferred; **Phase 7 dashboard substantially complete** — sign-in/up, /onboarding silent recovery, 3-step accordion onboarding (API key + connect platform + send first post) with auto-advance + step-locking, brand-aligned theme (paper cream + forest green + Commit Mono + Instrument Serif wordmark), framer-motion blur transitions, full sidebar with org switcher + profile switcher + nav, /profiles CRUD, profile picker on connect flows, profile scope on API key create, profile filter + time-range + error-code multi-select + manual refresh + focus refetch on the Post Log (now a TanStack Table), inline OAuth/credentials connect (no detour), webhook chip multi-select + synchronous test-deliver dialog with editable JSON preview; MVP slices of Phase 8 (Twitter/X) and Phase 11 (Pinterest) publishers shipped behind the AccountProvider framework. **179+ API tests green.** Bluesky publishes end-to-end today; LinkedIn personal posts publish; Pinterest connects end-to-end via the OAuth callback handler but the publish path is gated on the media-upload service (Phase 7.5).
+
+**Production live:** API at `https://api.letmepost.dev` (Railway), dashboard at `https://dashboard.letmepost.dev`, landing at `https://letmepost.dev`. NeonDB Postgres + Upstash Redis. The OAuth callback handler ships server-side state (HMAC-signed, 10-min TTL) so Pinterest/LinkedIn round-trips complete without a server-side session table. Cross-subdomain cookies wired via `COOKIE_DOMAIN=.letmepost.dev`.
+
+**Approvals in flight (April 2026):**
+- **Meta App Review** — business verification in progress; submission tomorrow
+- **LinkedIn MDP** — submitted, awaiting review
+- **Pinterest Standard Access** — pending demo video recording (Trial Access works today; pins are private to the creator until Standard clears)
+- **X paid tier + YouTube CASA** — not yet submitted
 
 **Scope decision (April 2026):** YouTube replaces TikTok for v1. TikTok is deferred to v2. Reasoning: YouTube's OAuth verification is a one-time annual security review with a known timeline; TikTok's Content Posting API approval is two separate audits (Upload + Direct Post), each on a 4–10-week manual review with frequent rejections, and the audit-state SELF_ONLY constraint complicates the demo path. We pick the platform where the gating cost is bounded.
 
-What's still missing from the original plan: Phase 6 LinkedIn org/Company-Page posting (MDP-gated), Phase 9 Meta trio, Phase 10 YouTube, Phase 12 SDK pipeline, Phase 13 docs polish, Phase 14 obs + launch prep, Phase 15 launch. Phase 5.5 (Profiles) was added after the initial plan to pick up the agency / multi-brand use case without per-profile pricing — both API and dashboard are done.
+**Immediate next slice (April 2026):** before resuming the new-platform phases, lock Bluesky and Pinterest to "perfect" — every API endpoint, every preflight rule, every webhook event verified end-to-end against production. This requires the media-upload service (Phase 7.5) as a foundation; Pinterest's publish path can't function without per-post media, and Bluesky video needs the same plumbing. Two-platform polish first, then Meta / X / YouTube once approvals clear.
+
+What's still missing from the original plan: Phase 6 LinkedIn org/Company-Page posting (MDP-gated), **Phase 7.5 Media Upload Service (new)**, Phase 9 Meta trio, Phase 10 YouTube, Phase 11 Pinterest rewrite, Phase 12 SDK pipeline, Phase 13 docs polish, Phase 14 obs + launch prep, Phase 15 launch. Phase 5.5 (Profiles) was added after the initial plan to pick up the agency / multi-brand use case without per-profile pricing — both API and dashboard are done.
 
 This plan takes us from that state to a public v1 launch. Every phase is filtered through the **seven product principles** in `PRODUCT.md` and traces to the **six research-corpus problems** we exist to solve:
 
@@ -19,7 +29,7 @@ This plan takes us from that state to a public v1 launch. Every phase is filtere
 
 The goal is not to match any competitor's feature count. The goal is to be the publishing primitive where **failure is loud, preventable, and documented** — with API version abstraction and flat pricing as the commercial wedges.
 
-**Honest estimate: 29 weeks of coding, 7–8 months to public launch** accounting for Meta + YouTube verification variance. (Original estimate was 28; +1 for the Phase 5.5 profiles retrofit.)
+**Honest estimate: 30 weeks of coding, 7–8 months to public launch** accounting for Meta + YouTube verification variance. (Original 28; +1 for Phase 5.5 profiles retrofit; +1 for Phase 7.5 media service.)
 
 ---
 
@@ -27,13 +37,13 @@ The goal is not to match any competitor's feature count. The goal is to be the p
 
 These are calendar-gated and take months. Start them all before writing any Phase 1 code.
 
-| Action | Why Day 0 | Expected wait | Buildable pre-approval? |
-|---|---|---|---|
-| **Meta App Review** (IG Graph + FB Pages + Threads) | 2–8 weeks per review cycle, rejections normal, business verification is its own slog | 6–12 weeks realistic | **Yes.** App in Development Mode can publish to the developer's own account + any account registered as a Tester. Same Graph API endpoints, same response shapes as post-approval — approval only lifts the "testers only" restriction. Phase 9 is genuinely a same-day deploy on approval. |
-| **YouTube OAuth verification** (Google Cloud) | Restricted-scope (`youtube.upload`) requires a one-time security assessment by an approved third-party CASA auditor; ~3–6 weeks first time, annual renewal after | 3–6 weeks first cycle | **Yes.** Unverified apps cap at 100 lifetime users — fine for staged rollout while the assessment runs. Same Data API v3 endpoints, same response shapes; verification only lifts the user cap and the unverified-app warning screen. |
-| **X API paid tier** | Paid billing near-instant; Elevated write + use-case review 1–3 weeks. **⚠ Feb 2026 shift:** X killed tiered pricing for new signups — Basic/Pro are closed to new developers; pay-per-use is the new floor. Budget starts accruing from Phase 8 start, not from launch. Revisit whether X stays in v1. | 1–3 weeks | **Partial.** No free write path; pay-per-use bills from the first call. |
-| **LinkedIn MDP / Community Management API** application | Many post scopes require MDP approval; we want this ready by Phase 6 | 2–6 weeks | **Partial.** Personal-account posting (`w_member_social`, Share on LinkedIn product) works on the standard dev tier without MDP. MDP / Community Management API gates **org- and company-page** posting only. ~60–70% of Phase 6 (personal posts, preflight suite, version-pinning layer, person-URN validation) is buildable day 0; the org-post codepath waits on approval. |
-| **Pinterest developer account + trial access** | Needed by Phase 11 | 1–2 weeks | **Yes.** Trial Access is the sandbox — all endpoints exposed, pins private to creator until Standard approval (requires a video of the OAuth flow). |
+| Action | Why Day 0 | Expected wait | Buildable pre-approval? | Status (April 2026) |
+|---|---|---|---|---|
+| **Meta App Review** (IG Graph + FB Pages + Threads) | 2–8 weeks per review cycle, rejections normal, business verification is its own slog | 6–12 weeks realistic | **Yes.** App in Development Mode can publish to the developer's own account + any account registered as a Tester. Same Graph API endpoints, same response shapes as post-approval — approval only lifts the "testers only" restriction. Phase 9 is genuinely a same-day deploy on approval. | Business verification in progress; submission tomorrow |
+| **YouTube OAuth verification** (Google Cloud) | Restricted-scope (`youtube.upload`) requires a one-time security assessment by an approved third-party CASA auditor; ~3–6 weeks first time, annual renewal after | 3–6 weeks first cycle | **Yes.** Unverified apps cap at 100 lifetime users — fine for staged rollout while the assessment runs. Same Data API v3 endpoints, same response shapes; verification only lifts the user cap and the unverified-app warning screen. | Not yet submitted |
+| **X API paid tier** | Paid billing near-instant; Elevated write + use-case review 1–3 weeks. **⚠ Feb 2026 shift:** X killed tiered pricing for new signups — Basic/Pro are closed to new developers; pay-per-use is the new floor. Budget starts accruing from Phase 8 start, not from launch. Revisit whether X stays in v1. | 1–3 weeks | **Partial.** No free write path; pay-per-use bills from the first call. | Not yet submitted |
+| **LinkedIn MDP / Community Management API** application | Many post scopes require MDP approval; we want this ready by Phase 6 | 2–6 weeks | **Partial.** Personal-account posting (`w_member_social`, Share on LinkedIn product) works on the standard dev tier without MDP. MDP / Community Management API gates **org- and company-page** posting only. ~60–70% of Phase 6 (personal posts, preflight suite, version-pinning layer, person-URN validation) is buildable day 0; the org-post codepath waits on approval. | Submitted, awaiting review |
+| **Pinterest developer account + trial access** | Needed by Phase 11 | 1–2 weeks | **Yes.** Trial Access is the sandbox — all endpoints exposed, pins private to creator until Standard approval (requires a video of the OAuth flow). | Trial Access live; Standard pending demo video |
 
 Also Day 0 (non-gating, cheap): register `letmepost` GitHub org, reserve `@letmepost` npm scope, reserve `letmepost` on PyPI, create empty `letmepost/sdk-python` and `letmepost/sdk-go` repos.
 
@@ -165,6 +175,47 @@ Destructive actions (disconnect account, revoke key, delete endpoint, delete pro
 **Effort:** Done.
 **NOT in scope:** Billing, analytics dashboards, team invites beyond single-org, whitelabel, theming switcher, mobile-first layout, API call log (request-level, as opposed to post-level), webhook delivery log (deferred — needs a backend ticket to expose BullMQ delivery history; today only the synchronous test-deliver round-trip is visible).
 
+## Phase 7.5 — Media Upload Service + Bluesky/Pinterest hardening
+
+**Goal:** Per-post media as a first-class concept across every publisher, plus the foundation that lets Pinterest, YouTube, and any future video platform actually publish without per-platform carve-outs. Then lock Bluesky and Pinterest to "perfect" against the live API before we resume new-platform work.
+
+**Why now:** Pinterest's publish path today reads `boardId / destinationUrl / imageUrl` from `platform_account.tokenMetadata` — a documented hack from when media wasn't a real concept. The `lmp-test` script exposed the gap end-to-end. YouTube long-form videos and Bluesky video both need the same plumbing. Doing this once unblocks three platforms.
+
+**Ships:**
+
+*Media upload service:*
+- New `POST /v1/media` — multipart, streams direct to S3 via `@aws-sdk/lib-storage`'s `Upload` (handles 100 MB+ video uploads without buffering server-side). Returns `{ id, url, contentType, sizeBytes, sha256 }`.
+- New `media` table — `(id, organizationId, profileId?, contentType, sizeBytes, sha256, s3Key, createdAt)`. No automatic deletion in v1; bucket grows forever (lifecycle policy is a follow-up if cost demands).
+- S3 bucket `letmepost-media` in `us-east-1` (same region as Railway), single bucket with `${env}/${orgId}/${mediaId}` prefix, public-read object ACLs (simpler forwarding to platforms; CloudFront layer if hotlinking becomes a concern).
+- New env: `AWS_REGION=us-east-1`, `S3_BUCKET=letmepost-media`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`. `.env.example` updated; Railway's `apps/api` service gets the secrets.
+- `MediaInput` schema in `packages/schemas` gets a third variant: `{ kind, mediaId }` referencing a `/v1/media` upload. The existing `{ url }` and `{ bytesBase64 }` variants stay (URL passthrough is still useful for callers who already have a CDN; bytes-inline stays for tiny images).
+- Shared `apps/api/src/platforms/_shared/media.ts` resolver — every publisher calls `resolveMedia(item)` to get the bytes-or-URL it needs. Three branches: `mediaId` → fetch row, derive S3 URL; `url` → passthrough; `bytesBase64` → decode.
+
+*Bluesky hardening (already publishes text):*
+- Single + multi-image carousel (max 4) via the new media plumbing
+- Alt text round-trip end-to-end (preflight + publish)
+- Video posts (Bluesky added these in 2024; ~100 MB MP4) via the same `mediaId` flow
+- Tighten preflight: image count, mime allowlist, exact size limits (1 MB images / 100 MB video), alt-text grapheme cap (2,000)
+- Confirm `post.queued → post.validated → post.published` webhook chain fires for every variant
+- `POST /v1/posts/validate` works for Bluesky (preflight-only)
+- `lmp-test` script grows: text post (today), single-image post, multi-image carousel, video post, alt-text echo, validation-only run
+
+*Pinterest rewrite:*
+- At OAuth-complete, fetch the user's boards via `GET /v5/boards` and store `defaultBoardId` on the account
+- Drop the `tokenMetadata.boardId/destinationUrl/imageUrl` carve-out entirely (delete the dispatch.ts code, gut the publisher's metadata reader)
+- Publisher reads `media[0]` (URL or `mediaId`), `text` as description, board from `account.defaultBoardId`
+- Per-post override extension: `pinterest: { boardId?, destinationUrl?, title? }` on the post body — the documented escape hatch for callers who want something other than the default board
+- Dashboard surfaces a "Default board" picker on the Pinterest account row (small select, fed by `GET /v5/boards`)
+- Image preflight: dimensions + aspect + size + URL reachability (the existing rules), now wired to the resolver instead of the metadata bag
+- `lmp-test` Pinterest test sends `media: [{ kind: "image", url }]` and expects a real publish
+
+**Problems solved:** 3 (opaque media rejections — Pinterest specifically gets the proper preflight; foundation for IG Reels / YouTube same shape).
+**Principles served:** 1 (preflight is the wedge), 2 (transparent errors continue), 4 (one media abstraction across N platforms).
+**Depends on:** Phases 1–7. The dashboard's connect drawer is reused as-is; only the post-publish path changes.
+**Effort:** ~1 week — media service (2 days) + Bluesky hardening (1–2 days) + Pinterest rewrite (2–3 days).
+**Risks:** S3 IAM policy footguns (public-read object ACLs disabled by default on new buckets — set bucket policy + Object Ownership = "Bucket owner enforced"); `@aws-sdk/lib-storage` chunk size tuning for slow uploaders.
+**NOT in scope:** S3 lifecycle deletion, CloudFront, byte-range serving, image transformation (resize / re-encode), video transcoding, signed-URL upload flow (callers go through our multipart endpoint; presigned PUT is a future option once we hit bandwidth pain).
+
 ## Phase 8 — Twitter/X
 
 **Goal:** Second commercial platform; validates the framework is generic.
@@ -204,17 +255,20 @@ Destructive actions (disconnect account, revoke key, delete endpoint, delete pro
 **Risks:** Verification timeline (CASA cost + scheduling); per-project quota cap on burst uploads — surface clearly, document raising it.
 **NOT in scope:** Live streams, community tab posts, comment moderation, Shorts-specific Reels-cross-posting, Studio analytics.
 
-## Phase 11 — Pinterest
+## Phase 11 — Pinterest extras (post-7.5)
 
-**Goal:** Cheapest integration, fastest-growing platform, clean win before launch.
+**Status:** Core publish path subsumed by Phase 7.5 (board fetch on connect, default-board with per-post override, image pin via `media: [{ kind: "image", url | mediaId }]`). What remains here is the long tail.
 
-**Ships:** Pinterest OAuth, board listing, pin create (image + video + rich pin); preflight (image dimensions + aspect + size, board ownership, destination URL reachability); error mapper.
+**Ships:**
+- Video pin support — Pinterest accepts MP4 via `cover_image_url` + media; preflight on duration / resolution / size
+- Rich pins (article / product) — schema.org markup + URL preflight
+- Board ownership preflight (verify the user can pin to the supplied `boardId` before hitting Pinterest's API)
+- Pinterest-specific error mapper polish — duplicate-pin, board-deleted, content-policy
+- Standard Access submission (the demo-video gate)
 
-**Problems solved:** 1.
-**Principles served:** 1, 2.
-**Depends on:** Phases 1–6.
-**Effort:** 1 week.
-**Risks:** Low.
+**Depends on:** Phase 7.5.
+**Effort:** 2–3 days plus Standard Access wait.
+**Risks:** Low — image MVP is already proven by 7.5.
 **NOT in scope:** Catalog/feed sync, ads, idea pins.
 
 ## Phase 12 — OpenAPI Pipeline, TS SDK, Autogen'd Python + Go
@@ -283,17 +337,18 @@ Destructive actions (disconnect account, revoke key, delete endpoint, delete pro
 | 11 | **Phase 5.5: Profiles (retrofit)** | — |
 | 12–14 | **Phase 6: LinkedIn (3 wks)** | TS SDK skeleton stubbed in week 14 |
 | 15–16 | Phase 7: Dashboard | TS SDK continues |
-| 17–18 | Phase 8: X | Py/Go generators |
-| 19–21 | **Phase 9: Meta trio (3 wks, gated on approval)** | If Meta not yet approved, swap in Phase 11 Pinterest + Phase 13 docs |
-| 22–24 | Phase 10: YouTube (build during verification) | Same swap rule |
-| 25 | Phase 11: Pinterest | — |
-| 26–28 | **Phase 13: Site + docs polish (3 wks)** | Contract test cron stabilization |
-| 29 | Phase 14: Obs + security + launch prep + pricing | — |
-| 30 | Phase 15: Launch | — |
+| 17 | **Phase 7.5: Media + S3 + Bluesky/Pinterest hardening (1 wk)** | — |
+| 18–19 | Phase 8: X (now gated on paid-tier signup) | Py/Go generators |
+| 20–22 | **Phase 9: Meta trio (3 wks, gated on approval)** | If Meta not yet approved, swap in Phase 11 extras + Phase 13 docs |
+| 23–25 | Phase 10: YouTube (build during CASA verification) | Same swap rule |
+| 26 | Phase 11: Pinterest extras (video pins, rich pins, board ACL preflight) | — |
+| 27–29 | **Phase 13: Site + docs polish (3 wks)** | Contract test cron stabilization |
+| 30 | Phase 14: Obs + security + launch prep + pricing | — |
+| 31 | Phase 15: Launch | — |
 
 Note: weeks 26–28 count as the *polish* window for docs, assuming the continuous-drip rule worked. If not, add 1–2 weeks. Realistic ship window: **7–8 months from Day 0**, accounting for Meta App Review + YouTube CASA verification variance.
 
-**Strictly sequential:** 1 → 2 → 3 → 4 → 5 → 5.5 → 6.
+**Strictly sequential:** 1 → 2 → 3 → 4 → 5 → 5.5 → 6 → 7 → 7.5.
 **Can parallelize:** Phase 7 (dashboard) with Phase 8 (X) and Phase 12 (SDKs).
 **Calendar-gated:** 9 (Meta App Review), 10 (YouTube CASA verification) — build readiness, deploy same-day on approval.
 **Always-background:** Docs narrative (Phase 13).

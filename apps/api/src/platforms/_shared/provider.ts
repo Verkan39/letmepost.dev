@@ -6,7 +6,7 @@ import { LetmepostError } from "../../errors.js";
  * Every platform returns one of these from `describeConnect`, and the
  * /v1/accounts/connect route passes it straight back to the client.
  *
- * OAuth platforms (LinkedIn, X, Meta, Pinterest, TikTok) return a
+ * OAuth platforms (LinkedIn, X, Meta, Pinterest, YouTube) return a
  * redirect URL + state. Bluesky — the one outlier in v1 — uses app
  * passwords, so it returns a form schema the UI renders and POSTs back
  * to the complete endpoint.

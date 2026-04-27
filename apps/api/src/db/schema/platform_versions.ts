@@ -13,6 +13,7 @@ export const platform = pgEnum("platform", [
   "instagram",
   "facebook",
   "threads",
+  "youtube",
   "tiktok",
   "pinterest",
 ]);

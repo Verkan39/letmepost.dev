@@ -8,7 +8,7 @@ Internal product description. Source of truth for positioning, ICP, scope, and p
 
 ## What letmepost.dev is
 
-A developer-grade HTTP API for publishing to social media platforms. A single endpoint contract (`POST /posts`) that routes to Bluesky, LinkedIn, Twitter/X, Instagram, Facebook, Threads, TikTok, and Pinterest, with **preflight validation, transparent errors, stable API versioning, and idempotency keys** as first-class contracts.
+A developer-grade HTTP API for publishing to social media platforms. A single endpoint contract (`POST /posts`) that routes to Bluesky, LinkedIn, Twitter/X, Instagram, Facebook, Threads, YouTube, and Pinterest, with **preflight validation, transparent errors, stable API versioning, and idempotency keys** as first-class contracts.
 
 Open-source core (Apache-2.0-ish, TBD), hosted SaaS as the primary commercial offering, self-host as a first-class community option. Same code, same API, no feature gate between the two.
 
@@ -30,7 +30,7 @@ From the 2025-2026 research corpus (150+ citations across GitHub, Trustpilot, Ca
 
 2. **LinkedIn API version churn is a serial killer of automations.** LinkedIn sunset five API versions in six months (20240401, 20241001, 20241101, 20250101, 20250401), each time simultaneously breaking n8n Cloud, Zapier, Make, Pabbly, and Postiz. The fix in every case was a single HTTP header.
 
-3. **Media upload validation failures are asynchronous and opaque.** Instagram Reels reject Google Drive URLs. TikTok rejects after upload with `file_format_check_failed`. Threads throws cryptic `OAuthException 2207052`. Every one of these is catchable with client-side validation *before* the API call.
+3. **Media upload validation failures are asynchronous and opaque.** Instagram Reels reject Google Drive URLs. YouTube `videos.insert` returns a generic `forbidden` for restricted-scope mismatches. Threads throws cryptic `OAuthException 2207052`. (Historical: TikTok's `file_format_check_failed` was the same shape — TikTok now deferred to v2.) Every one of these is catchable with client-side validation *before* the API call.
 
 4. **OAuth token lifecycle is a production liability.** LinkedIn tokens expire every 60 days and require full re-auth. Meta Instagram: 60 days. Google Business Profile: needs daily refresh. Bluesky access JWTs: minutes.
 
@@ -58,7 +58,7 @@ These are non-negotiable. If a feature breaks one of these, the feature loses.
 
 ### 1. Preflight over postflight
 
-Every platform's documented constraints are checked *before* the platform API call. Character counts (LinkedIn's 3000 emoji-aware, Threads' 500, X's 280), media formats, URL reachability, audit states (TikTok SELF_ONLY detection), URN patterns, business-account requirements, OAuth scopes — all validated client-side. Async rejections from the platform are always treated as *our* failure to preflight, not the user's failure to read docs.
+Every platform's documented constraints are checked *before* the platform API call. Character counts (LinkedIn's 3000 emoji-aware, Threads' 500, X's 280), media formats, URL reachability, YouTube container/codec/duration limits + per-project quota awareness, URN patterns, business-account requirements, OAuth scopes — all validated client-side. Async rejections from the platform are always treated as *our* failure to preflight, not the user's failure to read docs.
 
 ### 2. Transparent errors
 
@@ -104,7 +104,7 @@ The API contract, the SDK ergonomics, the error messages, the dashboard, the doc
 **Out of scope for v1** (future bets, not this product yet):
 
 - Inbox: DMs, comments, comment replies, review replies
-- Ads manager across Meta/Google/TikTok/LinkedIn/Pinterest/X
+- Ads manager across Meta/Google/YouTube/TikTok/LinkedIn/Pinterest/X
 - WhatsApp Business (templates, flows, phone numbers — a standalone product)
 - CRM-ish features (contacts, sequences, broadcasts)
 - Comment-to-DM automations
@@ -117,10 +117,10 @@ Decided from the 90-day Zernio dataset (2026-01-24 → 2026-04-23, 2.78M posts a
 2. **LinkedIn** — the wedge platform. #1 complaint volume in the research corpus, cleanest API of the major platforms (4.7% fail rate), no brutal approval gauntlet, 11.6k accounts in the data. Demonstrates preflight + version pinning as a concrete pitch.
 3. **Twitter/X** — table-stakes for the automation-builder ICP. 8.1k accounts.
 4. **Instagram + Facebook + Threads** — Meta Graph trio, built together because they share auth. Meta app review **must begin day 0** of the project, in parallel with Bluesky and LinkedIn work. Combined ~51% of post volume and 54k accounts.
-5. **TikTok** — audit-state aware, 18.6k accounts. API approval also started day 0, in parallel.
+5. **YouTube** — Data API v3 with `videos.insert` resumable upload. Bounded gating cost: a one-time CASA verification (3–6 weeks first cycle, annual renewal) instead of TikTok's two separate review tracks with frequent rejections. Replaces TikTok in v1 scope.
 6. **Pinterest** — cheapest integration, fastest-growing platform in the Zernio dataset (+1369% over 90 days), lowest failure rate (3%). Easy win and a cheap differentiator.
 
-**Deliberately cut from v1:** YouTube (declining signal -77%, video-infra heavy), Reddit (67% fail rate, hostile API), Telegram / Discord / Snapchat / Google Business / WhatsApp (long tail, <1k accounts each in the data).
+**Deliberately cut from v1:** TikTok (audit complexity — see roadmap deferral note), Reddit (67% fail rate, hostile API), Telegram / Discord / Snapchat / Google Business / WhatsApp (long tail, <1k accounts each in the data).
 
 ## How we're different
 

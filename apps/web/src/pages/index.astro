@@ -12,7 +12,7 @@ const platforms = [
   { name: "Instagram", slug: "instagram", status: "under_review" },
   { name: "Facebook", slug: "facebook", status: "under_review" },
   { name: "Threads", slug: "threads", status: "under_review" },
-  { name: "TikTok", slug: "tiktok", status: "under_review" },
+  { name: "YouTube", slug: "youtube", status: "under_review" },
 ] as const;
 
 const statusLabel: Record<string, string> = {
@@ -90,7 +90,7 @@ const methodClasses: Record<string, string> = {
 const faqs = [
   {
     q: "What actually works today?",
-    a: 'Bluesky is live end-to-end — connect an account, send a post, get a webhook back. Pinterest and Twitter/X publishers are built and tested but waiting on platform review (Pinterest Standard access; X Elevated write tier). LinkedIn, Meta (Instagram / Facebook / Threads), and TikTok are review-gated and typically clear 2–12 weeks from submission. See the <a href="https://github.com/rosekamallove/letmepost.dev/blob/main/plan.md">plan</a> for dates.',
+    a: 'Bluesky is live end-to-end — connect an account, send a post, get a webhook back. Pinterest and Twitter/X publishers are built and tested but waiting on platform review (Pinterest Standard access; X Elevated write tier). LinkedIn, Meta (Instagram / Facebook / Threads), and YouTube are review-gated and typically clear 3–12 weeks from submission (YouTube via the CASA verification track). See the <a href="https://github.com/rosekamallove/letmepost.dev/blob/main/plan.md">plan</a> for dates.',
   },
   {
     q: "Why another social media API?",
@@ -432,9 +432,10 @@ const liveGlyphShadow =
         }
       </ul>
       <p class="text-[0.8rem] mt-4 text-text-muted">
-        YouTube, Reddit, Telegram, Discord, Snapchat, Google Business, and
-        WhatsApp are deliberately not in the v1 scope. See the roadmap for the
-        reasoning.
+        TikTok is deferred to v2 — DB enum + schemas keep it reserved for an
+        additive add later. Reddit, Telegram, Discord, Snapchat, Google
+        Business, and WhatsApp are deliberately cut from v1. See the roadmap
+        for the reasoning.
       </p>
     </div>
   </section>

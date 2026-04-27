@@ -67,7 +67,7 @@ Non-negotiable, stated here so future sessions can't re-litigate without a reaso
 1. **Every API endpoint has tests before the endpoint is considered done.** No "I'll add tests later."
 2. **Multi-case coverage per endpoint.** At minimum: happy path, invalid input (per field), unauthorized, idempotency replay, upstream-platform failure, upstream-platform malformed response, rate-limited.
 3. **Preflight rules are tested independently of the handler.** A rule like "Instagram Reels ≤ 8MB" is a pure function with its own unit-test suite. The handler test confirms the rule is wired in.
-4. **External platform HTTP is always mocked via MSW.** No tests hit real Meta / LinkedIn / TikTok APIs. Separately, a small `contract/` suite runs against real APIs on a cron to catch upstream regressions — that one is not in the TDD loop.
+4. **External platform HTTP is always mocked via MSW.** No tests hit real Meta / LinkedIn / YouTube APIs. Separately, a small `contract/` suite runs against real APIs on a cron to catch upstream regressions — that one is not in the TDD loop.
 5. **In-memory requests only in the fast suite.** `app.request()` — no port binding, no supertest. The framework call is sub-millisecond; full tests with setup/teardown typically land at 5–50 ms each. Target the whole API suite running locally in seconds, not minutes — if it drifts above that, something is wrong.
 6. **Affected-only in CI.** `turbo run test --filter='...[origin/main]'` — don't re-run the world on every PR.
 

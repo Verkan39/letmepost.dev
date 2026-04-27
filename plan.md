@@ -2,22 +2,24 @@
 
 ## Context
 
-**Status (April 2026):** Phases 1–5.5 landed; **Phase 6 LinkedIn MVP shipped** (personal-account text UGC + 3,000-grapheme preflight + URN validation + version-pinning client) with MDP-gated org/Company-Page posting deferred; **Phase 7 dashboard substantially complete** — sign-in/up, /onboarding silent recovery, 3-step accordion onboarding (API key + connect platform + send first post) with auto-advance + step-locking, brand-aligned theme (paper cream + forest green + Commit Mono + Instrument Serif wordmark), framer-motion blur transitions, full sidebar with org switcher + profile switcher + nav, /profiles CRUD, profile picker on connect flows, profile scope on API key create, profile filter + time-range + error-code multi-select + manual refresh + focus refetch on the Post Log (now a TanStack Table), inline OAuth/credentials connect (no detour), webhook chip multi-select + synchronous test-deliver dialog with editable JSON preview; MVP slices of Phase 8 (Twitter/X) and Phase 11 (Pinterest) publishers shipped behind the AccountProvider framework. **179+ API tests green.** Bluesky publishes end-to-end today; LinkedIn personal posts publish; Pinterest + X are built and gated on platform review; Meta + TikTok are next.
+**Status (April 2026):** Phases 1–5.5 landed; **Phase 6 LinkedIn MVP shipped** (personal-account text UGC + 3,000-grapheme preflight + URN validation + version-pinning client) with MDP-gated org/Company-Page posting deferred; **Phase 7 dashboard substantially complete** — sign-in/up, /onboarding silent recovery, 3-step accordion onboarding (API key + connect platform + send first post) with auto-advance + step-locking, brand-aligned theme (paper cream + forest green + Commit Mono + Instrument Serif wordmark), framer-motion blur transitions, full sidebar with org switcher + profile switcher + nav, /profiles CRUD, profile picker on connect flows, profile scope on API key create, profile filter + time-range + error-code multi-select + manual refresh + focus refetch on the Post Log (now a TanStack Table), inline OAuth/credentials connect (no detour), webhook chip multi-select + synchronous test-deliver dialog with editable JSON preview; MVP slices of Phase 8 (Twitter/X) and Phase 11 (Pinterest) publishers shipped behind the AccountProvider framework. **179+ API tests green.** Bluesky publishes end-to-end today; LinkedIn personal posts publish; Pinterest + X are built and gated on platform review; Meta + YouTube are next.
 
-What's still missing from the original plan: Phase 6 LinkedIn org/Company-Page posting (MDP-gated), Phase 9 Meta trio, Phase 10 TikTok, Phase 12 SDK pipeline, Phase 13 docs polish, Phase 14 obs + launch prep, Phase 15 launch. Phase 5.5 (Profiles) was added after the initial plan to pick up the agency / multi-brand use case without per-profile pricing — both API and dashboard are done.
+**Scope decision (April 2026):** YouTube replaces TikTok for v1. TikTok is deferred to v2. Reasoning: YouTube's OAuth verification is a one-time annual security review with a known timeline; TikTok's Content Posting API approval is two separate audits (Upload + Direct Post), each on a 4–10-week manual review with frequent rejections, and the audit-state SELF_ONLY constraint complicates the demo path. We pick the platform where the gating cost is bounded.
+
+What's still missing from the original plan: Phase 6 LinkedIn org/Company-Page posting (MDP-gated), Phase 9 Meta trio, Phase 10 YouTube, Phase 12 SDK pipeline, Phase 13 docs polish, Phase 14 obs + launch prep, Phase 15 launch. Phase 5.5 (Profiles) was added after the initial plan to pick up the agency / multi-brand use case without per-profile pricing — both API and dashboard are done.
 
 This plan takes us from that state to a public v1 launch. Every phase is filtered through the **seven product principles** in `PRODUCT.md` and traces to the **six research-corpus problems** we exist to solve:
 
 1. **Silent failures** — posts "succeed" then never appear; `{body:{}, message:""}`; scheduled posts disappearing.
 2. **LinkedIn API version churn** — 5 versions sunset in 6 months simultaneously breaking every competitor. Fix is one HTTP header.
-3. **Opaque media upload rejections** — Instagram Reels, TikTok `file_format_check_failed`, Threads `OAuthException 2207052`. All catchable with preflight.
+3. **Opaque media upload rejections** — Instagram Reels, YouTube quota / aspect-ratio rejects, Threads `OAuthException 2207052` (and TikTok's `file_format_check_failed` historically — TikTok is now v2). All catchable with preflight.
 4. **OAuth token lifecycle rot** — LinkedIn/Meta 60d, GBP daily, Bluesky minutes.
 5. **Per-profile / per-seat pricing** — universally hated.
 6. **Double-posting from retry storms** — Postiz #1321; fix is idempotency keys.
 
 The goal is not to match any competitor's feature count. The goal is to be the publishing primitive where **failure is loud, preventable, and documented** — with API version abstraction and flat pricing as the commercial wedges.
 
-**Honest estimate: 29 weeks of coding, 7–8 months to public launch** accounting for Meta/TikTok approval variance. (Original estimate was 28; +1 for the Phase 5.5 profiles retrofit.)
+**Honest estimate: 29 weeks of coding, 7–8 months to public launch** accounting for Meta + YouTube verification variance. (Original estimate was 28; +1 for the Phase 5.5 profiles retrofit.)
 
 ---
 
@@ -28,7 +30,7 @@ These are calendar-gated and take months. Start them all before writing any Phas
 | Action | Why Day 0 | Expected wait | Buildable pre-approval? |
 |---|---|---|---|
 | **Meta App Review** (IG Graph + FB Pages + Threads) | 2–8 weeks per review cycle, rejections normal, business verification is its own slog | 6–12 weeks realistic | **Yes.** App in Development Mode can publish to the developer's own account + any account registered as a Tester. Same Graph API endpoints, same response shapes as post-approval — approval only lifts the "testers only" restriction. Phase 9 is genuinely a same-day deploy on approval. |
-| **TikTok Content Posting API** approval | Manual review, audit-state gate, "direct-post" is a separate review from "upload" | 4–10 weeks | **Yes.** Explicit Sandbox Mode. Unaudited clients can post, restricted to `SELF_ONLY` privacy — matches our audit-state preflight design exactly (we already plan to surface `SELF_ONLY` as a non-fatal `post.validated` warning). Build Phase 10 against real TikTok during the wait. |
+| **YouTube OAuth verification** (Google Cloud) | Restricted-scope (`youtube.upload`) requires a one-time security assessment by an approved third-party CASA auditor; ~3–6 weeks first time, annual renewal after | 3–6 weeks first cycle | **Yes.** Unverified apps cap at 100 lifetime users — fine for staged rollout while the assessment runs. Same Data API v3 endpoints, same response shapes; verification only lifts the user cap and the unverified-app warning screen. |
 | **X API paid tier** | Paid billing near-instant; Elevated write + use-case review 1–3 weeks. **⚠ Feb 2026 shift:** X killed tiered pricing for new signups — Basic/Pro are closed to new developers; pay-per-use is the new floor. Budget starts accruing from Phase 8 start, not from launch. Revisit whether X stays in v1. | 1–3 weeks | **Partial.** No free write path; pay-per-use bills from the first call. |
 | **LinkedIn MDP / Community Management API** application | Many post scopes require MDP approval; we want this ready by Phase 6 | 2–6 weeks | **Partial.** Personal-account posting (`w_member_social`, Share on LinkedIn product) works on the standard dev tier without MDP. MDP / Community Management API gates **org- and company-page** posting only. ~60–70% of Phase 6 (personal posts, preflight suite, version-pinning layer, person-URN validation) is buildable day 0; the org-post codepath waits on approval. |
 | **Pinterest developer account + trial access** | Needed by Phase 11 | 1–2 weeks | **Yes.** Trial Access is the sandbox — all endpoints exposed, pins private to creator until Standard approval (requires a video of the OAuth flow). |
@@ -189,18 +191,18 @@ Destructive actions (disconnect account, revoke key, delete endpoint, delete pro
 **Risks:** Biggest external blocker in the plan. Keep engineering ready-to-ship so you deploy same-day on approval. Also: media CDN + transient storage is a mini-decision (R2 or S3-compatible in Railway).
 **NOT in scope:** Shopping tags, collab posts, branded content, ads, Threads DM.
 
-## Phase 10 — TikTok
+## Phase 10 — YouTube
 
-**Ready-to-build gate:** TikTok Content Posting API approved.
+**Ready-to-build gate:** Google Cloud project with YouTube Data API v3 enabled. Verification (CASA) runs in parallel with build — unverified-app cap of 100 users is fine for staged rollout while the assessment clears.
 
-**Ships:** TikTok OAuth, audit-state detection (SELF_ONLY vs. public); `POST /v1/posts` with `platform: "tiktok"` — direct-post if approved, upload-inbox as fallback; preflight (video codec + container + frame-rate + duration + resolution + aspect — `file_format_check_failed` mapped + remediated *before* upload); audit-state surfaced as non-fatal `post.validated` warning when SELF_ONLY; async publish-status polling with transparent state transitions.
+**Ships:** YouTube OAuth 2.0 with offline access + refresh-token lifecycle (Google's refresh tokens are long-lived but revoke on inactivity / scope changes); `POST /v1/posts` with `platform: "youtube"` — resumable upload to `videos.insert` with status `private` / `unlisted` / `public`; preflight validator suite (video container + codec — H.264 / H.265 / AV1 / VP9; audio codec — AAC / Opus; max file size — 256 GB / 12 hours; aspect ratio + resolution — Shorts vs. long-form; title ≤ 100 chars; description ≤ 5000 chars; ≤ 500 tags totaling ≤ 500 chars; categoryId in the per-region allowlist; thumbnail dimensions when supplied); resumable upload chunking with retry on transient 5xx; quota-cost surfacing (Data API spends 1600 units per upload against a default 10k/day project budget — we tell users how much budget remains, a small differentiator); error mapper for `quotaExceeded`, `forbidden`, `videoChunkTooBig`, `uploadLimitExceeded`, `mediaBodyRequired`. `POST /v1/posts/validate` runs the preflight without uploading.
 
-**Problems solved:** 1, 3.
-**Principles served:** 1, 2.
-**Depends on:** Phases 1–6; TikTok approval.
-**Effort:** 2–3 weeks (video preflight requires real container parsing with `ffprobe` in the worker).
-**Risks:** Approval gate; audit-state surprises in production.
-**NOT in scope:** TikTok Shop, Live, analytics, comments.
+**Problems solved:** 1, 3, 4.
+**Principles served:** 1, 2, 3.
+**Depends on:** Phases 1–6; YouTube verification (parallelizable).
+**Effort:** 2.5–3 weeks (resumable upload + ffprobe-based preflight; both proven patterns we already need elsewhere).
+**Risks:** Verification timeline (CASA cost + scheduling); per-project quota cap on burst uploads — surface clearly, document raising it.
+**NOT in scope:** Live streams, community tab posts, comment moderation, Shorts-specific Reels-cross-posting, Studio analytics.
 
 ## Phase 11 — Pinterest
 
@@ -272,7 +274,7 @@ Destructive actions (disconnect account, revoke key, delete endpoint, delete pro
 
 | Week | Primary track | Background |
 |---|---|---|
-| Day 0 | — | Submit: Meta, TikTok, X, LinkedIn MDP, Pinterest |
+| Day 0 | — | Submit: Meta, YouTube CASA, X, LinkedIn MDP, Pinterest |
 | 1–2 | Phase 1: Persistence | External reviews in queue |
 | 3–4 | Phase 2: Auth + API keys | Docs narrative drafts begin (continuous from here) |
 | 5–6 | Phase 3: Idempotency + errors + obs wiring | Error-code registry docs drafts |
@@ -283,17 +285,17 @@ Destructive actions (disconnect account, revoke key, delete endpoint, delete pro
 | 15–16 | Phase 7: Dashboard | TS SDK continues |
 | 17–18 | Phase 8: X | Py/Go generators |
 | 19–21 | **Phase 9: Meta trio (3 wks, gated on approval)** | If Meta not yet approved, swap in Phase 11 Pinterest + Phase 13 docs |
-| 22–24 | Phase 10: TikTok (gated on approval) | Same swap rule |
+| 22–24 | Phase 10: YouTube (build during verification) | Same swap rule |
 | 25 | Phase 11: Pinterest | — |
 | 26–28 | **Phase 13: Site + docs polish (3 wks)** | Contract test cron stabilization |
 | 29 | Phase 14: Obs + security + launch prep + pricing | — |
 | 30 | Phase 15: Launch | — |
 
-Note: weeks 26–28 count as the *polish* window for docs, assuming the continuous-drip rule worked. If not, add 1–2 weeks. Realistic ship window: **7–8 months from Day 0**, accounting for Meta/TikTok approval variance.
+Note: weeks 26–28 count as the *polish* window for docs, assuming the continuous-drip rule worked. If not, add 1–2 weeks. Realistic ship window: **7–8 months from Day 0**, accounting for Meta App Review + YouTube CASA verification variance.
 
 **Strictly sequential:** 1 → 2 → 3 → 4 → 5 → 5.5 → 6.
 **Can parallelize:** Phase 7 (dashboard) with Phase 8 (X) and Phase 12 (SDKs).
-**Calendar-gated:** 9 (Meta), 10 (TikTok) — build readiness, deploy same-day on approval.
+**Calendar-gated:** 9 (Meta App Review), 10 (YouTube CASA verification) — build readiness, deploy same-day on approval.
 **Always-background:** Docs narrative (Phase 13).
 
 ---
@@ -303,10 +305,11 @@ Note: weeks 26–28 count as the *polish* window for docs, assuming the continuo
 The following will be asked for. The answer is "not in v1":
 
 - **Inbox surfaces** — comments, DMs, reviews, comment-to-DM automations. Entire product line for v2.
-- **Ads manager** across Meta/Google/TikTok/LinkedIn/Pinterest/X. Separate product line.
+- **Ads manager** across Meta/Google/YouTube/TikTok/LinkedIn/Pinterest/X. Separate product line.
 - **WhatsApp Business** (templates, flows, phone numbers, groups). Separate product line.
 - **CRM-ish features** — contacts, sequences, broadcasts.
-- **YouTube, Reddit, Telegram, Discord, Snapchat, Google Business**
+- **TikTok** — deferred to v2. The Content Posting API has two separate audits (Upload + Direct Post), each on a 4–10-week manual review with frequent rejections, and the SELF_ONLY constraint complicates the public demo path. Will revisit once v1 is shipped and the platform churn rate is understood. Schemas + DB enum keep `tiktok` reserved so the v2 add is additive, not a migration.
+- **Reddit, Telegram, Discord, Snapchat, Google Business**
 - **Advanced media ops** — image editing, video trimming, auto-captioning, thumbnail generation.
 - **Team-management UI** beyond single-org multi-member.
 - **Analytics dashboards** beyond post-log + error-log.
@@ -334,7 +337,7 @@ The following will be asked for. The answer is "not in v1":
 The v1 launch is shippable when:
 
 1. All phases' "Ships" items are green (1, 2, 3, 4, 5, 5.5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15).
-2. **End-to-end smoke test passes for all 8 platforms:** Bluesky, LinkedIn, Twitter/X, Instagram, Facebook, Threads, TikTok, Pinterest — each publishes a real post through the hosted API with idempotency + webhooks + error mapping verified.
+2. **End-to-end smoke test passes for all 8 platforms:** Bluesky, LinkedIn, Twitter/X, Instagram, Facebook, Threads, YouTube, Pinterest — each publishes a real post through the hosted API with idempotency + webhooks + error mapping verified.
 3. **Contract tests green on cron** for every platform (real API, not MSW) for 7 consecutive days.
 4. **Profile isolation verified:** an API key scoped to Profile A cannot read, publish from, or modify accounts in Profile B within the same org. Cross-profile access 404s (not 403) to avoid leaking existence. Org-wide keys keep working against any profile.
 5. **Post Log renders the full error contract** for every failure class (`preflight_failed`, `platform_rejected`, `platform_auth_failed`, `platform_unavailable`, `validation_failed`, `internal_error`), with the raw platform response visible and copy-as-curl on every row.

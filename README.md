@@ -4,7 +4,7 @@
 
 Open-source social media publishing API for developers and AI-agent builders. Every failure response carries the rule that failed, the raw platform body, and a remediation — never an empty `{ body: {} }`. No per-profile tax.
 
-**Status — alpha.** Bluesky works end-to-end. LinkedIn next. Meta and TikTok are review-gated by the platforms (6–12 weeks). See [`plan.md`](./plan.md).
+**Status — alpha.** Bluesky works end-to-end. LinkedIn next. Meta and YouTube are review-gated by the platforms (3–12 weeks). See [`plan.md`](./plan.md).
 
 [letmepost.dev](https://letmepost.dev) · [`PRODUCT.md`](./PRODUCT.md) · [`TECH.md`](./TECH.md) · [`plan.md`](./plan.md)
 
@@ -16,7 +16,7 @@ Four things developers hit every week with incumbent social-media APIs:
 
 1. **Silent failures.** Posts report success then never appear. Error bodies come back as `{}`.
 2. **API version churn.** LinkedIn sunset five API versions in six months; every sunset broke n8n, Zapier, Make, Pabbly, and Postiz.
-3. **Async media rejections.** TikTok's `file_format_check_failed`, Threads' `OAuthException 2207052`, Instagram Reels rejecting Google Drive URLs — all catchable client-side.
+3. **Async media rejections.** YouTube's restricted-scope mismatches surfacing as generic `forbidden`, Threads' `OAuthException 2207052`, Instagram Reels rejecting Google Drive URLs — all catchable client-side.
 4. **Per-profile pricing.** $6–12 per channel, per month, forever.
 
 letmepost.dev addresses all four, in one API.
@@ -107,10 +107,10 @@ Landing later as the stack grows: `apps/dashboard/` (Next.js), `packages/openapi
 | LinkedIn | next (~3 weeks) |
 | Twitter / X | soon |
 | Instagram · Facebook · Threads | soon (Meta review starts day 0) |
-| TikTok | later (TikTok review starts day 0) |
+| YouTube | later (CASA verification starts day 0) |
 | Pinterest | later |
 
-Deliberately cut from v1: YouTube, Reddit, Telegram, Discord, Snapchat, Google Business, WhatsApp. Reasoning in [`PRODUCT.md`](./PRODUCT.md).
+TikTok is deferred to v2 — schemas + DB enum keep it reserved so the v2 add is additive. Deliberately cut from v1: Reddit, Telegram, Discord, Snapchat, Google Business, WhatsApp. Reasoning in [`PRODUCT.md`](./PRODUCT.md).
 
 ## Contributing
 

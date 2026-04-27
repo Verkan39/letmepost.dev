@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -546,7 +546,12 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000;
  * quiet for a healthy org.
  */
 function NeedsAttentionSection({ accounts }: { accounts: Account[] }) {
-  const since = new Date(Date.now() - ONE_DAY_MS).toISOString();
+  // Memo'd: a fresh `Date.now()` each render would change the queryKey
+  // every render and react-query would never settle on a result.
+  const since = useMemo(
+    () => new Date(Date.now() - ONE_DAY_MS).toISOString(),
+    [],
+  );
 
   const failuresQuery = useQuery({
     queryKey: queryKeys.posts.list({
@@ -745,7 +750,10 @@ function HealthPills() {
       ),
   });
 
-  const since24 = new Date(Date.now() - ONE_DAY_MS).toISOString();
+  const since24 = useMemo(
+    () => new Date(Date.now() - ONE_DAY_MS).toISOString(),
+    [],
+  );
   const failuresQuery = useQuery({
     queryKey: queryKeys.posts.list({
       limit: 10,
@@ -855,7 +863,10 @@ function QuickActionsStrip() {
  * theme.
  */
 function PlatformBreakdownSection() {
-  const since = new Date(Date.now() - 30 * ONE_DAY_MS).toISOString();
+  const since = useMemo(
+    () => new Date(Date.now() - 30 * ONE_DAY_MS).toISOString(),
+    [],
+  );
   const query = useQuery({
     queryKey: queryKeys.posts.list({
       limit: 200,

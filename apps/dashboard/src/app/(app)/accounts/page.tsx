@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plug, Plus, Trash } from "@phosphor-icons/react";
+import { Copy, Plug, Plus, Trash } from "@phosphor-icons/react";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import type { Account } from "@/lib/accounts";
 import { queryKeys } from "@/lib/query-keys";
@@ -118,6 +118,25 @@ export default function AccountsListPage() {
                 {acc.handle ? (
                   <CardDescription>@{acc.handle}</CardDescription>
                 ) : null}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(acc.id);
+                      toast.success("Account id copied.");
+                    } catch {
+                      toast.error("Clipboard access denied.");
+                    }
+                  }}
+                  className="mt-2 group inline-flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground hover:text-foreground transition-colors max-w-full"
+                  title="Click to copy"
+                >
+                  <span className="truncate">{acc.id}</span>
+                  <Copy
+                    className="size-3 shrink-0 opacity-50 group-hover:opacity-100 transition-opacity"
+                    weight="regular"
+                  />
+                </button>
               </CardHeader>
               <CardContent className="flex items-center justify-between gap-2">
                 <ExpiryLine acc={acc} />

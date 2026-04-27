@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Platform } from "@letmepost/schemas";
 import { profiles as profilesTable } from "../db/schema/profiles.js";
 import { LetmepostError } from "../errors.js";
+import { apiKeyOrSession } from "../middleware/api-key-or-session.js";
 import { idempotency } from "../middleware/idempotency.js";
 import { rateLimit } from "../middleware/rate-limit.js";
 import { requireSession } from "../middleware/session.js";
@@ -76,7 +77,11 @@ export type AccountRoutesOptions = {
 
 export function createAccountRoutes(options: AccountRoutesOptions = {}) {
   const app = new Hono();
-  app.use("*", options.sessionMiddleware ?? requireSession());
+  // Auth is per-route below: writes (connect / disconnect) require a
+  // dashboard session; reads accept either Bearer or session so programmatic
+  // consumers can list accounts to find an id to publish against.
+  const session = options.sessionMiddleware ?? requireSession();
+  const dual = apiKeyOrSession();
   app.use("*", rateLimit());
   app.use("*", idempotency());
 
@@ -117,6 +122,7 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
   /** POST /v1/accounts/connect/:platform — describe how to connect. */
   app.post(
     "/connect/:platform",
+    session,
     zValidator("param", PlatformParam, (result) => {
       if (!result.success) {
         throw new LetmepostError({
@@ -141,6 +147,7 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
   /** POST /v1/accounts/connect/:platform/complete — finish the connect. */
   app.post(
     "/connect/:platform/complete",
+    session,
     zValidator("param", PlatformParam, (result) => {
       if (!result.success) {
         throw new LetmepostError({
@@ -215,18 +222,19 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
     },
   );
 
-  /** GET /v1/accounts — list for the session's active org. */
-  app.get("/", async (c) => {
-    const { organizationId } = c.var.session;
+  /** GET /v1/accounts — list. Bearer or session; orgId comes off c.var.apiKey
+   *  (set on both auth paths by `apiKeyOrSession`). */
+  app.get("/", dual, async (c) => {
+    const { organizationId } = c.var.apiKey;
     const repo = new DrizzlePlatformAccountsRepository(c.var.db);
     const rows = await repo.listByOrg(organizationId);
     return c.json({ data: rows.map(publicView) });
   });
 
-  /** GET /v1/accounts/:id — detail (no secret). */
-  app.get("/:id", async (c) => {
+  /** GET /v1/accounts/:id — detail (no secret). Bearer or session. */
+  app.get("/:id", dual, async (c) => {
     const id = c.req.param("id");
-    const { organizationId } = c.var.session;
+    const { organizationId } = c.var.apiKey;
     const repo = new DrizzlePlatformAccountsRepository(c.var.db);
     const account = await repo.findById(id);
     if (!account || account.organizationId !== organizationId) {
@@ -239,8 +247,8 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
     return c.json(publicView(account));
   });
 
-  /** DELETE /v1/accounts/:id — hard delete. */
-  app.delete("/:id", async (c) => {
+  /** DELETE /v1/accounts/:id — hard delete. Session-only (admin op). */
+  app.delete("/:id", session, async (c) => {
     const id = c.req.param("id");
     const { organizationId } = c.var.session;
     const repo = new DrizzlePlatformAccountsRepository(c.var.db);

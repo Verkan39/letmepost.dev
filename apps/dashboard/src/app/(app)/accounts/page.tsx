@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Trash } from "@phosphor-icons/react";
@@ -19,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
+import { ConnectAccountDrawer } from "@/components/app/connect-account-drawer";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
 
 export default function AccountsListPage() {
@@ -26,6 +26,7 @@ export default function AccountsListPage() {
   const [pendingDisconnect, setPendingDisconnect] = useState<Account | null>(
     null,
   );
+  const [connectOpen, setConnectOpen] = useState(false);
 
   const query = useQuery({
     queryKey: queryKeys.accounts.list(),
@@ -68,11 +69,9 @@ export default function AccountsListPage() {
             Connected social platform accounts. Tokens are encrypted at rest.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/accounts/new">
-            <Plus className="size-4" />
-            Connect account
-          </Link>
+        <Button onClick={() => setConnectOpen(true)}>
+          <Plus className="size-4" />
+          Connect account
         </Button>
       </FadeIn>
 
@@ -97,8 +96,8 @@ export default function AccountsListPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button asChild>
-              <Link href="/accounts/new">Connect account</Link>
+            <Button onClick={() => setConnectOpen(true)}>
+              Connect account
             </Button>
           </CardContent>
         </Card>
@@ -140,6 +139,11 @@ export default function AccountsListPage() {
           ))}
         </StaggerList>
       )}
+
+      <ConnectAccountDrawer
+        open={connectOpen}
+        onOpenChange={setConnectOpen}
+      />
 
       <ConfirmDialog
         open={pendingDisconnect !== null}

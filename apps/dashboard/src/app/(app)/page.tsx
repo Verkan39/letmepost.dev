@@ -8,9 +8,13 @@ import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
+  Broadcast,
   Copy,
+  Key,
   Lightning,
+  Plug,
   Rocket,
+  WarningCircle,
 } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -35,12 +39,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
-import { Plug, WarningCircle } from "@phosphor-icons/react";
 import {
   OnboardingChecklist,
   type ChecklistStep,
 } from "@/components/app/onboarding-checklist";
 import { OnboardingConnect } from "@/components/app/onboarding-connect";
+import { PLATFORM_BRANDS } from "@/components/app/platform-icons";
 
 const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -143,9 +147,12 @@ export default function DashboardHome() {
   return (
     <div className="space-y-6">
       <FadeIn>
-        <h1 className="text-lg font-semibold">
-          {activeOrg?.name ?? "Dashboard"}
-        </h1>
+        <div className="flex items-baseline gap-3 flex-wrap">
+          <h1 className="text-lg font-semibold">
+            {activeOrg?.name ?? "Dashboard"}
+          </h1>
+          {setupComplete ? <HealthPills /> : null}
+        </div>
         <p className="text-xs text-muted-foreground">
           {setupComplete
             ? "Your operator surface — connect accounts, mint API keys, subscribe to webhooks."
@@ -224,7 +231,14 @@ export default function DashboardHome() {
               accounts={accountsQ.data ?? []}
             />
 
-            <RecentActivitySection />
+            <QuickActionsStrip />
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <RecentActivitySection />
+              </div>
+              <PlatformBreakdownSection />
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -708,5 +722,239 @@ function RecentRow({ post }: { post: PostListItem }) {
         {formatRelative(ts)}
       </span>
     </Link>
+  );
+}
+
+/**
+ * Greeting health pills — "X today" + "Y failed in 24h" next to the org
+ * name. Both queries share the same keys as Recent Activity / Needs
+ * Attention so we don't double-fetch.
+ */
+function HealthPills() {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayQuery = useQuery({
+    queryKey: queryKeys.posts.list({
+      limit: 50,
+      after: todayStart.toISOString(),
+      _purpose: "today",
+    }),
+    queryFn: () =>
+      listPosts({ limit: 50, after: todayStart.toISOString() }).then(
+        (r) => r.data ?? [],
+      ),
+  });
+
+  const since24 = new Date(Date.now() - ONE_DAY_MS).toISOString();
+  const failuresQuery = useQuery({
+    queryKey: queryKeys.posts.list({
+      limit: 10,
+      status: ["failed"],
+      after: since24,
+      _purpose: "needs-attention",
+    }),
+    queryFn: () =>
+      listPosts({ limit: 10, status: ["failed"], after: since24 }).then(
+        (r) => r.data ?? [],
+      ),
+  });
+
+  if (todayQuery.isLoading && failuresQuery.isLoading) return null;
+
+  const todayCount = todayQuery.data?.length ?? 0;
+  const todayCapped = todayCount === 50 ? "50+" : todayCount;
+  const failureCount = failuresQuery.data?.length ?? 0;
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Badge variant="secondary" className="tabular-nums">
+        {todayCapped} today
+      </Badge>
+      {failureCount > 0 ? (
+        <Badge variant="destructive" className="tabular-nums">
+          {failureCount === 10 ? "10+" : failureCount} failed in 24h
+        </Badge>
+      ) : (
+        <Badge
+          variant="outline"
+          className="tabular-nums text-primary ring-1 ring-primary/30"
+        >
+          all green
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Quick actions strip — 4 frequent navigation targets the operator wants at
+ * arm's length. Plain shadcn-styled cards; click → route. Renders below the
+ * count cards so it doesn't fight Needs Attention for prominence.
+ */
+function QuickActionsStrip() {
+  const items: Array<{
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+    href: string;
+    detail: string;
+  }> = [
+    {
+      icon: Plug,
+      label: "Connect platform",
+      href: "/accounts/new",
+      detail: "Add another account",
+    },
+    {
+      icon: Key,
+      label: "Mint API key",
+      href: "/api-keys",
+      detail: "Org-wide or scoped",
+    },
+    {
+      icon: Lightning,
+      label: "Send test webhook",
+      href: "/webhooks",
+      detail: "Verify your handler",
+    },
+    {
+      icon: Broadcast,
+      label: "Subscribe webhook",
+      href: "/webhooks",
+      detail: "Listen for events",
+    },
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {items.map((it) => {
+        const Icon = it.icon;
+        return (
+          <Link
+            key={it.label}
+            href={it.href}
+            className="flex items-center gap-3 px-3 py-3 ring-1 ring-foreground/10 hover:ring-foreground/40 hover:bg-muted/40 transition-[box-shadow,background] bg-card"
+          >
+            <Icon className="size-5 text-muted-foreground shrink-0" />
+            <div className="min-w-0">
+              <div className="text-sm font-medium truncate">{it.label}</div>
+              <div className="text-[10px] text-muted-foreground truncate">
+                {it.detail}
+              </div>
+            </div>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Per-platform breakdown — last 30 days, posts grouped by platform with a
+ * brand-colored bar for total volume and a small status legend (published /
+ * failed / rejected) below each row. Inline div bars instead of a chart
+ * library: keeps the bundle thin and matches the brutalist sharp-corner
+ * theme.
+ */
+function PlatformBreakdownSection() {
+  const since = new Date(Date.now() - 30 * ONE_DAY_MS).toISOString();
+  const query = useQuery({
+    queryKey: queryKeys.posts.list({
+      limit: 200,
+      after: since,
+      _purpose: "breakdown",
+    }),
+    queryFn: () =>
+      listPosts({ limit: 200, after: since }).then((r) => r.data ?? []),
+  });
+
+  const groups = (() => {
+    const all = query.data ?? [];
+    return PLATFORM_BRANDS.map((brand) => {
+      let published = 0;
+      let failed = 0;
+      let rejected = 0;
+      let other = 0;
+      for (const p of all) {
+        if (p.platform !== brand.id) continue;
+        if (p.status === "published") published++;
+        else if (p.status === "failed") failed++;
+        else if (p.status === "rejected") rejected++;
+        else other++;
+      }
+      const total = published + failed + rejected + other;
+      return { brand, published, failed, rejected, other, total };
+    });
+  })();
+  const max = Math.max(1, ...groups.map((g) => g.total));
+  const totalAll = groups.reduce((sum, g) => sum + g.total, 0);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>By platform</CardTitle>
+        <CardDescription>
+          Posts in the last 30 days, grouped by platform.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {query.isLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-8" />
+            <Skeleton className="h-8" />
+            <Skeleton className="h-8" />
+          </div>
+        ) : totalAll === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No posts in the last 30 days. Widen the time range from the post
+            log to look further back.
+          </p>
+        ) : (
+          groups.map((g) => {
+            const pct = (g.total / max) * 100;
+            const Icon = g.brand.Icon;
+            return (
+              <div key={g.brand.id} className="space-y-1.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className="size-3.5 shrink-0"
+                      style={{ color: g.brand.color }}
+                    >
+                      <Icon className="size-full" />
+                    </span>
+                    <span className="text-xs font-medium">
+                      {g.brand.label}
+                    </span>
+                  </div>
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {g.total}
+                  </span>
+                </div>
+                <div className="h-1.5 bg-muted relative overflow-hidden">
+                  <div
+                    className="absolute inset-y-0 left-0 transition-[width] duration-500"
+                    style={{
+                      width: `${pct}%`,
+                      backgroundColor: g.brand.color,
+                    }}
+                  />
+                </div>
+                {g.total > 0 ? (
+                  <div className="flex gap-3 text-[10px] tabular-nums text-muted-foreground">
+                    <span>✓ {g.published}</span>
+                    {g.failed > 0 ? (
+                      <span className="text-destructive">✗ {g.failed}</span>
+                    ) : null}
+                    {g.rejected > 0 ? (
+                      <span className="text-destructive">⊘ {g.rejected}</span>
+                    ) : null}
+                    {g.other > 0 ? <span>· {g.other}</span> : null}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })
+        )}
+      </CardContent>
+    </Card>
   );
 }

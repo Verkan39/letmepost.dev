@@ -107,10 +107,18 @@ export default function NewAccountPage() {
     if (!platform || !descriptor || descriptor.kind !== "credentials") return;
     setSubmitting(true);
     try {
+      // Drop empty strings from optional fields — see onboarding-connect.tsx
+      // for the rationale (zod `.url().optional()` rejects "" before optional
+      // can apply).
+      const trimmed: Record<string, string> = {};
+      for (const [k, v] of Object.entries(formValues)) {
+        if (typeof v === "string" && v.trim() === "") continue;
+        trimmed[k] = v;
+      }
       await apiFetch(`/v1/accounts/connect/${platform}/complete`, {
         method: "POST",
         body: {
-          ...formValues,
+          ...trimmed,
           ...(effectiveProfileId ? { profileId: effectiveProfileId } : {}),
         },
       });

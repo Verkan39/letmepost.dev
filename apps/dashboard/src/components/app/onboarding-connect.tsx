@@ -106,10 +106,19 @@ export function OnboardingConnect({
     if (!picked || !descriptor || descriptor.kind !== "credentials") return;
     setBusy(true);
     try {
+      // Strip empty strings from optional fields — zod validators like
+      // `.url()` on an optional field still reject "" before `.optional()`
+      // can let it through. Sending `undefined` (omitting the key) is the
+      // safe default; required fields fail their own min(1) check anyway.
+      const trimmed: Record<string, string> = {};
+      for (const [k, v] of Object.entries(formValues)) {
+        if (typeof v === "string" && v.trim() === "") continue;
+        trimmed[k] = v;
+      }
       await apiFetch(`/v1/accounts/connect/${picked}/complete`, {
         method: "POST",
         body: {
-          ...formValues,
+          ...trimmed,
           ...(effectiveProfileId ? { profileId: effectiveProfileId } : {}),
         },
       });

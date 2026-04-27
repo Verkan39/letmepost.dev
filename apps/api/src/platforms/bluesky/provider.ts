@@ -44,10 +44,14 @@ const CompleteConnectInput = z.object({
       message:
         "This doesn't look like a Bluesky app password. Generate one at https://bsky.app/settings/app-passwords (don't use your account password).",
     }),
+  // The dashboard form posts `pdsUrl: ""` when the user leaves the optional
+  // field blank; zod's `.url()` would reject the empty string before
+  // `.optional()` can let it through. Preprocess "" → undefined first.
   pdsUrl: z
-    .string()
-    .url()
-    .optional()
+    .preprocess(
+      (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+      z.string().url().optional(),
+    )
     .describe("Override the default PDS (https://bsky.social) for self-hosted PDSes."),
 });
 

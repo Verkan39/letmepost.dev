@@ -16,6 +16,13 @@ import { authClient } from "@/lib/auth-client";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { API_URL } from "@/lib/env";
 import { queryKeys } from "@/lib/query-keys";
+import {
+  formatRelative,
+  listPosts,
+  statusTone,
+  type PostListItem,
+} from "@/lib/posts";
+import type { Account } from "@/lib/accounts";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,8 +32,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
+import { Plug, WarningCircle } from "@phosphor-icons/react";
 import {
   OnboardingChecklist,
   type ChecklistStep,
@@ -57,7 +66,7 @@ export default function DashboardHome() {
   // navigating from /accounts back home doesn't refetch.
   const accountsQ = useQuery({
     queryKey: queryKeys.accounts.list(),
-    queryFn: () => loadList<FirstAccount>("/v1/accounts"),
+    queryFn: () => loadList<Account>("/v1/accounts"),
   });
   const apiKeysQ = useQuery({
     queryKey: queryKeys.apiKeys.list(),
@@ -179,6 +188,7 @@ export default function DashboardHome() {
             initial={{ opacity: 0, y: 6, filter: "blur(6px)" }}
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             transition={{ duration: 0.32, ease: EASE_OUT }}
+            className="space-y-6"
           >
             <StaggerList className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <StaggerItem>
@@ -209,6 +219,12 @@ export default function DashboardHome() {
                 />
               </StaggerItem>
             </StaggerList>
+
+            <NeedsAttentionSection
+              accounts={accountsQ.data ?? []}
+            />
+
+            <RecentActivitySection />
           </motion.div>
         )}
       </AnimatePresence>
@@ -376,13 +392,6 @@ function ApiKeyStepBody({
   );
 }
 
-type FirstAccount = {
-  id: string;
-  platform: string;
-  displayName?: string | null;
-  handle?: string | null;
-};
-
 function QuickStartBody({
   apiKey,
   onSent,
@@ -397,7 +406,7 @@ function QuickStartBody({
   // cache by the time the user reaches step 3, so this hits the cache.
   const accountsQuery = useQuery({
     queryKey: queryKeys.accounts.list(),
-    queryFn: () => loadList<FirstAccount>("/v1/accounts"),
+    queryFn: () => loadList<Account>("/v1/accounts"),
   });
   const account = accountsQuery.data?.[0] ?? null;
 
@@ -503,5 +512,201 @@ function QuickStartBody({
         </p>
       ) : null}
     </div>
+  );
+}
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * "Needs attention" surfaces two operator-facing signals on the home page:
+ *
+ *   1. Posts that failed in the last 24h — the product's pitch is "fails
+ *      loudly", so failures get a count + direct link into the filtered
+ *      post log. Backed by its own posts query (status=failed, after=24h)
+ *      so the home page doesn't have to slurp the full failure list.
+ *   2. Account tokens expiring within 7 days. The accounts list is already
+ *      cached by the parent — we just filter it client-side.
+ *
+ * Renders nothing when neither bucket has anything; the home page stays
+ * quiet for a healthy org.
+ */
+function NeedsAttentionSection({ accounts }: { accounts: Account[] }) {
+  const since = new Date(Date.now() - ONE_DAY_MS).toISOString();
+
+  const failuresQuery = useQuery({
+    queryKey: queryKeys.posts.list({
+      limit: 10,
+      status: ["failed"],
+      after: since,
+      _purpose: "needs-attention",
+    }),
+    queryFn: () =>
+      listPosts({ limit: 10, status: ["failed"], after: since }).then(
+        (r) => r.data ?? [],
+      ),
+  });
+  const failures = failuresQuery.data ?? [];
+  const failureCount = failures.length;
+  const showsMore = failureCount === 10;
+
+  const expiring = accounts.filter((a) => {
+    if (!a.tokenExpiresAt) return false;
+    const ms = new Date(a.tokenExpiresAt).getTime() - Date.now();
+    return ms > 0 && ms < SEVEN_DAYS_MS;
+  });
+
+  if (failureCount === 0 && expiring.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <WarningCircle className="size-4 text-destructive" />
+          <CardTitle>Needs attention</CardTitle>
+        </div>
+        <CardDescription>
+          Things that&apos;ll cost you posts if you ignore them.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {failureCount > 0 ? (
+          <Link
+            href="/posts?status=failed"
+            className="flex items-center justify-between gap-3 px-3 py-2 ring-1 ring-foreground/10 hover:ring-foreground/30 hover:bg-muted/40 transition-[box-shadow,background]"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <Badge variant="destructive">
+                {showsMore ? "10+" : failureCount}
+              </Badge>
+              <span className="text-sm">
+                failed post{failureCount === 1 ? "" : "s"} in the last 24h
+              </span>
+            </div>
+            <ArrowRight className="size-4 text-muted-foreground shrink-0" />
+          </Link>
+        ) : null}
+
+        {expiring.length > 0 ? (
+          <div className="space-y-2">
+            <div className="text-xs text-muted-foreground">
+              Tokens expiring soon
+            </div>
+            {expiring.map((acc) => {
+              const ms =
+                new Date(acc.tokenExpiresAt as string).getTime() - Date.now();
+              const days = Math.max(0, Math.ceil(ms / ONE_DAY_MS));
+              return (
+                <div
+                  key={acc.id}
+                  className="flex items-center justify-between gap-3 px-3 py-2 ring-1 ring-foreground/10"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Badge variant="outline" className="uppercase tracking-wide">
+                      {acc.platform}
+                    </Badge>
+                    <span className="text-sm truncate">
+                      {acc.displayName ?? acc.handle ?? acc.id}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {days === 0
+                        ? "expires today"
+                        : `expires in ${days}d`}
+                    </span>
+                  </div>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/accounts">
+                      <Plug className="size-3" />
+                      Reconnect
+                    </Link>
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Recent activity — last 5 posts as a slim preview, with a "View all" link
+ * to the full Post Log. Same `posts.list` query family as the log itself,
+ * so the cache is shared.
+ */
+function RecentActivitySection() {
+  const query = useQuery({
+    queryKey: queryKeys.posts.list({ limit: 5, _purpose: "recent" }),
+    queryFn: () => listPosts({ limit: 5 }).then((r) => r.data ?? []),
+  });
+  const posts = query.data ?? [];
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle>Recent activity</CardTitle>
+            <CardDescription>
+              Last 5 posts — published or failed. Click for the full
+              record.
+            </CardDescription>
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/posts">
+              View all
+              <ArrowRight className="size-3" />
+            </Link>
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {query.isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10" />
+            <Skeleton className="h-10" />
+            <Skeleton className="h-10" />
+          </div>
+        ) : posts.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No posts yet. Once you publish through the API, recent activity
+            shows up here.
+          </p>
+        ) : (
+          <div className="divide-y divide-foreground/10 -mx-2">
+            {posts.map((p) => (
+              <RecentRow key={p.id} post={p} />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function RecentRow({ post }: { post: PostListItem }) {
+  const ts = post.publishedAt ?? post.createdAt;
+  return (
+    <Link
+      href={`/posts/${post.id}`}
+      className="flex items-center gap-3 px-2 py-2.5 hover:bg-muted/40 transition-colors"
+    >
+      <Badge variant="outline" className="uppercase tracking-wide shrink-0">
+        {post.platform}
+      </Badge>
+      <Badge variant={statusTone(post.status)} className="shrink-0">
+        {post.status}
+      </Badge>
+      <span className="flex-1 min-w-0 text-sm truncate">{post.text}</span>
+      {post.error?.code ? (
+        <Badge variant="outline" className="font-mono text-[10px] shrink-0">
+          {post.error.code}
+        </Badge>
+      ) : null}
+      <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+        {formatRelative(ts)}
+      </span>
+    </Link>
   );
 }

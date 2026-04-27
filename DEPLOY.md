@@ -50,14 +50,20 @@ Or via the dashboard: New Project → Deploy from GitHub repo → pick this repo
 
 ### 2. Add the API service
 
-Railway autodetects `apps/api/railway.json` and uses
-`apps/api/Dockerfile` as the build. Confirm under **Settings → Build**:
+The repo-root `railway.json` configures everything Railway needs.
+**Critical:** under **Settings → Source → Root Directory**, leave it
+**blank / `/`**. Do *not* set it to `/apps/api` — the Dockerfile is written
+to use the monorepo root as the build context (it copies `pnpm-lock.yaml`,
+every workspace `package.json`, etc. — none of those exist inside
+`apps/api/`).
+
+Confirm under **Settings → Build** (auto-populated from `railway.json`):
 
 - **Builder:** Dockerfile
 - **Dockerfile path:** `apps/api/Dockerfile`
 - **Watch paths:** `apps/api/**`, `packages/schemas/**`, `pnpm-lock.yaml`
 
-Under **Settings → Deploy** the `railway.json` already sets:
+Under **Settings → Deploy** (also from `railway.json`):
 
 - **Start command:** `pnpm --filter @letmepost/api start:api`
 - **Health check path:** `/health`
@@ -66,15 +72,18 @@ Under **Settings → Deploy** the `railway.json` already sets:
 
 ### 3. Add the worker service
 
-In the same Railway project: **+ New → GitHub Repo → same repo**. Then
-**Settings → Deploy → Custom Start Command**:
+In the same Railway project: **+ New → GitHub Repo → same repo**. Same
+**Root Directory: blank / `/`** as the API service.
+
+Then override the start command — **Settings → Deploy → Custom Start Command**:
 
 ```
 pnpm --filter @letmepost/api start:worker
 ```
 
 Disable health checks for the worker service (it doesn't bind a port).
-**Settings → Networking → Public networking: off**.
+**Settings → Networking → Public networking: off**. Both services share
+the same image; only the start command differs.
 
 ### 4. Wire up env vars
 

@@ -203,8 +203,6 @@ export default function DashboardHome() {
                   title="Connected accounts"
                   description="Social platform accounts available to the API."
                   count={counts.accounts}
-                  href="/accounts"
-                  cta="Manage accounts"
                 />
               </StaggerItem>
               <StaggerItem>
@@ -212,8 +210,6 @@ export default function DashboardHome() {
                   title="API keys"
                   description="Bearer tokens for programmatic API access."
                   count={counts.apiKeys}
-                  href="/api-keys"
-                  cta="Manage keys"
                 />
               </StaggerItem>
               <StaggerItem>
@@ -221,8 +217,6 @@ export default function DashboardHome() {
                   title="Webhook endpoints"
                   description="Delivery targets for post / token lifecycle events."
                   count={counts.webhooks}
-                  href="/webhooks"
-                  cta="Manage webhooks"
                 />
               </StaggerItem>
             </StaggerList>

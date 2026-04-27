@@ -11,6 +11,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -160,22 +161,22 @@ export default function ApiKeysPage() {
           <CardContent
             className={
               profiles.length > 0
-                ? "grid gap-4 md:grid-cols-[1fr_140px_180px_auto] md:items-end"
-                : "grid gap-4 md:grid-cols-[1fr_180px_auto] md:items-end"
+                ? "grid gap-4 md:grid-cols-[1fr_180px_220px]"
+                : "grid gap-4 md:grid-cols-[1fr_220px]"
             }
           >
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="key-name">Name</Label>
               <Input
                 id="key-name"
                 required
-                className="h-9"
+                className="h-9 w-full"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="production-web"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="key-prefix">Environment</Label>
               <Select
                 value={prefix}
@@ -183,7 +184,7 @@ export default function ApiKeysPage() {
                   setPrefix(v as "lmp_live_" | "lmp_test_")
                 }
               >
-                <SelectTrigger id="key-prefix" className="h-9">
+                <SelectTrigger id="key-prefix" className="h-9 w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -193,13 +194,13 @@ export default function ApiKeysPage() {
               </Select>
             </div>
             {profiles.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label htmlFor="key-scope">Scope</Label>
                 <Select
                   value={scope === "" ? "__org" : scope}
                   onValueChange={(v) => setScope(v === "__org" ? "" : v)}
                 >
-                  <SelectTrigger id="key-scope" className="h-9">
+                  <SelectTrigger id="key-scope" className="h-9 w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -213,18 +214,13 @@ export default function ApiKeysPage() {
                 </Select>
               </div>
             ) : null}
-            <div className="space-y-2">
-              {/* Invisible label keeps the button aligned with the labelled
-                  inputs to its left rather than floating mid-row. */}
-              <Label aria-hidden="true" className="invisible">
-                Action
-              </Label>
-              <Button type="submit" disabled={creating} className="w-full h-9">
-                <Plus className="size-4" />
-                {creating ? "Creating…" : "Create key"}
-              </Button>
-            </div>
           </CardContent>
+          <CardFooter className="justify-end border-t mt-6">
+            <Button type="submit" disabled={creating}>
+              <Plus className="size-4" />
+              {creating ? "Creating…" : "Create key"}
+            </Button>
+          </CardFooter>
         </form>
       </Card>
 

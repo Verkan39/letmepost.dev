@@ -227,11 +227,12 @@ export default function DashboardHome() {
               </StaggerItem>
             </StaggerList>
 
+            <QuickActionsStrip />
+
             <NeedsAttentionSection
               accounts={accountsQ.data ?? []}
             />
 
-            <QuickActionsStrip />
 
             <div className="grid gap-4 lg:grid-cols-3">
               <div className="lg:col-span-2">
@@ -250,8 +251,6 @@ function CountCard(props: {
   title: string;
   description: string;
   count: number | null;
-  href: string;
-  cta: string;
 }) {
   return (
     <Card>
@@ -268,11 +267,6 @@ function CountCard(props: {
           </div>
         )}
       </CardContent>
-      <CardFooter>
-        <Button asChild variant="outline" size="sm">
-          <Link href={props.href}>{props.cta}</Link>
-        </Button>
-      </CardFooter>
     </Card>
   );
 }

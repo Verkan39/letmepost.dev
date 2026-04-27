@@ -27,10 +27,14 @@ RUN pnpm install --frozen-lockfile
 
 # ─── 3. build ───────────────────────────────────────────────────────────────
 FROM deps AS build
+# turbo.json lives at the repo root and declares `build` with
+# `dependsOn: ["^build"]` — so building the API also builds @letmepost/schemas
+# (which it imports at runtime as compiled dist/, not TS source).
+COPY turbo.json ./
 COPY packages/config-tsconfig packages/config-tsconfig
 COPY packages/schemas packages/schemas
 COPY apps/api apps/api
-RUN pnpm --filter @letmepost/api build
+RUN pnpm turbo run build --filter=@letmepost/api
 
 # ─── 4. runner ──────────────────────────────────────────────────────────────
 FROM base AS runner
@@ -49,9 +53,10 @@ COPY packages/config-tsconfig/package.json packages/config-tsconfig/
 # the workspace root; pnpm prunes it otherwise. Tweak if image size matters.
 RUN pnpm install --frozen-lockfile --prod
 
-# Compiled output + the schemas source the API imports.
+# Compiled output for both the API and the schemas package — runtime imports
+# go through @letmepost/schemas → packages/schemas/dist/index.js.
 COPY --from=build /app/apps/api/dist apps/api/dist
-COPY --from=build /app/packages/schemas/src packages/schemas/src
+COPY --from=build /app/packages/schemas/dist packages/schemas/dist
 
 # Migrations are read at runtime by `dist/db/migrate.js`.
 COPY apps/api/drizzle apps/api/drizzle

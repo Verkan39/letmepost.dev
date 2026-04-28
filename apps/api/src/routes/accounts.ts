@@ -519,6 +519,25 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
           { code, state, redirectUri },
         );
       } catch (err) {
+        // Always log the underlying detail — LetmepostError instances skip
+        // the global error logger because they're "expected" responses, but
+        // a connect-flow failure is something an operator wants to grep.
+        const detail =
+          err instanceof LetmepostError
+            ? {
+                code: err.code,
+                rule: err.rule,
+                platform: err.platform,
+                message: err.message,
+                platformResponse: err.platformResponse,
+              }
+            : err instanceof Error
+              ? { message: err.message, stack: err.stack }
+              : err;
+        console.error(
+          `[oauth/callback/${platform}] completeConnect failed`,
+          detail,
+        );
         const reason =
           err instanceof LetmepostError
             ? err.code

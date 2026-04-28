@@ -15,7 +15,6 @@ import {
   getS3Client,
 } from "../media/s3.js";
 import { LetmepostError } from "../errors.js";
-import { apiKeyAuth } from "../middleware/api-key.js";
 import { apiKeyOrSession } from "../middleware/api-key-or-session.js";
 import { rateLimit } from "../middleware/rate-limit.js";
 import { DrizzleMediaRepository } from "../repositories/media.js";
@@ -44,7 +43,7 @@ const MAX_BYTES = 200 * 1024 * 1024;
  * buffer the whole upload in memory, which defeats the YouTube long-form
  * use case.
  */
-media.post("/", apiKeyAuth(), rateLimit(), async (c) => {
+media.post("/", apiKeyOrSession(), rateLimit(), async (c) => {
   const { organizationId, profileId: keyProfileId } = c.var.apiKey;
 
   const requestedProfileId = c.req.query("profileId");

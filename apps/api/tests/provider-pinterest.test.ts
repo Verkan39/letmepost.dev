@@ -45,7 +45,7 @@ function tokenExchangeHandler() {
       token_type: "Bearer",
       expires_in: 2_592_000,
       refresh_token_expires_in: 5_184_000,
-      scope: "boards:read boards:write pins:read pins:write",
+      scope: "boards:read boards:write pins:read pins:write user_accounts:read",
     });
   });
 }
@@ -70,7 +70,7 @@ describe("PinterestProvider", () => {
     expect(url.searchParams.get("response_type")).toBe("code");
     expect(url.searchParams.get("state")).toBe(descriptor.state);
     expect(url.searchParams.get("scope")).toBe(
-      "boards:read,boards:write,pins:read,pins:write",
+      "boards:read,boards:write,pins:read,pins:write,user_accounts:read",
     );
     expect(descriptor.redirectUri).toBe(
       "https://api.letmepost.dev/v1/accounts/oauth/pinterest/callback",
@@ -107,7 +107,13 @@ describe("PinterestProvider", () => {
     expect(account.displayName).toBe("alice");
     expect(account.tokenMetadata).toMatchObject({
       refreshToken: "refresh-token-def",
-      grantedScopes: ["boards:read", "boards:write", "pins:read", "pins:write"],
+      grantedScopes: [
+        "boards:read",
+        "boards:write",
+        "pins:read",
+        "pins:write",
+        "user_accounts:read",
+      ],
       defaultBoardId: "board-first",
       defaultBoardName: "Pins to share",
     });
@@ -162,7 +168,7 @@ describe("PinterestProvider", () => {
           refresh_token: "rotated-refresh",
           token_type: "Bearer",
           expires_in: 2_592_000,
-          scope: "boards:read boards:write pins:read pins:write",
+          scope: "boards:read boards:write pins:read pins:write user_accounts:read",
         });
       }),
     );

@@ -42,13 +42,28 @@ const SCOPES: Record<Platform, PlatformScopeSet> = {
   },
   pinterest: {
     kind: "oauth",
-    // Publish scope set: read the caller's boards, read/write pins, and
-    // create boards. `boards:write` covers the boardless-account case —
-    // letting users create their first board from the dashboard instead
-    // of dead-ending. Pinterest requires `pins:read` alongside `pins:write`
-    // because some endpoints echo the pin back on create.
-    write: ["boards:read", "boards:write", "pins:read", "pins:write"],
-    extended: ["user_accounts:read", "pins:read_secret"],
+    // Publish scope set: read the caller's boards, read/write pins, create
+    // boards, and read the user's account info.
+    //
+    // `user_accounts:read` is required because completeConnect calls
+    // `GET /v5/user_account` to pin the platform_account_id to the real
+    // Pinterest user (instead of a synthetic uuid). Without this scope
+    // Pinterest 403s that call and the whole connect surfaces as
+    // platform_rejected.
+    //
+    // `boards:write` covers the boardless-account case — letting users
+    // create their first board from the dashboard instead of dead-ending.
+    //
+    // Pinterest requires `pins:read` alongside `pins:write` because some
+    // endpoints echo the pin back on create.
+    write: [
+      "boards:read",
+      "boards:write",
+      "pins:read",
+      "pins:write",
+      "user_accounts:read",
+    ],
+    extended: ["pins:read_secret"],
   },
   twitter: {
     kind: "oauth",

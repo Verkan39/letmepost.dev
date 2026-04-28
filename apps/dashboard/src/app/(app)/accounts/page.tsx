@@ -16,12 +16,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { ConnectAccountDrawer } from "@/components/app/connect-account-drawer";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
 import { PinterestDefaultBoard } from "@/components/app/pinterest-default-board";
+import { PLATFORM_BRANDS } from "@/components/app/platform-icons";
+
+// Brand lookup keyed by platform id. Falls back to a neutral grey block
+// if a future platform adds an account row before its brand entry lands.
+const BRAND_BY_ID = Object.fromEntries(
+  PLATFORM_BRANDS.map((b) => [b.id, b]),
+) as Record<string, (typeof PLATFORM_BRANDS)[number]>;
+const FALLBACK_COLOR = "#737373";
 
 export default function AccountsListPage() {
   const queryClient = useQueryClient();
@@ -130,72 +137,83 @@ export default function AccountsListPage() {
         </Card>
       ) : (
         <StaggerList className="grid gap-4 md:grid-cols-2">
-          {accounts.map((acc) => (
-            <StaggerItem key={acc.id}>
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="uppercase tracking-wide">
-                    {acc.platform}
-                  </Badge>
-                </div>
-                <CardTitle className="mt-2">
-                  {acc.displayName ?? acc.handle ?? acc.id}
-                </CardTitle>
-                {acc.handle ? (
-                  <CardDescription>@{acc.handle}</CardDescription>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(acc.id);
-                      toast.success("Account id copied.");
-                    } catch {
-                      toast.error("Clipboard access denied.");
-                    }
-                  }}
-                  className="mt-2 group inline-flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground hover:text-foreground transition-colors max-w-full"
-                  title="Click to copy"
+          {accounts.map((acc) => {
+            const brand = BRAND_BY_ID[acc.platform];
+            const accentColor = brand?.color ?? FALLBACK_COLOR;
+            const Icon = brand?.Icon;
+            const label = brand?.label ?? acc.platform;
+            return (
+              <StaggerItem key={acc.id} className="h-full">
+                <Card
+                  className="flex flex-col h-full border-l-4"
+                  style={{ borderLeftColor: accentColor }}
                 >
-                  <span className="truncate">{acc.id}</span>
-                  <Copy
-                    className="size-3 shrink-0 opacity-50 group-hover:opacity-100 transition-opacity"
-                    weight="regular"
-                  />
-                </button>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {acc.platform === "pinterest" ? (
-                  <PinterestDefaultBoard accountId={acc.id} />
-                ) : null}
-                <div className="flex items-center justify-between gap-2">
-                  <ExpiryLine acc={acc} />
-                  <div className="flex items-center gap-1 shrink-0">
-                    {needsReconnect(acc) ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setConnectOpen(true)}
-                      >
-                        <Plug className="size-4" />
-                        Reconnect
-                      </Button>
-                    ) : null}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setPendingDisconnect(acc)}
+                  <CardHeader>
+                    <div
+                      className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider"
+                      style={{ color: accentColor }}
                     >
-                      <Trash className="size-4" />
-                      Disconnect
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            </StaggerItem>
-          ))}
+                      {Icon ? <Icon className="size-3.5" /> : null}
+                      <span>{label}</span>
+                    </div>
+                    <CardTitle className="mt-2">
+                      {acc.displayName ?? acc.handle ?? acc.id}
+                    </CardTitle>
+                    {acc.handle ? (
+                      <CardDescription>@{acc.handle}</CardDescription>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(acc.id);
+                          toast.success("Account id copied.");
+                        } catch {
+                          toast.error("Clipboard access denied.");
+                        }
+                      }}
+                      className="mt-2 group inline-flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground hover:text-foreground transition-colors max-w-full"
+                      title="Click to copy"
+                    >
+                      <span className="truncate">{acc.id}</span>
+                      <Copy
+                        className="size-3 shrink-0 opacity-50 group-hover:opacity-100 transition-opacity"
+                        weight="regular"
+                      />
+                    </button>
+                  </CardHeader>
+                  <CardContent className="flex flex-col flex-1 gap-3">
+                    {acc.platform === "pinterest" ? (
+                      <PinterestDefaultBoard accountId={acc.id} />
+                    ) : null}
+                    <div className="mt-auto flex items-center justify-between gap-2">
+                      <ExpiryLine acc={acc} />
+                      <div className="flex items-center gap-1 shrink-0">
+                        {needsReconnect(acc) ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setConnectOpen(true)}
+                          >
+                            <Plug className="size-4" />
+                            Reconnect
+                          </Button>
+                        ) : null}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPendingDisconnect(acc)}
+                        >
+                          <Trash className="size-4" />
+                          Disconnect
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </StaggerItem>
+            );
+          })}
         </StaggerList>
       )}
 

@@ -46,10 +46,11 @@ function publicView(account: {
   platformAccountId: string;
   displayName: string | null;
   tokenExpiresAt: Date | null;
+  tokenMetadata: Record<string, unknown> | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
-  return {
+  const base = {
     id: account.id,
     profileId: account.profileId,
     platform: account.platform,
@@ -59,6 +60,20 @@ function publicView(account: {
     createdAt: account.createdAt,
     updatedAt: account.updatedAt,
   };
+  // Platform-specific public extensions. Only non-secret fields surface
+  // here — refresh tokens, scopes, and similar stay in tokenMetadata and
+  // never leak. Adding a new platform's public fields = add a new branch.
+  if (account.platform === "pinterest") {
+    const meta = (account.tokenMetadata ?? {}) as PinterestTokenMetadata;
+    return {
+      ...base,
+      pinterest: {
+        defaultBoardId: meta.defaultBoardId ?? null,
+        defaultBoardName: meta.defaultBoardName ?? null,
+      },
+    };
+  }
+  return base;
 }
 
 export type AccountRoutesOptions = {

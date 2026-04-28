@@ -173,6 +173,72 @@ describeIfDb("Pinterest default-board picker endpoints", () => {
     });
   });
 
+  it("GET /v1/accounts surfaces pinterest.defaultBoard{Id,Name} on Pinterest rows", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+      const repo = new DrizzlePlatformAccountsRepository(tx);
+      const pin = await repo.create({
+        organizationId: fixture.organizationId,
+        profileId: fixture.profileId,
+        platform: "pinterest",
+        platformAccountId: "pin-user-7",
+        displayName: "alice-pin",
+        token: "pin-access-token",
+        tokenMetadata: {
+          defaultBoardId: "board-x",
+          defaultBoardName: "Pins to share",
+          // refreshToken should NOT leak into the public view.
+          refreshToken: "should-not-appear",
+        },
+      });
+
+      const app = createApp({ db: tx });
+      const listRes = await app.request("/v1/accounts", {
+        method: "GET",
+        headers: { Authorization: `Bearer ${fixture.apiKey.plaintext}` },
+      });
+      const listBody = (await listRes.json()) as {
+        data: Array<Record<string, unknown>>;
+      };
+      const found = listBody.data.find((a) => a.id === pin.id) as
+        | { pinterest?: { defaultBoardId: string; defaultBoardName: string } }
+        | undefined;
+      expect(found?.pinterest?.defaultBoardId).toBe("board-x");
+      expect(found?.pinterest?.defaultBoardName).toBe("Pins to share");
+      expect(JSON.stringify(found)).not.toContain("should-not-appear");
+
+      const detailRes = await app.request(`/v1/accounts/${pin.id}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${fixture.apiKey.plaintext}` },
+      });
+      const detailBody = (await detailRes.json()) as Record<string, unknown>;
+      expect(
+        (
+          detailBody as {
+            pinterest?: { defaultBoardId: string };
+          }
+        ).pinterest?.defaultBoardId,
+      ).toBe("board-x");
+      expect(JSON.stringify(detailBody)).not.toContain("should-not-appear");
+    });
+  });
+
+  it("non-Pinterest accounts don't get a `pinterest` extension on the public view", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+      const app = createApp({ db: tx });
+      const res = await app.request(`/v1/accounts/${fixture.accountId}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${fixture.apiKey.plaintext}` },
+      });
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body.platform).toBe("bluesky");
+      expect("pinterest" in body).toBe(false);
+    });
+  });
+
   it("rejects requests against a non-Pinterest account with platform.mismatch", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {

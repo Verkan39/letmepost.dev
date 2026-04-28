@@ -318,6 +318,64 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
   });
 
   /**
+   * POST /v1/accounts/:id/pinterest/boards — create a board on the user's
+   * Pinterest account. Recovers from the boardless-connect dead-end without
+   * forcing the user to leave for pinterest.com. Optional `setAsDefault`
+   * lifts the new board into `tokenMetadata.defaultBoardId` in one round-trip.
+   */
+  const PinterestCreateBoardBody = z.object({
+    name: z.string().min(1).max(180),
+    description: z.string().max(500).optional(),
+    privacy: z.enum(["PUBLIC", "PROTECTED", "SECRET"]).optional(),
+    /** When true, the new board's id lands as the account's default. */
+    setAsDefault: z.boolean().optional(),
+  });
+  app.post("/:id/pinterest/boards", dual, async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const parsed = PinterestCreateBoardBody.safeParse(body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      throw new LetmepostError({
+        code: "validation_failed",
+        status: 400,
+        message: issue?.message ?? "Invalid body.",
+        rule: issue?.path.join(".") || "body",
+      });
+    }
+    const account = await loadPinterestAccount(c);
+    const client = new PinterestClient(account.token);
+    const created = await client.createBoard({
+      name: parsed.data.name,
+      ...(parsed.data.description !== undefined
+        ? { description: parsed.data.description }
+        : {}),
+      ...(parsed.data.privacy !== undefined
+        ? { privacy: parsed.data.privacy }
+        : {}),
+    });
+
+    if (parsed.data.setAsDefault) {
+      const repo = new DrizzlePlatformAccountsRepository(c.var.db);
+      await repo.updateMetadata(account.id, {
+        defaultBoardId: created.id,
+        defaultBoardName: created.name,
+      });
+    }
+
+    return c.json(
+      {
+        id: created.id,
+        name: created.name,
+        privacy: created.privacy ?? null,
+        ...(parsed.data.setAsDefault
+          ? { defaultBoardId: created.id, defaultBoardName: created.name }
+          : {}),
+      },
+      201,
+    );
+  });
+
+  /**
    * GET /v1/accounts/:id/pinterest/boards — proxy to /v5/boards using the
    * stored token. Used by the dashboard's default-board picker so the user
    * can see their actual boards (not just the first one Pinterest happened

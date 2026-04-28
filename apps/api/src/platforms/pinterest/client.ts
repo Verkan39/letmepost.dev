@@ -196,6 +196,69 @@ export class PinterestClient {
   }
 
   /**
+   * POST /v5/boards — create a board on the caller's account. Used by the
+   * dashboard's "Create board" flow to recover from boardless connects
+   * without forcing the user to leave for pinterest.com. Requires the
+   * `boards:write` scope on the connected account.
+   */
+  async createBoard(input: {
+    name: string;
+    description?: string;
+    /** Defaults server-side to PUBLIC; null/undefined = let Pinterest decide. */
+    privacy?: "PUBLIC" | "PROTECTED" | "SECRET";
+  }): Promise<PinterestBoardSummary> {
+    const body: Record<string, unknown> = { name: input.name };
+    if (input.description !== undefined) body.description = input.description;
+    if (input.privacy !== undefined) body.privacy = input.privacy;
+
+    const res = await platformFetch<PinterestBoardSummary>({
+      method: "POST",
+      url: `${this.apiBase}/boards`,
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      body,
+      platform: PLATFORM,
+    });
+
+    if (res.ok && res.body?.id) return res.body;
+
+    const upstreamMessage = extractUpstreamMessage(res.body);
+    const lowerMsg = (upstreamMessage ?? "").toLowerCase();
+    if (
+      res.status === 401 ||
+      lowerMsg.includes("invalid_token") ||
+      lowerMsg.includes("scope")
+    ) {
+      throw authFailed({
+        platform: PLATFORM,
+        platformResponse: res.body ?? res.raw ?? undefined,
+        remediation:
+          "Pinterest rejected board creation — likely the connected account predates the boards:write scope. Reconnect Pinterest from the dashboard.",
+      });
+    }
+    if (
+      res.status === 409 ||
+      lowerMsg.includes("duplicate") ||
+      lowerMsg.includes("already exists") ||
+      lowerMsg.includes("name already")
+    ) {
+      throw rejected({
+        platform: PLATFORM,
+        platformResponse: res.body ?? res.raw ?? undefined,
+        upstreamMessage:
+          upstreamMessage ?? "A board with that name already exists.",
+        remediation:
+          "Pick a different board name; Pinterest enforces unique names per account.",
+      });
+    }
+
+    throw rejected({
+      platform: PLATFORM,
+      platformResponse: res.body ?? res.raw ?? undefined,
+      ...(upstreamMessage !== undefined ? { upstreamMessage } : {}),
+    });
+  }
+
+  /**
    * GET /v5/boards — first page only (Pinterest paginates with `bookmark`,
    * but the connect flow only needs the first page to seed `defaultBoardId`).
    * Dashboard refreshes call this directly via a v1 endpoint.

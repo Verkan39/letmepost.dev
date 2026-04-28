@@ -239,6 +239,146 @@ describeIfDb("Pinterest default-board picker endpoints", () => {
     });
   });
 
+  it("POST /v1/accounts/:id/pinterest/boards creates a board (and optionally sets it as default)", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+      const repo = new DrizzlePlatformAccountsRepository(tx);
+      const account = await repo.create({
+        organizationId: fixture.organizationId,
+        profileId: fixture.profileId,
+        platform: "pinterest",
+        platformAccountId: "pin-user-create",
+        token: "pin-access-token",
+        tokenMetadata: {},
+      });
+
+      let receivedBody: Record<string, unknown> | null = null;
+      server.use(
+        http.post(
+          "https://api.pinterest.com/v5/boards",
+          async ({ request }) => {
+            receivedBody = (await request.json()) as Record<string, unknown>;
+            return HttpResponse.json(
+              { id: "board-new", name: "Demo board", privacy: "PUBLIC" },
+              { status: 201 },
+            );
+          },
+        ),
+      );
+
+      const app = createApp({ db: tx });
+      const res = await app.request(
+        `/v1/accounts/${account.id}/pinterest/boards`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+          },
+          body: JSON.stringify({
+            name: "Demo board",
+            privacy: "PUBLIC",
+            setAsDefault: true,
+          }),
+        },
+      );
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as {
+        id: string;
+        name: string;
+        defaultBoardId?: string;
+      };
+      expect(body.id).toBe("board-new");
+      expect(body.defaultBoardId).toBe("board-new");
+      expect(receivedBody).toMatchObject({
+        name: "Demo board",
+        privacy: "PUBLIC",
+      });
+
+      const reloaded = await repo.findById(account.id);
+      expect(
+        (reloaded?.tokenMetadata as Record<string, unknown> | undefined)
+          ?.defaultBoardId,
+      ).toBe("board-new");
+    });
+  });
+
+  it("POST /boards surfaces Pinterest's duplicate-name error as platform_rejected", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+      const repo = new DrizzlePlatformAccountsRepository(tx);
+      const account = await repo.create({
+        organizationId: fixture.organizationId,
+        profileId: fixture.profileId,
+        platform: "pinterest",
+        platformAccountId: "pin-user-dup",
+        token: "pin-access-token",
+        tokenMetadata: {},
+      });
+      server.use(
+        http.post("https://api.pinterest.com/v5/boards", () =>
+          HttpResponse.json(
+            { message: "Board name already exists", code: 130 },
+            { status: 409 },
+          ),
+        ),
+      );
+
+      const app = createApp({ db: tx });
+      const res = await app.request(
+        `/v1/accounts/${account.id}/pinterest/boards`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+          },
+          body: JSON.stringify({ name: "Existing board" }),
+        },
+      );
+      expect(res.status).toBe(502);
+      const body = (await res.json()) as {
+        error: { code: string; remediation?: string };
+      };
+      expect(body.error.code).toBe("platform_rejected");
+      expect(body.error.remediation).toContain("unique");
+    });
+  });
+
+  it("POST /boards rejects invalid privacy value at validation time", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+      const repo = new DrizzlePlatformAccountsRepository(tx);
+      const account = await repo.create({
+        organizationId: fixture.organizationId,
+        profileId: fixture.profileId,
+        platform: "pinterest",
+        platformAccountId: "pin-user-bad",
+        token: "pin-access-token",
+        tokenMetadata: {},
+      });
+
+      const app = createApp({ db: tx });
+      const res = await app.request(
+        `/v1/accounts/${account.id}/pinterest/boards`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+          },
+          body: JSON.stringify({ name: "x", privacy: "BANANA" }),
+        },
+      );
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: { code: string } };
+      expect(body.error.code).toBe("validation_failed");
+    });
+  });
+
   it("rejects requests against a non-Pinterest account with platform.mismatch", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {

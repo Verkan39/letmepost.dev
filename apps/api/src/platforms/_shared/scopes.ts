@@ -42,10 +42,12 @@ const SCOPES: Record<Platform, PlatformScopeSet> = {
   },
   pinterest: {
     kind: "oauth",
-    // MVP scope for Pinterest publish: read the caller's boards, read/write
-    // pins. Pinterest requires `pins:read` alongside `pins:write` because
-    // some endpoints echo the pin back on create.
-    write: ["boards:read", "pins:read", "pins:write"],
+    // Publish scope set: read the caller's boards, read/write pins, and
+    // create boards. `boards:write` covers the boardless-account case —
+    // letting users create their first board from the dashboard instead
+    // of dead-ending. Pinterest requires `pins:read` alongside `pins:write`
+    // because some endpoints echo the pin back on create.
+    write: ["boards:read", "boards:write", "pins:read", "pins:write"],
     extended: ["user_accounts:read", "pins:read_secret"],
   },
   twitter: {

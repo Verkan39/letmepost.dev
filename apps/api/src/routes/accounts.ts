@@ -329,6 +329,13 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
     privacy: z.enum(["PUBLIC", "PROTECTED", "SECRET"]).optional(),
     /** When true, the new board's id lands as the account's default. */
     setAsDefault: z.boolean().optional(),
+    /**
+     * Idempotent mode. If a board with the same name already exists, return
+     * it (with `existing: true`) instead of failing with a duplicate-name
+     * error. Lets callers write "ensure this board exists" without
+     * orchestrating list-then-match-then-create themselves.
+     */
+    upsert: z.boolean().optional(),
   });
   app.post("/:id/pinterest/boards", dual, async (c) => {
     const body = await c.req.json().catch(() => null);
@@ -344,18 +351,70 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
     }
     const account = await loadPinterestAccount(c);
     const client = new PinterestClient(account.token);
-    const created = await client.createBoard({
-      name: parsed.data.name,
-      ...(parsed.data.description !== undefined
-        ? { description: parsed.data.description }
-        : {}),
-      ...(parsed.data.privacy !== undefined
-        ? { privacy: parsed.data.privacy }
-        : {}),
-    });
+    const repo = new DrizzlePlatformAccountsRepository(c.var.db);
+
+    let created;
+    try {
+      created = await client.createBoard({
+        name: parsed.data.name,
+        ...(parsed.data.description !== undefined
+          ? { description: parsed.data.description }
+          : {}),
+        ...(parsed.data.privacy !== undefined
+          ? { privacy: parsed.data.privacy }
+          : {}),
+      });
+    } catch (err) {
+      // Upsert recovery: Pinterest's duplicate-name error becomes a
+      // lookup. We accept any platform_rejected whose upstream payload
+      // smells like a duplicate (code 58 OR phrasing match).
+      if (parsed.data.upsert && isPinterestDuplicateNameError(err)) {
+        const all = await client.listBoards({ pageSize: 250 });
+        const match = all.find(
+          (b) => b.name.toLowerCase() === parsed.data.name.toLowerCase(),
+        );
+        if (match) {
+          if (parsed.data.setAsDefault) {
+            await repo.updateMetadata(account.id, {
+              defaultBoardId: match.id,
+              defaultBoardName: match.name,
+            });
+          }
+          return c.json(
+            {
+              id: match.id,
+              name: match.name,
+              privacy: match.privacy ?? null,
+              existing: true,
+              ...(parsed.data.setAsDefault
+                ? {
+                    defaultBoardId: match.id,
+                    defaultBoardName: match.name,
+                  }
+                : {}),
+            },
+            200,
+          );
+        }
+        // Pinterest reports a duplicate but we can't find it in the user's
+        // boards list. Most often a sandbox quirk (cross-environment name
+        // uniqueness). Surface a more actionable error than the raw 409.
+        throw new LetmepostError({
+          code: "platform_rejected",
+          status: 502,
+          platform: "pinterest",
+          message:
+            "Pinterest reports a board with this name already exists, but it isn't in the user's boards list. This usually means the board lives in a different Pinterest environment (e.g. production vs sandbox) — pick a different name.",
+          rule: "pinterest.board.upsert_ghost",
+          ...(err instanceof LetmepostError && err.platformResponse !== undefined
+            ? { platformResponse: err.platformResponse }
+            : {}),
+        });
+      }
+      throw err;
+    }
 
     if (parsed.data.setAsDefault) {
-      const repo = new DrizzlePlatformAccountsRepository(c.var.db);
       await repo.updateMetadata(account.id, {
         defaultBoardId: created.id,
         defaultBoardName: created.name,
@@ -367,6 +426,7 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
         id: created.id,
         name: created.name,
         privacy: created.privacy ?? null,
+        existing: false,
         ...(parsed.data.setAsDefault
           ? { defaultBoardId: created.id, defaultBoardName: created.name }
           : {}),
@@ -630,6 +690,30 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
   }
 
   return app;
+}
+
+/**
+ * Sniff a Pinterest "duplicate board name" error out of whatever shape
+ * `createBoard` threw. Pinterest's upstream payload uses code 58 for
+ * duplicate names, and we also accept the wording in case Pinterest tweaks
+ * the code.
+ */
+function isPinterestDuplicateNameError(err: unknown): boolean {
+  if (!(err instanceof LetmepostError)) return false;
+  if (err.code !== "platform_rejected") return false;
+  if (err.platform !== "pinterest") return false;
+  const resp = err.platformResponse;
+  if (resp && typeof resp === "object") {
+    const r = resp as Record<string, unknown>;
+    if (r.code === 58) return true;
+    if (typeof r.message === "string") {
+      const m = r.message.toLowerCase();
+      if (m.includes("already have a board") || m.includes("already exists")) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 /**

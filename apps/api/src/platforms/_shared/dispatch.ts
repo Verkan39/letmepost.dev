@@ -6,6 +6,7 @@ import { LetmepostError } from "../../errors.js";
 import type { DecryptedPlatformAccount } from "../../repositories/platform-accounts.js";
 import { blueskyPublisher } from "../bluesky/publisher.js";
 import { linkedinPublisher } from "../linkedin/publisher.js";
+import { PinterestClient } from "../pinterest/client.js";
 import { pinterestPublisher } from "../pinterest/publisher.js";
 import type { PinterestTokenMetadata } from "../pinterest/provider.js";
 import { twitterPublisher } from "../twitter/publisher.js";
@@ -91,6 +92,18 @@ export async function publishForAccount(
       const meta = (account.tokenMetadata ?? {}) as PinterestTokenMetadata;
       const boardId = input.pinterest?.boardId ?? meta.defaultBoardId;
       if (!boardId) {
+        // Best-effort: surface the user's actual boards so the caller can
+        // pick one without an extra round-trip. Already on the failure
+        // path, so the extra Pinterest call is acceptable; if it fails
+        // we just omit the hint rather than masking the real error.
+        let availableBoards: { id: string; name: string }[] | undefined;
+        try {
+          const client = new PinterestClient(account.token);
+          const boards = await client.listBoards({ pageSize: 25 });
+          availableBoards = boards.map((b) => ({ id: b.id, name: b.name }));
+        } catch {
+          // intentional swallow — the publish error is what matters
+        }
         throw new LetmepostError({
           code: "validation_failed",
           status: 400,
@@ -99,7 +112,10 @@ export async function publishForAccount(
             "Pinterest posts need a board — none configured on the account and none on the request.",
           rule: "pinterest.board.required",
           remediation:
-            "Set a default board on the connected Pinterest account, or pass `pinterest: { boardId }` on the request body.",
+            "Set a default board via PATCH /v1/accounts/:id/pinterest/default-board, or pass `pinterest: { boardId }` on the request body. Use one of the ids in `platformResponse.availableBoards` below.",
+          ...(availableBoards
+            ? { platformResponse: { availableBoards } }
+            : {}),
         });
       }
       if (!input.media || input.media.length === 0) {

@@ -234,7 +234,7 @@ describeIfDb("POST /v1/posts (pinterest)", () => {
     });
   });
 
-  it("rejects when neither defaultBoardId nor pinterest.boardId is set", async () => {
+  it("rejects when neither defaultBoardId nor pinterest.boardId is set, and surfaces availableBoards", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
       const fixture = await seed(tx);
@@ -248,6 +248,18 @@ describeIfDb("POST /v1/posts (pinterest)", () => {
         token: "access-token",
         tokenMetadata: {},
       });
+      // The boardless-publish error path lists boards as a discoverability
+      // hint. Stub a couple of boards and assert they show up on the error.
+      server.use(
+        http.get("https://api.pinterest.com/v5/boards", () =>
+          HttpResponse.json({
+            items: [
+              { id: "board-a", name: "Inspiration" },
+              { id: "board-b", name: "Travel" },
+            ],
+          }),
+        ),
+      );
       const app = createApp({ db: tx });
       const res = await app.request("/v1/posts", {
         method: "POST",
@@ -262,8 +274,19 @@ describeIfDb("POST /v1/posts (pinterest)", () => {
         }),
       });
       expect(res.status).toBe(400);
-      const body = (await res.json()) as { error: { rule?: string } };
+      const body = (await res.json()) as {
+        error: {
+          rule?: string;
+          platformResponse?: {
+            availableBoards?: { id: string; name: string }[];
+          };
+        };
+      };
       expect(body.error.rule).toBe("pinterest.board.required");
+      expect(body.error.platformResponse?.availableBoards).toEqual([
+        { id: "board-a", name: "Inspiration" },
+        { id: "board-b", name: "Travel" },
+      ]);
     });
   });
 

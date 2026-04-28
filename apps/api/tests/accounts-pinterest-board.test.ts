@@ -304,6 +304,123 @@ describeIfDb("Pinterest default-board picker endpoints", () => {
     });
   });
 
+  it("POST /boards with upsert: true returns the existing board on duplicate name", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+      const repo = new DrizzlePlatformAccountsRepository(tx);
+      const account = await repo.create({
+        organizationId: fixture.organizationId,
+        profileId: fixture.profileId,
+        platform: "pinterest",
+        platformAccountId: "pin-user-upsert",
+        token: "pin-access-token",
+        tokenMetadata: {},
+      });
+      // Pinterest pretends the board already exists, then returns it via
+      // /v5/boards on the recovery list call.
+      server.use(
+        http.post("https://api.pinterest.com/v5/boards", () =>
+          HttpResponse.json(
+            { message: "Try a different name. You already have a board with this name!", code: 58 },
+            { status: 409 },
+          ),
+        ),
+        http.get("https://api.pinterest.com/v5/boards", () =>
+          HttpResponse.json({
+            items: [{ id: "board-existing", name: "letmepost test", privacy: "PUBLIC" }],
+          }),
+        ),
+      );
+
+      const app = createApp({ db: tx });
+      const res = await app.request(
+        `/v1/accounts/${account.id}/pinterest/boards`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+          },
+          body: JSON.stringify({
+            name: "letmepost test",
+            privacy: "PUBLIC",
+            setAsDefault: true,
+            upsert: true,
+          }),
+        },
+      );
+      // Upsert path returns 200 (we didn't create) — distinguishable from
+      // 201 (fresh creation) for callers that care.
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        id: string;
+        existing?: boolean;
+        defaultBoardId?: string;
+      };
+      expect(body.id).toBe("board-existing");
+      expect(body.existing).toBe(true);
+      expect(body.defaultBoardId).toBe("board-existing");
+
+      // Default landed on the account row even though we adopted, not created.
+      const reloaded = await repo.findById(account.id);
+      expect(
+        (reloaded?.tokenMetadata as Record<string, unknown> | undefined)
+          ?.defaultBoardId,
+      ).toBe("board-existing");
+    });
+  });
+
+  it("POST /boards with upsert: true surfaces a clear ghost-duplicate error when Pinterest's state is inconsistent", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+      const repo = new DrizzlePlatformAccountsRepository(tx);
+      const account = await repo.create({
+        organizationId: fixture.organizationId,
+        profileId: fixture.profileId,
+        platform: "pinterest",
+        platformAccountId: "pin-user-ghost",
+        token: "pin-access-token",
+        tokenMetadata: {},
+      });
+      // Pinterest claims duplicate but lists no matching board (sandbox quirk).
+      server.use(
+        http.post("https://api.pinterest.com/v5/boards", () =>
+          HttpResponse.json(
+            { message: "You already have a board with this name!", code: 58 },
+            { status: 409 },
+          ),
+        ),
+        http.get("https://api.pinterest.com/v5/boards", () =>
+          HttpResponse.json({ items: [] }),
+        ),
+      );
+
+      const app = createApp({ db: tx });
+      const res = await app.request(
+        `/v1/accounts/${account.id}/pinterest/boards`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+          },
+          body: JSON.stringify({
+            name: "phantom board",
+            upsert: true,
+          }),
+        },
+      );
+      expect(res.status).toBe(502);
+      const body = (await res.json()) as {
+        error: { code: string; rule?: string };
+      };
+      expect(body.error.code).toBe("platform_rejected");
+      expect(body.error.rule).toBe("pinterest.board.upsert_ghost");
+    });
+  });
+
   it("POST /boards surfaces Pinterest's duplicate-name error as platform_rejected", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {

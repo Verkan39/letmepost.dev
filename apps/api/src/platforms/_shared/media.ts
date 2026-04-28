@@ -1,5 +1,11 @@
 import type { MediaInput } from "@letmepost/schemas";
+import type { DrizzleClient } from "../../db/index.js";
 import { LetmepostError } from "../../errors.js";
+import {
+  buildPublicUrl,
+  getPublicBaseUrl,
+} from "../../media/s3.js";
+import { DrizzleMediaRepository } from "../../repositories/media.js";
 
 /**
  * A `MediaInput` resolved to actual bytes + a definite mime type. Preflight
@@ -14,6 +20,17 @@ export type LoadedMediaItem = {
   altText?: string;
 };
 
+/**
+ * Tenancy context required to resolve `mediaId`-shaped inputs. Threaded from
+ * the posts route → dispatcher → publisher → resolver. URL/base64 inputs
+ * don't need it.
+ */
+export type MediaResolverContext = {
+  db: DrizzleClient;
+  organizationId: string;
+  profileId: string;
+};
+
 export type LoadMediaOptions = {
   /**
    * Platform tag stamped on errors so the user gets a `platform` field on the
@@ -26,25 +43,38 @@ export type LoadMediaOptions = {
    * `bluesky.media.reachable`. Falls back to a generic message if omitted.
    */
   reachableRule?: string;
+  /**
+   * DB client + tenancy context required to resolve the `mediaId` variant.
+   * Omitting these makes `mediaId`-shaped inputs fail loudly — keeps tests
+   * that don't exercise the new path from silently no-oping.
+   */
+  db?: DrizzleClient;
+  organizationId?: string;
+  profileId?: string;
 };
 
 /**
- * Resolve a `MediaInput` (URL or inline base64) into bytes + mime type.
- * Errors are mapped to the canonical `LetmepostError` contract so callers
- * never have to re-translate.
+ * Resolve a `MediaInput` into bytes + mime type. Errors are mapped to the
+ * canonical `LetmepostError` contract so callers never have to re-translate.
  *
+ *   - mediaId          → load the `media` row scoped to org+profile, then
+ *                        fetch the bytes from the public S3 URL. Cross-tenant
+ *                        ids 404. Missing creds / unknown id → 404.
  *   - inline base64    → decoded; mime defaults to `image/jpeg` or
  *                        `video/mp4` based on `kind` (caller usually owns
  *                        the actual mime via the platform's preflight)
  *   - URL              → fetched; on non-2xx → `preflight_failed`; on
  *                        network failure → `platform_unavailable`
- *   - neither          → `validation_failed` (Zod refinement should catch
- *                        this; loud fallback)
+ *   - none of the above → `validation_failed` (Zod refinement should catch
+ *                         this; loud fallback)
  */
 export async function loadMediaItem(
   item: MediaInput,
   opts: LoadMediaOptions = {},
 ): Promise<LoadedMediaItem> {
+  if (item.mediaId) {
+    return loadFromMediaId(item, opts);
+  }
   if (item.bytesBase64) {
     const bytes = Uint8Array.from(Buffer.from(item.bytesBase64, "base64"));
     const mimeType =
@@ -59,7 +89,7 @@ export async function loadMediaItem(
     throw new LetmepostError({
       code: "validation_failed",
       status: 400,
-      message: "Media item must provide either 'url' or 'bytesBase64'.",
+      message: "Media item must provide 'mediaId', 'url', or 'bytesBase64'.",
       ...(opts.platform ? { platform: opts.platform } : {}),
     });
   }
@@ -109,4 +139,78 @@ function withAlt(
   altText: string | undefined,
 ): LoadedMediaItem {
   return altText !== undefined ? { ...base, altText } : base;
+}
+
+async function loadFromMediaId(
+  item: MediaInput,
+  opts: LoadMediaOptions,
+): Promise<LoadedMediaItem> {
+  if (!item.mediaId) throw new Error("loadFromMediaId called without mediaId");
+  if (!opts.db || !opts.organizationId || !opts.profileId) {
+    // Loud fallback. Hitting this means a publisher is calling the resolver
+    // without threading tenancy through — caller bug, not a user error.
+    throw new LetmepostError({
+      code: "internal_error",
+      status: 500,
+      message:
+        "Media resolver called without db/organizationId/profileId for a mediaId-shaped input.",
+      ...(opts.platform ? { platform: opts.platform } : {}),
+    });
+  }
+
+  const repo = new DrizzleMediaRepository(opts.db);
+  const row = await repo.findByIdScoped({
+    organizationId: opts.organizationId,
+    profileId: opts.profileId,
+    id: item.mediaId,
+  });
+  if (!row) {
+    // 404 (not 403) so cross-tenant probing can't differentiate "exists but
+    // not yours" from "doesn't exist".
+    throw new LetmepostError({
+      code: "not_found",
+      status: 404,
+      message: "Media not found.",
+      rule: "media.unknown",
+      ...(opts.platform ? { platform: opts.platform } : {}),
+    });
+  }
+
+  const url = buildPublicUrl({
+    publicBaseUrl: getPublicBaseUrl(),
+    s3Key: row.s3Key,
+  });
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch {
+    throw new LetmepostError({
+      code: "platform_unavailable",
+      status: 503,
+      message: `Failed to fetch media bytes from ${url}.`,
+      ...(opts.platform ? { platform: opts.platform } : {}),
+      remediation:
+        "S3 may be transiently unavailable; retry, or contact support if persistent.",
+    });
+  }
+  if (!res.ok) {
+    throw new LetmepostError({
+      code: "internal_error",
+      status: 500,
+      message: `Media bytes unreachable (S3 returned ${res.status}).`,
+      ...(opts.platform ? { platform: opts.platform } : {}),
+    });
+  }
+  const buf = await res.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+
+  return withAlt(
+    {
+      kind: item.kind,
+      mimeType: row.contentType,
+      byteLength: bytes.byteLength,
+      bytes,
+    },
+    item.altText,
+  );
 }

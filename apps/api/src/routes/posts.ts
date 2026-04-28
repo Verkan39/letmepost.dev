@@ -206,6 +206,11 @@ posts.post(
         text,
         ...(media !== undefined ? { media } : {}),
         ...(firstComment !== undefined ? { firstComment } : {}),
+        mediaContext: {
+          db: c.var.db,
+          organizationId,
+          profileId: account.profileId,
+        },
       });
 
       const publishedAt = new Date();

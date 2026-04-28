@@ -6,4 +6,5 @@ export * from "./posts.js";
 export * from "./post_attempts.js";
 export * from "./idempotency_records.js";
 export * from "./profiles.js";
+export * from "./media.js";
 export * from "./webhook_endpoints.js";

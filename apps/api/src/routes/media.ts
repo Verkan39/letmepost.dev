@@ -1,0 +1,337 @@
+import { createHash } from "node:crypto";
+import { PassThrough, Readable } from "node:stream";
+import { Upload } from "@aws-sdk/lib-storage";
+import Busboy from "busboy";
+import { Hono } from "hono";
+import type { CreateMediaResponse } from "@letmepost/schemas";
+import { generateMediaId } from "../media/ids.js";
+import {
+  buildPublicUrl,
+  buildS3Key,
+  extForContentType,
+  getBucketName,
+  getEnvPrefix,
+  getPublicBaseUrl,
+  getS3Client,
+} from "../media/s3.js";
+import { LetmepostError } from "../errors.js";
+import { apiKeyAuth } from "../middleware/api-key.js";
+import { rateLimit } from "../middleware/rate-limit.js";
+import { DrizzleMediaRepository } from "../repositories/media.js";
+import { DrizzleProfilesRepository } from "../repositories/profiles.js";
+
+export const media = new Hono();
+
+/** 200 MB ceiling for v1. YouTube long-form needs more, but the worker that
+ *  actually uploads to YouTube is the place to bump this — keep the public
+ *  surface conservative until we have telemetry on real upload sizes. */
+const MAX_BYTES = 200 * 1024 * 1024;
+
+/**
+ * `POST /v1/media`
+ *
+ * Multipart upload. The single `file` part is streamed straight to S3 via
+ * `@aws-sdk/lib-storage`'s `Upload` (which handles multipart S3 internally
+ * for files >5 MB). sha256 + size are computed by piping the part stream
+ * through a passthrough hasher, so the row's metadata is always honest.
+ *
+ * On success the response carries the public URL — which is just
+ * `${MEDIA_PUBLIC_BASE_URL}/${s3Key}`. Callers store the `id` and reference
+ * it from post bodies as `media: [{ kind: "image", mediaId: "med_..." }]`.
+ *
+ * The body is intentionally consumed as a stream — `c.req.parseBody()` would
+ * buffer the whole upload in memory, which defeats the YouTube long-form
+ * use case.
+ */
+media.post("/", apiKeyAuth(), rateLimit(), async (c) => {
+  const { organizationId, profileId: keyProfileId } = c.var.apiKey;
+
+  const requestedProfileId = c.req.query("profileId");
+  const profileId = await resolveProfileId(
+    c.var.db,
+    organizationId,
+    keyProfileId,
+    requestedProfileId ?? null,
+  );
+
+  const contentType = c.req.header("Content-Type") ?? "";
+  if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
+    throw new LetmepostError({
+      code: "validation_failed",
+      status: 400,
+      message:
+        "POST /v1/media requires Content-Type: multipart/form-data with a `file` part.",
+      rule: "media.content_type",
+      remediation:
+        "Use a multipart upload (e.g. `curl -F file=@path/to/image.jpg`).",
+    });
+  }
+
+  if (!c.req.raw.body) {
+    throw new LetmepostError({
+      code: "validation_failed",
+      status: 400,
+      message: "Request body is empty.",
+      rule: "media.empty_body",
+    });
+  }
+
+  const upload = await streamPartToS3({
+    organizationId,
+    profileId,
+    contentType,
+    body: Readable.fromWeb(c.req.raw.body as never),
+  });
+
+  const repo = new DrizzleMediaRepository(c.var.db);
+  const row = await repo.create({
+    id: upload.mediaId,
+    organizationId,
+    profileId,
+    contentType: upload.contentType,
+    sizeBytes: upload.sizeBytes,
+    sha256: upload.sha256,
+    s3Key: upload.s3Key,
+  });
+
+  const body: CreateMediaResponse = {
+    id: row.id,
+    url: upload.publicUrl,
+    contentType: row.contentType,
+    sizeBytes: row.sizeBytes,
+    sha256: row.sha256,
+    createdAt: row.createdAt.toISOString(),
+  };
+  return c.json(body, 201);
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Internals
+ * ───────────────────────────────────────────────────────────────────────── */
+
+type UploadResult = {
+  mediaId: string;
+  contentType: string;
+  sizeBytes: number;
+  sha256: string;
+  s3Key: string;
+  publicUrl: string;
+};
+
+async function streamPartToS3(args: {
+  organizationId: string;
+  profileId: string;
+  contentType: string;
+  body: Readable;
+}): Promise<UploadResult> {
+  const busboy = Busboy({
+    headers: { "content-type": args.contentType },
+    limits: { files: 1, fileSize: MAX_BYTES },
+  });
+
+  return new Promise<UploadResult>((resolve, reject) => {
+    let settled = false;
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      fn();
+    };
+
+    let fileSeen = false;
+    let truncated = false;
+
+    busboy.on("file", (fieldname, fileStream, info) => {
+      if (fieldname !== "file") {
+        // Drain, ignore.
+        fileStream.resume();
+        return;
+      }
+      if (fileSeen) {
+        fileStream.resume();
+        settle(() =>
+          reject(
+            new LetmepostError({
+              code: "validation_failed",
+              status: 400,
+              message:
+                "POST /v1/media accepts exactly one `file` part per request.",
+              rule: "media.single_file",
+            }),
+          ),
+        );
+        return;
+      }
+      fileSeen = true;
+
+      const partContentType =
+        info.mimeType?.toLowerCase() || "application/octet-stream";
+
+      const mediaId = generateMediaId();
+      const ext = extForContentType(partContentType);
+      const s3Key = buildS3Key({
+        envPrefix: getEnvPrefix(),
+        organizationId: args.organizationId,
+        mediaId,
+        ext,
+      });
+
+      const hash = createHash("sha256");
+      let sizeBytes = 0;
+      const passthrough = new PassThrough();
+
+      fileStream.on("data", (chunk: Buffer) => {
+        hash.update(chunk);
+        sizeBytes += chunk.length;
+      });
+      fileStream.on("limit", () => {
+        truncated = true;
+      });
+      fileStream.pipe(passthrough);
+
+      const upload = new Upload({
+        client: getS3Client(),
+        params: {
+          Bucket: getBucketName(),
+          Key: s3Key,
+          Body: passthrough,
+          ContentType: partContentType,
+          /** Pinterest et al. occasionally probe with HEAD/GET; an inline
+           *  disposition keeps preview-style fetchers happy. */
+          ContentDisposition: "inline",
+        },
+      });
+
+      upload
+        .done()
+        .then(() => {
+          if (truncated) {
+            settle(() =>
+              reject(
+                new LetmepostError({
+                  code: "validation_failed",
+                  status: 413,
+                  message: `Media file exceeds the ${MAX_BYTES} byte limit.`,
+                  rule: "media.size_max",
+                  remediation:
+                    "Compress the asset, or open an issue if you need a higher limit for a specific platform.",
+                }),
+              ),
+            );
+            return;
+          }
+          settle(() =>
+            resolve({
+              mediaId,
+              contentType: partContentType,
+              sizeBytes,
+              sha256: hash.digest("hex"),
+              s3Key,
+              publicUrl: buildPublicUrl({
+                publicBaseUrl: getPublicBaseUrl(),
+                s3Key,
+              }),
+            }),
+          );
+        })
+        .catch((err: unknown) => {
+          settle(() =>
+            reject(
+              new LetmepostError({
+                code: "internal_error",
+                status: 500,
+                message:
+                  err instanceof Error
+                    ? `S3 upload failed: ${err.message}`
+                    : "S3 upload failed.",
+                platform: "s3",
+              }),
+            ),
+          );
+        });
+    });
+
+    busboy.on("error", (err: unknown) => {
+      settle(() =>
+        reject(
+          new LetmepostError({
+            code: "validation_failed",
+            status: 400,
+            message:
+              err instanceof Error
+                ? `Multipart parse failed: ${err.message}`
+                : "Multipart parse failed.",
+            rule: "media.parse_failed",
+          }),
+        ),
+      );
+    });
+
+    busboy.on("finish", () => {
+      if (!fileSeen) {
+        settle(() =>
+          reject(
+            new LetmepostError({
+              code: "validation_failed",
+              status: 400,
+              message: "POST /v1/media requires a `file` part.",
+              rule: "media.missing_file",
+            }),
+          ),
+        );
+      }
+    });
+
+    args.body.pipe(busboy);
+  });
+}
+
+/**
+ * Mirrors the resolution rule used by `/v1/accounts/connect`:
+ *   - profile-scoped key → must match (or omit) `?profileId`
+ *   - org-wide key       → uses `?profileId` if supplied, else org's "default"
+ *
+ * Cross-profile access surfaces as 404, never 403, to avoid leaking
+ * profile-existence to a key that shouldn't see it.
+ */
+async function resolveProfileId(
+  db: import("../db/index.js").DrizzleClient,
+  organizationId: string,
+  keyProfileId: string | null,
+  requestedProfileId: string | null,
+): Promise<string> {
+  if (keyProfileId) {
+    if (requestedProfileId && requestedProfileId !== keyProfileId) {
+      throw new LetmepostError({
+        code: "not_found",
+        status: 404,
+        message: "Profile not found.",
+        rule: "api_key.profile_scope",
+      });
+    }
+    return keyProfileId;
+  }
+
+  const profilesRepo = new DrizzleProfilesRepository(db);
+
+  if (requestedProfileId) {
+    const profile = await profilesRepo.findById(requestedProfileId);
+    if (!profile || profile.organizationId !== organizationId) {
+      throw new LetmepostError({
+        code: "not_found",
+        status: 404,
+        message: "Profile not found.",
+        rule: "profile.unknown",
+      });
+    }
+    return profile.id;
+  }
+
+  const def = await profilesRepo.findByOrgAndSlug(organizationId, "default");
+  if (def) return def.id;
+
+  throw new LetmepostError({
+    code: "internal_error",
+    status: 500,
+    message: "Default profile missing for organization.",
+  });
+}

@@ -19,6 +19,7 @@ import {
 import { apiKeyRoutes } from "./routes/api-keys.js";
 import { authRoutes } from "./routes/auth.js";
 import { health } from "./routes/health.js";
+import { media } from "./routes/media.js";
 import { posts } from "./routes/posts.js";
 import {
   createProfileRoutes,
@@ -147,6 +148,7 @@ export function createApp(options: AppOptions = {}) {
   app.route("/health", health);
   app.route("/posts", posts);
   app.route("/v1/posts", posts);
+  app.route("/v1/media", media);
   app.onError(onError);
   return app;
 }

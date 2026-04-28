@@ -2,6 +2,7 @@ import type { CreatePostResponse, MediaInput } from "@letmepost/schemas";
 import {
   loadMediaItem as sharedLoadMediaItem,
   type LoadedMediaItem as SharedLoadedMediaItem,
+  type MediaResolverContext,
 } from "../_shared/media.js";
 import type { Publisher } from "../_shared/publisher.js";
 import {
@@ -34,15 +35,27 @@ export type BlueskyPublishInput = {
   text: string;
   media?: MediaInput[];
   firstComment?: { text: string };
+  /** Required only if any media item references a `mediaId`. */
+  mediaContext?: MediaResolverContext;
 };
 
 /** A media item with bytes resolved, ready for preflight + upload. */
 type LoadedMediaItem = SharedLoadedMediaItem;
 
-function loadMediaItem(item: MediaInput): Promise<LoadedMediaItem> {
+function loadMediaItem(
+  item: MediaInput,
+  ctx: MediaResolverContext | undefined,
+): Promise<LoadedMediaItem> {
   return sharedLoadMediaItem(item, {
     platform: "bluesky",
     reachableRule: "bluesky.media.reachable",
+    ...(ctx
+      ? {
+          db: ctx.db,
+          organizationId: ctx.organizationId,
+          profileId: ctx.profileId,
+        }
+      : {}),
   });
 }
 
@@ -86,13 +99,15 @@ async function publishFirstComment(
 
 export const blueskyPublisher: Publisher<BlueskyCredentials, BlueskyPublishInput> = {
   async publish(creds, input): Promise<CreatePostResponse> {
-    const { text, media = [], firstComment } = input;
+    const { text, media = [], firstComment, mediaContext } = input;
 
     validateBlueskyText(text);
 
     // Resolve bytes FIRST (so size preflight is honest), then preflight, then
     // upload. If any resolve/preflight step fails, we never hit upstream.
-    const loaded = await Promise.all(media.map(loadMediaItem));
+    const loaded = await Promise.all(
+      media.map((item) => loadMediaItem(item, mediaContext)),
+    );
     validateBlueskyMedia(
       loaded.map((l) => {
         const item: ResolvedMediaItem = {

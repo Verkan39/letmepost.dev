@@ -26,20 +26,33 @@ export const TWITTER_GIF_MAX_BYTES = 15_000_000;
 export const TWITTER_VIDEO_MAX_BYTES = 512_000_000;
 
 /**
- * A single media item on a post. The caller provides bytes either inline
- * (`bytesBase64`) or by URL (`url`) — the publisher resolves to bytes before
- * running size preflight. Exactly one of the two must be set.
+ * A single media item on a post. The caller provides bytes via one of three
+ * sources:
+ *   - `mediaId`     — references a prior `POST /v1/media` upload. Preferred
+ *                     for production: the bytes already live on our CDN, so
+ *                     publish-time latency drops by the upload roundtrip.
+ *   - `url`         — passthrough; publisher fetches from a third-party CDN.
+ *                     Useful for callers who already host their own assets.
+ *   - `bytesBase64` — inline. Convenient for tiny images and tests; do not
+ *                     use for video — multipart upload via `POST /v1/media`
+ *                     is the only sane path past a few MB.
+ *
+ * Exactly one of the three must be set on each item.
  */
+export const MEDIA_ID_PATTERN = /^med_[0-9A-Za-z]{22}$/;
+
 const MediaSource = z
   .object({
+    mediaId: z.string().regex(MEDIA_ID_PATTERN).optional(),
     url: z.string().url().optional(),
     bytesBase64: z.string().min(1).optional(),
   })
   .refine(
-    (v) => (v.url ? 1 : 0) + (v.bytesBase64 ? 1 : 0) === 1,
+    (v) =>
+      (v.mediaId ? 1 : 0) + (v.url ? 1 : 0) + (v.bytesBase64 ? 1 : 0) === 1,
     {
       message:
-        "Exactly one of 'url' or 'bytesBase64' must be provided for each media item.",
+        "Exactly one of 'mediaId', 'url', or 'bytesBase64' must be provided for each media item.",
     },
   );
 
@@ -59,6 +72,23 @@ const MediaVideo = z
 
 export const MediaInput = z.union([MediaImage, MediaVideo]);
 export type MediaInput = z.infer<typeof MediaInput>;
+
+/**
+ * Response shape for `POST /v1/media`. The `id` is what callers reference
+ * back from `media: [{ kind, mediaId }]` on a post body. `url` is the
+ * resolved public URL — provided so callers that prefer to send `{ url }`
+ * to other systems (or just want to render a preview) don't have to
+ * reconstruct it.
+ */
+export const CreateMediaResponse = z.object({
+  id: z.string().regex(MEDIA_ID_PATTERN),
+  url: z.string().url(),
+  contentType: z.string(),
+  sizeBytes: z.number().int().nonnegative(),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  createdAt: z.string(),
+});
+export type CreateMediaResponse = z.infer<typeof CreateMediaResponse>;
 
 export const FirstComment = z.object({
   text: z.string().min(1),

@@ -1,6 +1,9 @@
 import type { CreatePostResponse, MediaInput } from "@letmepost/schemas";
 import { LetmepostError } from "../../errors.js";
-import { loadMediaItem as sharedLoadMediaItem } from "../_shared/media.js";
+import {
+  loadMediaItem as sharedLoadMediaItem,
+  type MediaResolverContext,
+} from "../_shared/media.js";
 import type { Publisher } from "../_shared/publisher.js";
 import { TwitterClient } from "./client.js";
 import {
@@ -24,12 +27,24 @@ export type TwitterPublishInput = {
   text: string;
   /** Single media item; MVP. */
   media?: MediaInput[];
+  /** Required only if any media item references a `mediaId`. */
+  mediaContext?: MediaResolverContext;
 };
 
-function loadMediaItem(item: MediaInput) {
+function loadMediaItem(
+  item: MediaInput,
+  ctx: MediaResolverContext | undefined,
+) {
   return sharedLoadMediaItem(item, {
     platform: "twitter",
     reachableRule: "twitter.media.reachable",
+    ...(ctx
+      ? {
+          db: ctx.db,
+          organizationId: ctx.organizationId,
+          profileId: ctx.profileId,
+        }
+      : {}),
   });
 }
 
@@ -38,7 +53,7 @@ export const twitterPublisher: Publisher<
   TwitterPublishInput
 > = {
   async publish(creds, input): Promise<CreatePostResponse> {
-    const { text, media = [] } = input;
+    const { text, media = [], mediaContext } = input;
 
     validateTwitterText(text);
 
@@ -55,7 +70,9 @@ export const twitterPublisher: Publisher<
       });
     }
 
-    const loaded = await Promise.all(media.map(loadMediaItem));
+    const loaded = await Promise.all(
+      media.map((item) => loadMediaItem(item, mediaContext)),
+    );
     validateTwitterMedia(
       loaded.map((l): TwitterResolvedMediaItem => {
         return {

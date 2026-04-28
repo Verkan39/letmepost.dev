@@ -5,6 +5,7 @@ import { blueskyPublisher } from "../bluesky/publisher.js";
 import { linkedinPublisher } from "../linkedin/publisher.js";
 import { pinterestPublisher } from "../pinterest/publisher.js";
 import { twitterPublisher } from "../twitter/publisher.js";
+import type { MediaResolverContext } from "./media.js";
 
 /**
  * Single source of truth for "given an account + a post body, run the right
@@ -27,6 +28,11 @@ export type PublishInput = {
   text: string;
   media?: Parameters<typeof blueskyPublisher.publish>[1]["media"];
   firstComment?: Parameters<typeof blueskyPublisher.publish>[1]["firstComment"];
+  /**
+   * Tenancy context for resolving `mediaId`-shaped inputs. Required when any
+   * media item references a mediaId; URL / bytesBase64 paths ignore it.
+   */
+  mediaContext?: MediaResolverContext;
 };
 
 export async function publishForAccount(
@@ -41,6 +47,9 @@ export async function publishForAccount(
       if (input.media !== undefined) blueskyInput.media = input.media;
       if (input.firstComment !== undefined) {
         blueskyInput.firstComment = input.firstComment;
+      }
+      if (input.mediaContext !== undefined) {
+        blueskyInput.mediaContext = input.mediaContext;
       }
       return blueskyPublisher.publish(
         { handle: account.platformAccountId, appPassword: account.token },
@@ -67,6 +76,9 @@ export async function publishForAccount(
         {
           text: input.text,
           ...(input.media !== undefined ? { media: input.media } : {}),
+          ...(input.mediaContext !== undefined
+            ? { mediaContext: input.mediaContext }
+            : {}),
         },
       );
     case "pinterest": {

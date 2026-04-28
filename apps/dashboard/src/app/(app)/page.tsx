@@ -228,11 +228,13 @@ export default function DashboardHome() {
             />
 
 
-            <div className="grid gap-4 lg:grid-cols-3">
-              <div className="lg:col-span-2">
+            <div className="grid gap-4 lg:grid-cols-3 items-stretch">
+              <div className="lg:col-span-2 flex">
                 <RecentActivitySection />
               </div>
-              <PlatformBreakdownSection />
+              <div className="flex">
+                <PlatformBreakdownSection />
+              </div>
             </div>
           </motion.div>
         )}
@@ -648,7 +650,7 @@ function RecentActivitySection() {
   const posts = query.data ?? [];
 
   return (
-    <Card>
+    <Card className="flex flex-col w-full">
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -666,7 +668,7 @@ function RecentActivitySection() {
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1">
         {query.isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-10" />
@@ -885,14 +887,14 @@ function PlatformBreakdownSection() {
   const totalAll = groups.reduce((sum, g) => sum + g.total, 0);
 
   return (
-    <Card>
+    <Card className="flex flex-col w-full">
       <CardHeader>
         <CardTitle>By platform</CardTitle>
         <CardDescription>
           Posts in the last 30 days, grouped by platform.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="flex-1 space-y-3">
         {query.isLoading ? (
           <div className="space-y-3">
             <Skeleton className="h-8" />

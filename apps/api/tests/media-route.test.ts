@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { createApp } from "../src/app.js";
 import { seed } from "../src/db/seed.js";
 import { media as mediaTable } from "../src/db/schema/media.js";
+import { generateMediaId } from "../src/media/ids.js";
 import { __resetS3CacheForTests } from "../src/media/s3.js";
 import {
   canRunDbTests,
@@ -168,6 +169,112 @@ describeIfReady("POST /v1/media", () => {
       expect(fetched.headers.get("content-type")).toContain("image/jpeg");
       const fetchedBytes = Buffer.from(await fetched.arrayBuffer());
       expect(fetchedBytes.equals(TINY_JPEG)).toBe(true);
+    });
+  });
+
+  it("GET /v1/media lists rows scoped to the api-key's org, newest first", async () => {
+    const { db } = await getTestDb();
+    __resetS3CacheForTests();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+      const baseTs = new Date("2026-04-28T10:00:00Z");
+
+      // Insert three rows with deterministic timestamps so ordering is
+      // testable without depending on insertion timing.
+      const rows = [
+        { id: generateMediaId(), createdAt: new Date(baseTs.getTime() + 0) },
+        { id: generateMediaId(), createdAt: new Date(baseTs.getTime() + 1_000) },
+        { id: generateMediaId(), createdAt: new Date(baseTs.getTime() + 2_000) },
+      ];
+      for (const r of rows) {
+        await tx.insert(mediaTable).values({
+          id: r.id,
+          organizationId: fixture.organizationId,
+          profileId: fixture.profileId,
+          contentType: "image/jpeg",
+          sizeBytes: 100,
+          sha256: "0".repeat(64),
+          s3Key: `test/${fixture.organizationId}/${r.id}.jpg`,
+          createdAt: r.createdAt,
+        });
+      }
+
+      const app = createApp({ db: tx });
+      const res = await app.request("/v1/media", {
+        method: "GET",
+        headers: { Authorization: `Bearer ${fixture.apiKey.plaintext}` },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        data: { id: string; url: string; contentType: string }[];
+        nextCursor: string | null;
+      };
+      expect(body.data).toHaveLength(3);
+      expect(body.data.map((r) => r.id)).toEqual([
+        rows[2]!.id,
+        rows[1]!.id,
+        rows[0]!.id,
+      ]);
+      expect(body.data[0]!.url.endsWith(".jpg")).toBe(true);
+      expect(body.nextCursor).toBeNull();
+    });
+  });
+
+  it("GET /v1/media paginates via cursor", async () => {
+    const { db } = await getTestDb();
+    __resetS3CacheForTests();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+      const baseTs = new Date("2026-04-28T10:00:00Z");
+      const ids = [
+        generateMediaId(),
+        generateMediaId(),
+        generateMediaId(),
+        generateMediaId(),
+      ];
+      for (let i = 0; i < ids.length; i++) {
+        await tx.insert(mediaTable).values({
+          id: ids[i]!,
+          organizationId: fixture.organizationId,
+          profileId: fixture.profileId,
+          contentType: "image/jpeg",
+          sizeBytes: 1,
+          sha256: "0".repeat(64),
+          s3Key: `test/${fixture.organizationId}/${ids[i]!}.jpg`,
+          createdAt: new Date(baseTs.getTime() + i * 1000),
+        });
+      }
+
+      const app = createApp({ db: tx });
+      const first = await app.request("/v1/media?limit=2", {
+        method: "GET",
+        headers: { Authorization: `Bearer ${fixture.apiKey.plaintext}` },
+      });
+      expect(first.status).toBe(200);
+      const firstBody = (await first.json()) as {
+        data: { id: string }[];
+        nextCursor: string | null;
+      };
+      expect(firstBody.data).toHaveLength(2);
+      expect(firstBody.nextCursor).toBeTruthy();
+
+      const second = await app.request(
+        `/v1/media?limit=2&cursor=${encodeURIComponent(firstBody.nextCursor!)}`,
+        {
+          method: "GET",
+          headers: { Authorization: `Bearer ${fixture.apiKey.plaintext}` },
+        },
+      );
+      const secondBody = (await second.json()) as {
+        data: { id: string }[];
+        nextCursor: string | null;
+      };
+      expect(secondBody.data).toHaveLength(2);
+      const seenIds = new Set([
+        ...firstBody.data.map((r) => r.id),
+        ...secondBody.data.map((r) => r.id),
+      ]);
+      expect(seenIds.size).toBe(4);
     });
   });
 

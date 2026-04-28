@@ -18,6 +18,9 @@ export const queryKeys = {
   webhooks: {
     list: () => ["webhooks"] as const,
   },
+  media: {
+    list: () => ["media"] as const,
+  },
   posts: {
     list: (filters: unknown) => ["posts", "list", filters] as const,
     detail: (id: string) => ["posts", "detail", id] as const,

@@ -16,6 +16,7 @@ import {
 } from "../media/s3.js";
 import { LetmepostError } from "../errors.js";
 import { apiKeyAuth } from "../middleware/api-key.js";
+import { apiKeyOrSession } from "../middleware/api-key-or-session.js";
 import { rateLimit } from "../middleware/rate-limit.js";
 import { DrizzleMediaRepository } from "../repositories/media.js";
 import { DrizzleProfilesRepository } from "../repositories/profiles.js";
@@ -103,6 +104,79 @@ media.post("/", apiKeyAuth(), rateLimit(), async (c) => {
     createdAt: row.createdAt.toISOString(),
   };
   return c.json(body, 201);
+});
+
+/**
+ * `GET /v1/media`
+ *
+ * List uploaded media, scoped to the api-key's org and (when set) profile.
+ * Org-wide keys can pass `?profileId=…` to narrow; profile-scoped keys are
+ * pinned to their profile and ignore the query param. Cursor-paginated
+ * (keyset on createdAt desc); responses include `nextCursor` when more
+ * pages exist.
+ *
+ * Accepts either Bearer or session — the dashboard's media management
+ * page reads through this with the cookie session.
+ */
+media.get("/", apiKeyOrSession(), rateLimit(), async (c) => {
+  const { organizationId, profileId: keyProfileId } = c.var.apiKey;
+  const requestedProfileId = c.req.query("profileId");
+  const limitParam = c.req.query("limit");
+  const cursor = c.req.query("cursor");
+
+  // Resolution mirrors the POST path:
+  //   - profile-scoped key + ?profileId mismatch → 404 (no leak)
+  //   - profile-scoped key                        → use the key's profileId
+  //   - org-wide key + ?profileId                 → use the request's
+  //   - org-wide key (no query)                   → list across all profiles
+  let effectiveProfileId: string | undefined;
+  if (keyProfileId) {
+    if (requestedProfileId && requestedProfileId !== keyProfileId) {
+      throw new LetmepostError({
+        code: "not_found",
+        status: 404,
+        message: "Profile not found.",
+        rule: "api_key.profile_scope",
+      });
+    }
+    effectiveProfileId = keyProfileId;
+  } else if (requestedProfileId) {
+    effectiveProfileId = requestedProfileId;
+  }
+
+  const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
+  if (limit !== undefined && (!Number.isFinite(limit) || limit < 1)) {
+    throw new LetmepostError({
+      code: "validation_failed",
+      status: 400,
+      message: "limit must be a positive integer.",
+      rule: "limit",
+    });
+  }
+
+  const repo = new DrizzleMediaRepository(c.var.db);
+  const filters: { organizationId: string; profileId?: string } = {
+    organizationId,
+  };
+  if (effectiveProfileId) filters.profileId = effectiveProfileId;
+  const opts: { limit?: number; cursor?: string } = {};
+  if (limit !== undefined) opts.limit = limit;
+  if (cursor) opts.cursor = cursor;
+  const result = await repo.list(filters, opts);
+
+  const baseUrl = (await import("../media/s3.js")).getPublicBaseUrl();
+  return c.json({
+    data: result.data.map((row) => ({
+      id: row.id,
+      url: `${baseUrl}/${row.s3Key}`,
+      contentType: row.contentType,
+      sizeBytes: row.sizeBytes,
+      sha256: row.sha256,
+      profileId: row.profileId,
+      createdAt: row.createdAt.toISOString(),
+    })),
+    nextCursor: result.nextCursor,
+  });
 });
 
 /* ─────────────────────────────────────────────────────────────────────────

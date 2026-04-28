@@ -20,6 +20,7 @@ const LABELS: Record<string, string> = {
   webhooks: "Webhooks",
   posts: "Post log",
   profiles: "Profiles",
+  media: "Media",
 };
 
 function labelFor(segment: string): string {

@@ -11,6 +11,7 @@ import {
   Broadcast,
   ListBullets,
   Folders,
+  ImageSquare,
   SignOut,
   CaretUpDown,
   Check,
@@ -48,6 +49,7 @@ const NAV_ITEMS = [
   { href: "/posts", label: "Logs", icon: ListBullets },
   { href: "/accounts", label: "Accounts", icon: Plug },
   { href: "/profiles", label: "Profiles", icon: Folders },
+  { href: "/media", label: "Media", icon: ImageSquare },
   { href: "/api-keys", label: "API keys", icon: Key },
   { href: "/webhooks", label: "Webhooks", icon: Broadcast },
 ] as const;

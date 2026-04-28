@@ -31,6 +31,7 @@ export class ApiRequestError extends Error {
 
 type RequestOpts = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
+  /** Pass a `FormData` instance to send multipart; anything else is JSON-stringified. */
   body?: unknown;
   headers?: Record<string, string>;
   /** When true, do not throw on non-2xx — return the parsed error instead. */
@@ -42,15 +43,30 @@ export async function apiFetch<T>(
   opts: RequestOpts = {},
 ): Promise<T> {
   const url = path.startsWith("http") ? path : `${API_URL}${path}`;
+  // FormData bodies are sent verbatim — the browser owns the multipart
+  // boundary and sets the Content-Type itself. Setting our usual JSON
+  // Content-Type breaks the boundary negotiation, so it has to be omitted
+  // for the upload path.
+  const isFormData =
+    typeof FormData !== "undefined" && opts.body instanceof FormData;
+  const baseHeaders: Record<string, string> = {
+    Accept: "application/json",
+    ...(opts.headers ?? {}),
+  };
+  if (!isFormData) {
+    baseHeaders["Content-Type"] =
+      baseHeaders["Content-Type"] ?? "application/json";
+  }
   const res = await fetch(url, {
     method: opts.method ?? "GET",
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      ...(opts.headers ?? {}),
-    },
-    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    headers: baseHeaders,
+    body:
+      opts.body === undefined
+        ? undefined
+        : isFormData
+          ? (opts.body as FormData)
+          : JSON.stringify(opts.body),
   });
 
   const text = await res.text();

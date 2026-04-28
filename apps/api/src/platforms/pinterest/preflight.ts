@@ -1,4 +1,7 @@
-import { PINTEREST_IMAGE_MAX_BYTES } from "@letmepost/schemas";
+import {
+  PINTEREST_IMAGE_MAX_BYTES,
+  type MediaInput,
+} from "@letmepost/schemas";
 import { LetmepostError } from "../../errors.js";
 import { platformFetch } from "../_shared/http.js";
 
@@ -10,17 +13,28 @@ const ALLOWED_IMAGE_MIMES = new Set<string>([
   "image/webp",
 ]);
 
+/**
+ * The publisher's input shape after the Phase 7.5 rewrite. `boardId` is
+ * resolved by the caller (publisher) — either from `pinterest.boardId` on
+ * the request body or from `tokenMetadata.defaultBoardId` — so by the time
+ * this preflight runs we have a definite value.
+ */
 export interface PinterestPublishInput {
+  /** Pin description / caption. Maps to Pinterest's `description`. */
   text?: string;
+  /** Resolved at the publisher: per-post override → account default. */
   boardId: string;
-  destinationUrl: string;
-  imageUrl: string;
+  /** Optional click-through URL. Pinterest's v5 makes this optional. */
+  destinationUrl?: string;
+  /** Optional pin title. */
   title?: string;
+  /** Single media item — image MVP. Multi-image and video land in Phase 11. */
+  media: MediaInput[];
 }
 
 /**
- * Pure preflight — only validates fields callers control. URL reachability is
- * a separate async step because it requires a network call.
+ * Pure preflight on caller-controlled fields. Image URL reachability is a
+ * separate async step (the publisher runs it after this).
  */
 export function validatePinterestInput(input: PinterestPublishInput): void {
   if (!input.boardId || input.boardId.trim().length === 0) {
@@ -31,35 +45,48 @@ export function validatePinterestInput(input: PinterestPublishInput): void {
       rule: "pinterest.board.required",
       platform: PLATFORM,
       remediation:
-        "Provide a Pinterest board id — the pin must land on a board you own.",
+        "Set a default board on the connected Pinterest account, or pass `pinterest: { boardId }` on the request body.",
     });
   }
 
-  if (!input.destinationUrl || input.destinationUrl.trim().length === 0) {
+  if (!input.media || input.media.length === 0) {
     throw new LetmepostError({
       code: "preflight_failed",
       status: 400,
-      message: "Pinterest pin requires a destinationUrl.",
-      rule: "pinterest.destination_url.required",
+      message: "Pinterest pins require exactly one media item.",
+      rule: "pinterest.media.required",
       platform: PLATFORM,
       remediation:
-        "Provide the click-through URL Pinterest opens when the pin is tapped.",
+        "Pass `media: [{ kind: \"image\", url | mediaId }]` on the request body.",
     });
   }
-
-  if (!input.imageUrl || input.imageUrl.trim().length === 0) {
+  if (input.media.length > 1) {
     throw new LetmepostError({
       code: "preflight_failed",
       status: 400,
-      message: "Pinterest pin requires an imageUrl.",
-      rule: "pinterest.image_url.required",
+      message: "Pinterest MVP supports a single media item per pin.",
+      rule: "pinterest.media.single_only",
       platform: PLATFORM,
-      remediation: "MVP supports single-image pins only; provide a public image URL.",
+      remediation:
+        "Send one media item; multi-image carousels + video pins land in Phase 11.",
+    });
+  }
+  const item = input.media[0]!;
+  if (item.kind !== "image") {
+    throw new LetmepostError({
+      code: "preflight_failed",
+      status: 400,
+      message: "Pinterest MVP supports image pins only.",
+      rule: "pinterest.media.image_only",
+      platform: PLATFORM,
+      remediation:
+        "Use kind: \"image\". Video pins land in Phase 11 once core publishing is locked.",
     });
   }
 
-  assertHttpUrl(input.destinationUrl, "pinterest.destination_url.http");
-  assertHttpUrl(input.imageUrl, "pinterest.image_url.http");
+  if (input.destinationUrl !== undefined) {
+    assertHttpUrl(input.destinationUrl, "pinterest.destination_url.http");
+  }
 }
 
 function assertHttpUrl(raw: string, rule: string): void {
@@ -89,26 +116,24 @@ function assertHttpUrl(raw: string, rule: string): void {
 }
 
 /**
- * HEAD the destination and image URLs; confirm 2xx and, for the image, the
- * content-type + reported content-length against the Pinterest limits.
- *
- * Pinterest's docs put the single-image ceiling at 20 MB. We honour that as
- * the ceiling; servers that don't return a content-length are allowed
- * through (Pinterest will do its own check downstream).
+ * Fetch the destination + image URLs and confirm 2xx; on the image, also
+ * check content-type + content-length against Pinterest's caps. Pinterest
+ * docs put the single-image ceiling at 20 MB. Servers that don't return a
+ * content-length are allowed through — Pinterest will do its own check.
  */
 export async function assertPinterestUrlsReachable(input: {
-  destinationUrl: string;
+  destinationUrl?: string;
   imageUrl: string;
 }): Promise<void> {
-  // Destination URL — just needs to resolve.
-  await headAndAssertOk(input.destinationUrl, {
-    rule: "pinterest.destination_url.reachable",
-    remediation:
-      "Pinterest requires the destination URL to return 2xx on a HEAD request.",
-  });
+  if (input.destinationUrl) {
+    await fetchAndAssertOk(input.destinationUrl, {
+      rule: "pinterest.destination_url.reachable",
+      remediation:
+        "Pinterest requires the destination URL to return 2xx; verify it is publicly reachable.",
+    });
+  }
 
-  // Image URL — also validate content-type and (when present) size.
-  const imgRes = await headAndAssertOk(input.imageUrl, {
+  const imgRes = await fetchAndAssertOk(input.imageUrl, {
     rule: "pinterest.image_url.reachable",
     remediation:
       "Pinterest must be able to fetch the image URL; verify it is public and returns 2xx.",
@@ -149,7 +174,7 @@ export async function assertPinterestUrlsReachable(input: {
   }
 }
 
-async function headAndAssertOk(
+async function fetchAndAssertOk(
   url: string,
   ctx: { rule: string; remediation: string },
 ): Promise<{ headers: Headers }> {
@@ -159,15 +184,13 @@ async function headAndAssertOk(
       method: "GET",
       url,
       // A handful of CDNs (including Pinterest's own image hosts) reject HEAD
-      // or don't echo content-length on HEAD — we use GET but rely on the
-      // outer fetch to stream-abort; for MVP this is acceptable. A proper
-      // HEAD with fallback lands in Phase 11 follow-up.
+      // or don't echo content-length on HEAD; we use GET and rely on the
+      // outer client to short-circuit. A proper HEAD-with-fallback lands in
+      // Phase 11.
       platform: PLATFORM,
       timeoutMs: 10_000,
     });
   } catch (err) {
-    // Already a LetmepostError(platform_unavailable) from platformFetch —
-    // rewrap as preflight_failed because this is a user-supplied URL.
     throw new LetmepostError({
       code: "preflight_failed",
       status: 400,

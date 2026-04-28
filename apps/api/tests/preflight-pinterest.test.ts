@@ -8,7 +8,7 @@ import {
 } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { PINTEREST_IMAGE_MAX_BYTES } from "@letmepost/schemas";
+import { PINTEREST_IMAGE_MAX_BYTES, type MediaInput } from "@letmepost/schemas";
 import {
   assertPinterestUrlsReachable,
   validatePinterestInput,
@@ -27,18 +27,28 @@ afterAll(() => {
   server.close();
 });
 
+const imageItem: MediaInput = {
+  kind: "image",
+  url: "https://example.com/img.jpg",
+};
+
 function baseInput() {
   return {
     boardId: "board-123",
     destinationUrl: "https://example.com/product",
-    imageUrl: "https://example.com/img.jpg",
     text: "caption",
+    media: [imageItem],
   };
 }
 
 describe("validatePinterestInput — required fields", () => {
   it("accepts a fully specified input", () => {
     expect(() => validatePinterestInput(baseInput())).not.toThrow();
+  });
+
+  it("accepts input without an explicit destinationUrl", () => {
+    const { destinationUrl: _, ...rest } = baseInput();
+    expect(() => validatePinterestInput(rest)).not.toThrow();
   });
 
   it("rejects missing boardId with pinterest.board.required", () => {
@@ -51,25 +61,41 @@ describe("validatePinterestInput — required fields", () => {
     }
   });
 
-  it("rejects missing destinationUrl with pinterest.destination_url.required", () => {
+  it("rejects missing media with pinterest.media.required", () => {
     try {
-      validatePinterestInput({ ...baseInput(), destinationUrl: "" });
+      validatePinterestInput({ ...baseInput(), media: [] });
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(LetmepostError);
+      expect((err as LetmepostError).rule).toBe("pinterest.media.required");
+    }
+  });
+
+  it("rejects multi-media with pinterest.media.single_only", () => {
+    try {
+      validatePinterestInput({
+        ...baseInput(),
+        media: [imageItem, imageItem],
+      });
       throw new Error("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(LetmepostError);
       expect((err as LetmepostError).rule).toBe(
-        "pinterest.destination_url.required",
+        "pinterest.media.single_only",
       );
     }
   });
 
-  it("rejects missing imageUrl with pinterest.image_url.required", () => {
+  it("rejects video media with pinterest.media.image_only", () => {
     try {
-      validatePinterestInput({ ...baseInput(), imageUrl: "" });
+      validatePinterestInput({
+        ...baseInput(),
+        media: [{ kind: "video", url: "https://example.com/v.mp4" }],
+      });
       throw new Error("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(LetmepostError);
-      expect((err as LetmepostError).rule).toBe("pinterest.image_url.required");
+      expect((err as LetmepostError).rule).toBe("pinterest.media.image_only");
     }
   });
 
@@ -85,16 +111,6 @@ describe("validatePinterestInput — required fields", () => {
       expect((err as LetmepostError).rule).toBe(
         "pinterest.destination_url.http",
       );
-    }
-  });
-
-  it("rejects malformed imageUrl with image_url.http", () => {
-    try {
-      validatePinterestInput({ ...baseInput(), imageUrl: "not a url" });
-      throw new Error("should have thrown");
-    } catch (err) {
-      expect(err).toBeInstanceOf(LetmepostError);
-      expect((err as LetmepostError).rule).toBe("pinterest.image_url.http");
     }
   });
 });
@@ -118,6 +134,24 @@ describe("assertPinterestUrlsReachable", () => {
     await expect(
       assertPinterestUrlsReachable({
         destinationUrl: "https://example.com/product",
+        imageUrl: "https://example.com/img.jpg",
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("passes when no destinationUrl is provided", async () => {
+    server.use(
+      http.get(
+        "https://example.com/img.jpg",
+        () =>
+          new HttpResponse(null, {
+            status: 200,
+            headers: { "Content-Type": "image/jpeg" },
+          }),
+      ),
+    );
+    await expect(
+      assertPinterestUrlsReachable({
         imageUrl: "https://example.com/img.jpg",
       }),
     ).resolves.toBeUndefined();

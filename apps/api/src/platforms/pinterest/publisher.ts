@@ -1,5 +1,9 @@
 import type { CreatePostResponse } from "@letmepost/schemas";
 import { LetmepostError } from "../../errors.js";
+import {
+  resolveMediaToUrl,
+  type MediaResolverContext,
+} from "../_shared/media.js";
 import type { Publisher } from "../_shared/publisher.js";
 import { PinterestClient } from "./client.js";
 import {
@@ -11,7 +15,6 @@ import {
 /**
  * Credentials the Pinterest publisher needs. Token comes from the
  * platform_accounts.token column (decrypted at the repository boundary).
- * TODO(phase-11): handle proactive refresh when expiresAt is near.
  */
 export type PinterestCredentials = {
   /** Pinterest access token (OAuth 2.0 bearer). */
@@ -22,18 +25,35 @@ export type PinterestCredentials = {
 
 export const pinterestPublisher: Publisher<
   PinterestCredentials,
-  PinterestPublishInput
+  PinterestPublishInput & { mediaContext?: MediaResolverContext }
 > = {
   async publish(creds, input): Promise<CreatePostResponse> {
-    // Preflight (pure) before any network call.
+    // Pure preflight (board / media presence / kind) before any network.
     validatePinterestInput(input);
 
-    // URL reachability + mime / size preflight — requires network but still
-    // happens before we call Pinterest.
-    await assertPinterestUrlsReachable({
-      destinationUrl: input.destinationUrl,
-      imageUrl: input.imageUrl,
+    // Resolve the single media item to a public URL. mediaId → S3 URL,
+    // url → passthrough, bytesBase64 → preflight_failed (caller should hit
+    // /v1/media first). The resolver is the only place mediaId tenancy is
+    // enforced; rejected ids 404 here, never leak existence.
+    const mediaItem = input.media[0]!;
+    const resolved = await resolveMediaToUrl(mediaItem, {
+      platform: "pinterest",
+      reachableRule: "pinterest.media.reachable",
+      ...(input.mediaContext
+        ? {
+            db: input.mediaContext.db,
+            organizationId: input.mediaContext.organizationId,
+            profileId: input.mediaContext.profileId,
+          }
+        : {}),
     });
+
+    // URL reachability + mime / size preflight on the resolved URL.
+    const reachableArgs: Parameters<typeof assertPinterestUrlsReachable>[0] = {
+      imageUrl: resolved.url,
+    };
+    if (input.destinationUrl) reachableArgs.destinationUrl = input.destinationUrl;
+    await assertPinterestUrlsReachable(reachableArgs);
 
     const client = new PinterestClient(
       creds.accessToken,
@@ -42,8 +62,10 @@ export const pinterestPublisher: Publisher<
 
     const createArgs: Parameters<PinterestClient["createPin"]>[0] = {
       boardId: input.boardId,
-      destinationUrl: input.destinationUrl,
-      imageUrl: input.imageUrl,
+      // Pinterest's `link` is optional in v5 — fall back to the image URL so
+      // the pin still has a click destination instead of a dead pin.
+      destinationUrl: input.destinationUrl ?? resolved.url,
+      imageUrl: resolved.url,
     };
     if (input.title !== undefined) createArgs.title = input.title;
     if (input.text !== undefined) createArgs.description = input.text;

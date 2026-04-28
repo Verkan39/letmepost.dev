@@ -95,6 +95,20 @@ export const FirstComment = z.object({
 });
 export type FirstComment = z.infer<typeof FirstComment>;
 
+/**
+ * Per-post Pinterest extension — the documented escape hatch for callers
+ * who want to override the connected account's default board, set a
+ * specific click-through URL, or stamp a pin title. All fields optional;
+ * omit the whole object to publish to the account's `defaultBoardId` with
+ * the image URL as the click-through.
+ */
+export const PinterestPostOverrides = z.object({
+  boardId: z.string().min(1).optional(),
+  destinationUrl: z.string().url().optional(),
+  title: z.string().min(1).optional(),
+});
+export type PinterestPostOverrides = z.infer<typeof PinterestPostOverrides>;
+
 export const CreatePostRequest = z.object({
   account: AccountRef,
   text: z.string().min(1),
@@ -107,6 +121,8 @@ export const CreatePostRequest = z.object({
    * synchronously and returns 201.
    */
   scheduledAt: z.string().datetime().optional(),
+  /** Pinterest-specific overrides — board, destination URL, title. */
+  pinterest: PinterestPostOverrides.optional(),
 });
 export type CreatePostRequest = z.infer<typeof CreatePostRequest>;
 

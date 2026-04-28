@@ -12,7 +12,9 @@ import type {
 import { scopeSetFor } from "../_shared/scopes.js";
 import {
   exchangePinterestCode,
+  PINTEREST_API_BASE,
   PINTEREST_OAUTH_AUTHORIZE_URL,
+  PinterestClient,
   refreshPinterestToken,
   type PinterestTokenResponse,
 } from "./client.js";
@@ -44,6 +46,8 @@ export type PinterestProviderConfig = {
   authorizeUrl?: string;
   /** Override the token URL for tests. */
   tokenUrl?: string;
+  /** Override the API base — tests point at MSW. */
+  apiBase?: string;
 };
 
 const CompleteConnectInput = z.object({
@@ -58,6 +62,14 @@ export type PinterestTokenMetadata = {
   grantedScopes?: string[];
   authorizeUrl?: string;
   tokenUrl?: string;
+  /**
+   * Default board the publisher pins to when the request body doesn't pass
+   * `pinterest.boardId`. Seeded at connect-time from the user's first board;
+   * the dashboard lets the user change it via PATCH /v1/accounts/:id.
+   */
+  defaultBoardId?: string;
+  /** Friendly board name for the picker — kept in sync alongside the id. */
+  defaultBoardName?: string;
 };
 
 function computeRedirectUri(baseUrl: string): string {
@@ -151,14 +163,28 @@ export class PinterestProvider implements AccountProvider {
     if (this.config.tokenUrl) exchangeArgs.tokenUrl = this.config.tokenUrl;
     const tokens = await exchangePinterestCode(exchangeArgs);
 
+    // Pin a real Pinterest user as platformAccountId, and seed the default
+    // board so the publisher has somewhere to pin without per-post overrides.
+    // Both round-trips happen serially — Pinterest's rate limits are loose
+    // here and the alternative (parallel + retry on partial failure) adds
+    // complexity for no real benefit.
+    const apiBase = this.config.apiBase ?? PINTEREST_API_BASE;
+    const client = new PinterestClient(tokens.access_token, apiBase);
+    const userAccount = await client.getUserAccount();
+    const boards = await client.listBoards({ pageSize: 25 });
+
+    const metadata = toMetadata(tokens, this.config);
+    const firstBoard = boards[0];
+    if (firstBoard) {
+      metadata.defaultBoardId = firstBoard.id;
+      metadata.defaultBoardName = firstBoard.name;
+    }
+
     return {
-      // TODO(phase-11): call `GET /v5/user_account` to resolve the real
-      // Pinterest user id + username. Synthetic id keeps the unique index
-      // stable per-org until then.
-      platformAccountId: `pinterest-${randomUUID()}`,
-      displayName: null,
+      platformAccountId: userAccount.id,
+      displayName: userAccount.username,
       token: tokens.access_token,
-      tokenMetadata: toMetadata(tokens, this.config),
+      tokenMetadata: metadata,
       tokenExpiresAt: expiresAtFrom(tokens),
     };
   }

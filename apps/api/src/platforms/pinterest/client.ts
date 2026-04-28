@@ -47,6 +47,27 @@ export interface PinterestPin {
   link: string | null;
 }
 
+/** Subset of /v5/user_account we read at connect-time. */
+export interface PinterestUserAccount {
+  /** Stable account id — Pinterest also exposes `username` (mutable). */
+  id: string;
+  username: string;
+  account_type?: string;
+  profile_image?: string;
+}
+
+/** Subset of /v5/boards items we care about — id + name only. */
+export interface PinterestBoardSummary {
+  id: string;
+  name: string;
+  privacy?: "PUBLIC" | "PROTECTED" | "SECRET";
+}
+
+interface PinterestBoardsListResponse {
+  items: PinterestBoardSummary[];
+  bookmark?: string | null;
+}
+
 export class PinterestClient {
   constructor(
     private readonly accessToken: string,
@@ -148,6 +169,61 @@ export class PinterestClient {
       platformResponse: res.body ?? res.raw ?? undefined,
       ...(upstreamMessage !== undefined ? { upstreamMessage } : {}),
     });
+  }
+
+  /**
+   * GET /v5/user_account — used at connect-time to pin a real, stable
+   * platform_account_id (and a friendly displayName) instead of the
+   * synthetic `pinterest-${uuid}` placeholder.
+   */
+  async getUserAccount(): Promise<PinterestUserAccount> {
+    const res = await platformFetch<PinterestUserAccount>({
+      method: "GET",
+      url: `${this.apiBase}/user_account`,
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      platform: PLATFORM,
+    });
+    if (!res.ok || !res.body) {
+      throw rejected({
+        platform: PLATFORM,
+        platformResponse: res.body ?? res.raw ?? undefined,
+        upstreamMessage:
+          extractUpstreamMessage(res.body) ??
+          "Pinterest /v5/user_account did not return a user.",
+      });
+    }
+    return res.body;
+  }
+
+  /**
+   * GET /v5/boards — first page only (Pinterest paginates with `bookmark`,
+   * but the connect flow only needs the first page to seed `defaultBoardId`).
+   * Dashboard refreshes call this directly via a v1 endpoint.
+   */
+  async listBoards(opts: {
+    pageSize?: number;
+  } = {}): Promise<PinterestBoardSummary[]> {
+    const url = new URL(`${this.apiBase}/boards`);
+    url.searchParams.set(
+      "page_size",
+      String(Math.min(Math.max(opts.pageSize ?? 25, 1), 250)),
+    );
+    const res = await platformFetch<PinterestBoardsListResponse>({
+      method: "GET",
+      url: url.toString(),
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      platform: PLATFORM,
+    });
+    if (!res.ok || !res.body) {
+      throw rejected({
+        platform: PLATFORM,
+        platformResponse: res.body ?? res.raw ?? undefined,
+        upstreamMessage:
+          extractUpstreamMessage(res.body) ??
+          "Pinterest /v5/boards did not return a list.",
+      });
+    }
+    return res.body.items ?? [];
   }
 }
 

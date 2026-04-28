@@ -141,6 +141,94 @@ function withAlt(
   return altText !== undefined ? { ...base, altText } : base;
 }
 
+/**
+ * Like `loadMediaItem`, but returns only the resolved public URL — no byte
+ * fetch. For platforms that pass a URL upstream rather than uploading bytes
+ * (Pinterest, Meta image / Reels source).
+ *
+ *   - mediaId      → load row, build URL from `s3Key`. mimeType comes from
+ *                    the row's `contentType` so per-platform mime preflight
+ *                    is honest without a HEAD round-trip.
+ *   - url          → passthrough; mimeType undefined (caller's preflight
+ *                    HEADs the URL if it needs to know).
+ *   - bytesBase64  → preflight_failed: bytes-inline doesn't make sense for
+ *                    URL-consuming platforms. Direct callers to /v1/media.
+ */
+export type ResolvedMediaUrl = {
+  kind: "image" | "video";
+  url: string;
+  /** Known when the source was a `mediaId` (we control the row); undefined for raw URL. */
+  mimeType?: string;
+  altText?: string;
+};
+
+export async function resolveMediaToUrl(
+  item: MediaInput,
+  opts: LoadMediaOptions = {},
+): Promise<ResolvedMediaUrl> {
+  if (item.mediaId) {
+    if (!opts.db || !opts.organizationId || !opts.profileId) {
+      throw new LetmepostError({
+        code: "internal_error",
+        status: 500,
+        message:
+          "Media resolver called without db/organizationId/profileId for a mediaId-shaped input.",
+        ...(opts.platform ? { platform: opts.platform } : {}),
+      });
+    }
+    const repo = new DrizzleMediaRepository(opts.db);
+    const row = await repo.findByIdScoped({
+      organizationId: opts.organizationId,
+      profileId: opts.profileId,
+      id: item.mediaId,
+    });
+    if (!row) {
+      throw new LetmepostError({
+        code: "not_found",
+        status: 404,
+        message: "Media not found.",
+        rule: "media.unknown",
+        ...(opts.platform ? { platform: opts.platform } : {}),
+      });
+    }
+    return withUrlAlt(
+      {
+        kind: item.kind,
+        url: buildPublicUrl({
+          publicBaseUrl: getPublicBaseUrl(),
+          s3Key: row.s3Key,
+        }),
+        mimeType: row.contentType,
+      },
+      item.altText,
+    );
+  }
+
+  if (item.url) {
+    return withUrlAlt({ kind: item.kind, url: item.url }, item.altText);
+  }
+
+  // bytesBase64 — not supportable for URL-consumers. Fail loudly with a
+  // remediation pointing at /v1/media so the user knows the right path.
+  throw new LetmepostError({
+    code: "preflight_failed",
+    status: 400,
+    message:
+      "Inline bytesBase64 isn't accepted on URL-consuming platforms (e.g. Pinterest).",
+    rule: "media.bytes_inline_unsupported",
+    ...(opts.platform ? { platform: opts.platform } : {}),
+    remediation:
+      "Upload via POST /v1/media first, then reference the returned id as { kind, mediaId }.",
+  });
+}
+
+function withUrlAlt(
+  base: Omit<ResolvedMediaUrl, "altText">,
+  altText: string | undefined,
+): ResolvedMediaUrl {
+  return altText !== undefined ? { ...base, altText } : base;
+}
+
 async function loadFromMediaId(
   item: MediaInput,
   opts: LoadMediaOptions,

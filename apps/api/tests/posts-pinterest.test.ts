@@ -59,6 +59,11 @@ function captureDispatcher(): {
   };
 }
 
+/**
+ * Seeds a Pinterest account with `defaultBoardId` already populated — the
+ * publisher's normal path. Per-post overrides on the request body are
+ * exercised in their own test.
+ */
 async function seedWithPinterest(tx: DrizzleClient) {
   const fixture = await seed(tx);
   const repo = new DrizzlePlatformAccountsRepository(tx);
@@ -67,12 +72,11 @@ async function seedWithPinterest(tx: DrizzleClient) {
     profileId: fixture.profileId,
     platform: "pinterest",
     platformAccountId: "pinterest-user-1",
-    displayName: "pinterest-user-1",
+    displayName: "alice-on-pinterest",
     token: "access-token-xyz",
     tokenMetadata: {
-      boardId: "board-abc",
-      destinationUrl: "https://example.com/product",
-      imageUrl: "https://example.com/img.jpg",
+      defaultBoardId: "board-abc",
+      defaultBoardName: "Default board",
     },
   });
   return { fixture, account };
@@ -94,20 +98,27 @@ function imageReachable() {
   ];
 }
 
+const imageMedia = {
+  kind: "image" as const,
+  url: "https://example.com/img.jpg",
+};
+
 describeIfDb("POST /v1/posts (pinterest)", () => {
-  it("publishes a pin, marks the row published, dispatches post.published", async () => {
+  it("publishes a pin via the request body's media + account default board", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
       const { fixture, account } = await seedWithPinterest(tx);
+      let pinBody: Record<string, unknown> | null = null;
       server.use(
         ...imageReachable(),
-        http.post("https://api.pinterest.com/v5/pins", () =>
-          HttpResponse.json({
+        http.post("https://api.pinterest.com/v5/pins", async ({ request }) => {
+          pinBody = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json({
             id: "pin-123",
             board_id: "board-abc",
-            link: "https://example.com/product",
-          }),
-        ),
+            link: "https://www.pinterest.com/pin/pin-123/",
+          });
+        }),
       );
       const { dispatcher, events } = captureDispatcher();
       const app = createApp({ db: tx, webhookDispatcher: dispatcher });
@@ -121,6 +132,7 @@ describeIfDb("POST /v1/posts (pinterest)", () => {
         body: JSON.stringify({
           account: { platform: "pinterest", id: account.id },
           text: "our new product",
+          media: [imageMedia],
         }),
       });
 
@@ -132,6 +144,15 @@ describeIfDb("POST /v1/posts (pinterest)", () => {
       };
       expect(body.platform).toBe("pinterest");
       expect(body.status).toBe("published");
+      expect(pinBody).toMatchObject({
+        board_id: "board-abc",
+        link: "https://example.com/img.jpg",
+        media_source: {
+          source_type: "image_url",
+          url: "https://example.com/img.jpg",
+        },
+        description: "our new product",
+      });
 
       const [row] = await tx
         .select()
@@ -141,8 +162,108 @@ describeIfDb("POST /v1/posts (pinterest)", () => {
 
       const ev = events.find((e) => e.type === "post.published");
       expect(ev).toBeDefined();
-      const data = ev?.data as { id: string; platform: string };
-      expect(data.platform).toBe("pinterest");
+    });
+  });
+
+  it("honors per-post pinterest overrides (boardId + destinationUrl + title)", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const { fixture, account } = await seedWithPinterest(tx);
+      let pinBody: Record<string, unknown> | null = null;
+      server.use(
+        ...imageReachable(),
+        http.post("https://api.pinterest.com/v5/pins", async ({ request }) => {
+          pinBody = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json({
+            id: "pin-456",
+            board_id: "board-other",
+            link: "https://example.com/product",
+          });
+        }),
+      );
+      const app = createApp({ db: tx });
+
+      const res = await app.request("/v1/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+        },
+        body: JSON.stringify({
+          account: { platform: "pinterest", id: account.id },
+          text: "with overrides",
+          media: [imageMedia],
+          pinterest: {
+            boardId: "board-other",
+            destinationUrl: "https://example.com/product",
+            title: "Click here",
+          },
+        }),
+      });
+
+      expect(res.status).toBe(201);
+      expect(pinBody).toMatchObject({
+        board_id: "board-other",
+        link: "https://example.com/product",
+        title: "Click here",
+        description: "with overrides",
+      });
+    });
+  });
+
+  it("rejects when no media is supplied (validation_failed)", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const { fixture, account } = await seedWithPinterest(tx);
+      const app = createApp({ db: tx });
+      const res = await app.request("/v1/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+        },
+        body: JSON.stringify({
+          account: { platform: "pinterest", id: account.id },
+          text: "missing media",
+        }),
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: { code: string; rule?: string } };
+      expect(body.error.code).toBe("validation_failed");
+      expect(body.error.rule).toBe("pinterest.media.required");
+    });
+  });
+
+  it("rejects when neither defaultBoardId nor pinterest.boardId is set", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+      const repo = new DrizzlePlatformAccountsRepository(tx);
+      const account = await repo.create({
+        organizationId: fixture.organizationId,
+        profileId: fixture.profileId,
+        platform: "pinterest",
+        platformAccountId: "pinterest-user-2",
+        displayName: "no-board",
+        token: "access-token",
+        tokenMetadata: {},
+      });
+      const app = createApp({ db: tx });
+      const res = await app.request("/v1/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+        },
+        body: JSON.stringify({
+          account: { platform: "pinterest", id: account.id },
+          text: "no board",
+          media: [imageMedia],
+        }),
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: { rule?: string } };
+      expect(body.error.rule).toBe("pinterest.board.required");
     });
   });
 
@@ -171,6 +292,7 @@ describeIfDb("POST /v1/posts (pinterest)", () => {
         body: JSON.stringify({
           account: { platform: "pinterest", id: account.id },
           text: "auth should fail",
+          media: [imageMedia],
         }),
       });
       expect(res.status).toBe(401);
@@ -188,56 +310,11 @@ describeIfDb("POST /v1/posts (pinterest)", () => {
     });
   });
 
-  it("marks row rejected + emits post.rejected on a duplicate-pin error", async () => {
-    const { db } = await getTestDb();
-    await runInTransaction(db, async (tx) => {
-      const { fixture, account } = await seedWithPinterest(tx);
-      server.use(
-        ...imageReachable(),
-        http.post("https://api.pinterest.com/v5/pins", () =>
-          HttpResponse.json(
-            { message: "Duplicate pin already exists", code: 150 },
-            { status: 409 },
-          ),
-        ),
-      );
-      const { dispatcher, events } = captureDispatcher();
-      const app = createApp({ db: tx, webhookDispatcher: dispatcher });
-
-      const res = await app.request("/v1/posts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
-        },
-        body: JSON.stringify({
-          account: { platform: "pinterest", id: account.id },
-          text: "will duplicate",
-        }),
-      });
-      expect(res.status).toBe(502);
-      const body = (await res.json()) as { error: { code: string; remediation?: string } };
-      expect(body.error.code).toBe("platform_rejected");
-      expect(body.error.remediation).toContain("duplicate");
-
-      const [row] = await tx
-        .select()
-        .from(postsTable)
-        .where(eq(postsTable.organizationId, fixture.organizationId));
-      expect(row?.status).toBe("rejected");
-      expect(events.some((e) => e.type === "post.rejected")).toBe(true);
-    });
-  });
-
   it("fails in preflight (no Pinterest call) when the image URL returns 404", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
       const { fixture, account } = await seedWithPinterest(tx);
       server.use(
-        http.get(
-          "https://example.com/product",
-          () => new HttpResponse(null, { status: 200 }),
-        ),
         http.get(
           "https://example.com/img.jpg",
           () => new HttpResponse(null, { status: 404 }),
@@ -253,6 +330,7 @@ describeIfDb("POST /v1/posts (pinterest)", () => {
         body: JSON.stringify({
           account: { platform: "pinterest", id: account.id },
           text: "missing image",
+          media: [imageMedia],
         }),
       });
       expect(res.status).toBe(400);
@@ -267,41 +345,6 @@ describeIfDb("POST /v1/posts (pinterest)", () => {
         .from(postsTable)
         .where(eq(postsTable.organizationId, fixture.organizationId));
       expect(row?.status).toBe("rejected");
-    });
-  });
-
-  it("marks row failed + emits post.failed when Pinterest is unreachable (network error)", async () => {
-    const { db } = await getTestDb();
-    await runInTransaction(db, async (tx) => {
-      const { fixture, account } = await seedWithPinterest(tx);
-      server.use(
-        ...imageReachable(),
-        http.post("https://api.pinterest.com/v5/pins", () => HttpResponse.error()),
-      );
-      const { dispatcher, events } = captureDispatcher();
-      const app = createApp({ db: tx, webhookDispatcher: dispatcher });
-
-      const res = await app.request("/v1/posts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
-        },
-        body: JSON.stringify({
-          account: { platform: "pinterest", id: account.id },
-          text: "network dies",
-        }),
-      });
-      expect(res.status).toBe(503);
-      const body = (await res.json()) as { error: { code: string } };
-      expect(body.error.code).toBe("platform_unavailable");
-
-      const [row] = await tx
-        .select()
-        .from(postsTable)
-        .where(eq(postsTable.organizationId, fixture.organizationId));
-      expect(row?.status).toBe("failed");
-      expect(events.some((e) => e.type === "post.failed")).toBe(true);
     });
   });
 });

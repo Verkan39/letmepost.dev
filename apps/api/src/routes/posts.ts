@@ -78,6 +78,7 @@ posts.post(
       media,
       firstComment,
       scheduledAt,
+      pinterest,
     } = c.req.valid("json");
     const { organizationId } = c.var.apiKey;
     const repo = new DrizzlePlatformAccountsRepository(c.var.db);
@@ -206,6 +207,7 @@ posts.post(
         text,
         ...(media !== undefined ? { media } : {}),
         ...(firstComment !== undefined ? { firstComment } : {}),
+        ...(pinterest !== undefined ? { pinterest } : {}),
         mediaContext: {
           db: c.var.db,
           organizationId,

@@ -16,6 +16,39 @@ afterAll(() => {
 
 const AUTHORIZE_URL = "https://test.example/pinterest/authorize";
 const TOKEN_URL = "https://test.example/pinterest/token";
+const API_BASE = "https://test.example/pinterest/v5";
+
+function userAccountHandler() {
+  return http.get(`${API_BASE}/user_account`, () =>
+    HttpResponse.json({
+      id: "pinterest-user-987",
+      username: "alice",
+      account_type: "BUSINESS",
+    }),
+  );
+}
+
+function boardsHandler(items: { id: string; name: string }[]) {
+  return http.get(`${API_BASE}/boards`, () =>
+    HttpResponse.json({ items }),
+  );
+}
+
+function tokenExchangeHandler() {
+  return http.post(TOKEN_URL, async ({ request }) => {
+    const form = new URLSearchParams(await request.text());
+    expect(form.get("grant_type")).toBe("authorization_code");
+    expect(form.get("code")).toBe("auth-code-xyz");
+    return HttpResponse.json({
+      access_token: "access-token-abc",
+      refresh_token: "refresh-token-def",
+      token_type: "Bearer",
+      expires_in: 2_592_000,
+      refresh_token_expires_in: 5_184_000,
+      scope: "boards:read pins:read pins:write",
+    });
+  });
+}
 
 describe("PinterestProvider", () => {
   it("describeConnect returns an oauth descriptor with narrow-by-default scopes and a computed redirectUri", () => {
@@ -43,46 +76,71 @@ describe("PinterestProvider", () => {
     expect(descriptor.codeVerifier).toBeUndefined();
   });
 
-  it("completeConnect exchanges a code for an access + refresh token and packs metadata", async () => {
+  it("completeConnect uses the real Pinterest user id + seeds defaultBoardId from /v5/boards", async () => {
     server.use(
-      http.post(TOKEN_URL, async ({ request }) => {
-        const form = new URLSearchParams(await request.text());
-        expect(form.get("grant_type")).toBe("authorization_code");
-        expect(form.get("code")).toBe("auth-code-xyz");
-        return HttpResponse.json({
-          access_token: "access-token-abc",
-          refresh_token: "refresh-token-def",
-          token_type: "Bearer",
-          expires_in: 2_592_000,
-          refresh_token_expires_in: 5_184_000,
-          scope: "boards:read pins:read pins:write",
-        });
-      }),
+      tokenExchangeHandler(),
+      userAccountHandler(),
+      boardsHandler([
+        { id: "board-first", name: "Pins to share" },
+        { id: "board-second", name: "Inspo" },
+      ]),
     );
     const p = new PinterestProvider({
       clientId: "cid",
       clientSecret: "cs",
       tokenUrl: TOKEN_URL,
+      apiBase: API_BASE,
     });
     const account = await p.completeConnect(
       { organizationId: "o", baseUrl: "https://api.letmepost.dev" },
       {
         code: "auth-code-xyz",
         state: "s",
-        redirectUri: "https://api.letmepost.dev/v1/accounts/oauth/pinterest/callback",
+        redirectUri:
+          "https://api.letmepost.dev/v1/accounts/oauth/pinterest/callback",
       },
     );
     expect(account.token).toBe("access-token-abc");
+    expect(account.platformAccountId).toBe("pinterest-user-987");
+    expect(account.displayName).toBe("alice");
     expect(account.tokenMetadata).toMatchObject({
       refreshToken: "refresh-token-def",
       grantedScopes: ["boards:read", "pins:read", "pins:write"],
+      defaultBoardId: "board-first",
+      defaultBoardName: "Pins to share",
     });
     expect(account.tokenExpiresAt).toBeInstanceOf(Date);
-    expect(account.platformAccountId).toMatch(/^pinterest-/);
+  });
+
+  it("completeConnect succeeds without a defaultBoardId when the user has no boards yet", async () => {
+    server.use(
+      tokenExchangeHandler(),
+      userAccountHandler(),
+      boardsHandler([]),
+    );
+    const p = new PinterestProvider({
+      clientId: "cid",
+      clientSecret: "cs",
+      tokenUrl: TOKEN_URL,
+      apiBase: API_BASE,
+    });
+    const account = await p.completeConnect(
+      { organizationId: "o", baseUrl: "https://api.letmepost.dev" },
+      {
+        code: "auth-code-xyz",
+        state: "s",
+        redirectUri:
+          "https://api.letmepost.dev/v1/accounts/oauth/pinterest/callback",
+      },
+    );
+    expect(account.platformAccountId).toBe("pinterest-user-987");
+    expect(
+      (account.tokenMetadata as Record<string, unknown> | null)?.defaultBoardId,
+    ).toBeUndefined();
   });
 
   it("completeConnect surfaces zod validation errors as validation_failed", async () => {
-    const p = new PinterestProvider({ tokenUrl: TOKEN_URL });
+    const p = new PinterestProvider({ tokenUrl: TOKEN_URL, apiBase: API_BASE });
     await expect(
       p.completeConnect(
         { organizationId: "o", baseUrl: "https://x.example" },

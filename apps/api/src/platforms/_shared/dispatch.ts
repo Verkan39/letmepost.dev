@@ -1,9 +1,13 @@
-import type { CreatePostResponse } from "@letmepost/schemas";
+import type {
+  CreatePostResponse,
+  PinterestPostOverrides,
+} from "@letmepost/schemas";
 import { LetmepostError } from "../../errors.js";
 import type { DecryptedPlatformAccount } from "../../repositories/platform-accounts.js";
 import { blueskyPublisher } from "../bluesky/publisher.js";
 import { linkedinPublisher } from "../linkedin/publisher.js";
 import { pinterestPublisher } from "../pinterest/publisher.js";
+import type { PinterestTokenMetadata } from "../pinterest/provider.js";
 import { twitterPublisher } from "../twitter/publisher.js";
 import type { MediaResolverContext } from "./media.js";
 
@@ -33,6 +37,8 @@ export type PublishInput = {
    * media item references a mediaId; URL / bytesBase64 paths ignore it.
    */
   mediaContext?: MediaResolverContext;
+  /** Pinterest-specific per-post overrides (board, destination URL, title). */
+  pinterest?: PinterestPostOverrides;
 };
 
 export async function publishForAccount(
@@ -82,31 +88,46 @@ export async function publishForAccount(
         },
       );
     case "pinterest": {
-      const meta = (account.tokenMetadata ?? {}) as Record<string, unknown>;
-      const boardId = pickString(meta.boardId) ?? pickString(meta.board_id);
-      const destinationUrl =
-        pickString(meta.destinationUrl) ?? pickString(meta.destination_url);
-      const imageUrl =
-        pickString(meta.imageUrl) ?? pickString(meta.image_url);
-      if (!boardId || !destinationUrl || !imageUrl) {
+      const meta = (account.tokenMetadata ?? {}) as PinterestTokenMetadata;
+      const boardId = input.pinterest?.boardId ?? meta.defaultBoardId;
+      if (!boardId) {
         throw new LetmepostError({
           code: "validation_failed",
           status: 400,
           platform: "pinterest",
           message:
-            "Pinterest posts need boardId, destinationUrl, and imageUrl set on the account metadata (MVP).",
-          rule: "pinterest.account_metadata.required",
+            "Pinterest posts need a board — none configured on the account and none on the request.",
+          rule: "pinterest.board.required",
           remediation:
-            "Populate boardId/destinationUrl/imageUrl on platformAccount.tokenMetadata, or wait for the Phase 11 per-post media slice.",
+            "Set a default board on the connected Pinterest account, or pass `pinterest: { boardId }` on the request body.",
+        });
+      }
+      if (!input.media || input.media.length === 0) {
+        throw new LetmepostError({
+          code: "validation_failed",
+          status: 400,
+          platform: "pinterest",
+          message: "Pinterest posts require a media item.",
+          rule: "pinterest.media.required",
+          remediation:
+            "Pass `media: [{ kind: \"image\", url | mediaId }]` on the request body.",
         });
       }
       return pinterestPublisher.publish(
         { accessToken: account.token },
         {
           boardId,
-          destinationUrl,
-          imageUrl,
+          media: input.media,
           ...(input.text !== undefined ? { text: input.text } : {}),
+          ...(input.pinterest?.destinationUrl !== undefined
+            ? { destinationUrl: input.pinterest.destinationUrl }
+            : {}),
+          ...(input.pinterest?.title !== undefined
+            ? { title: input.pinterest.title }
+            : {}),
+          ...(input.mediaContext !== undefined
+            ? { mediaContext: input.mediaContext }
+            : {}),
         },
       );
     }
@@ -117,8 +138,4 @@ export async function publishForAccount(
         message: `Unknown platform: ${account.platform}.`,
       });
   }
-}
-
-function pickString(v: unknown): string | undefined {
-  return typeof v === "string" && v.length > 0 ? v : undefined;
 }

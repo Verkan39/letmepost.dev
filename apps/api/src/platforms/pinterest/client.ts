@@ -11,11 +11,22 @@ const PLATFORM = "pinterest";
 /**
  * Pinterest API v5 hosts.
  *   - Production:  https://api.pinterest.com/v5
- *   - Sandbox:     https://api-sandbox.pinterest.com/v5  (unused in MVP)
+ *   - Sandbox:     https://api-sandbox.pinterest.com/v5
+ *
+ * Pinterest's Trial Access tier (every app pre-Standard-Access approval)
+ * REJECTS pin creation on the production host with a hard 400/code-29
+ * error pointing at the sandbox. Setting PINTEREST_API_BASE to the sandbox
+ * URL routes every /v5/* call there during the trial window; clear it
+ * after approval to flip back to production. The OAuth authorize URL
+ * stays on `pinterest.com` — that one isn't sandboxed.
+ *
+ * The token-exchange endpoint lives under the same base because the v5
+ * spec collocates it with the resource API; we derive it from the base so
+ * a single env var swaps everything.
  */
-export const PINTEREST_API_BASE = "https://api.pinterest.com/v5";
-export const PINTEREST_OAUTH_TOKEN_URL =
-  "https://api.pinterest.com/v5/oauth/token";
+export const PINTEREST_API_BASE =
+  process.env.PINTEREST_API_BASE ?? "https://api.pinterest.com/v5";
+export const PINTEREST_OAUTH_TOKEN_URL = `${PINTEREST_API_BASE}/oauth/token`;
 export const PINTEREST_OAUTH_AUTHORIZE_URL =
   "https://www.pinterest.com/oauth/";
 

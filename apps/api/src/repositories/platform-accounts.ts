@@ -59,6 +59,14 @@ export interface PlatformAccountsRepository {
     id: string,
     input: UpdatePlatformTokenInput,
   ): Promise<DecryptedPlatformAccount>;
+  /**
+   * Patch tokenMetadata WITHOUT rotating the token. Caller-supplied keys
+   * are merged with the existing metadata; pass `null` to clear a key.
+   */
+  updateMetadata(
+    id: string,
+    patch: Record<string, unknown>,
+  ): Promise<DecryptedPlatformAccount>;
 }
 
 function hydrate(row: PlatformAccountRow): DecryptedPlatformAccount {
@@ -158,6 +166,38 @@ export class DrizzlePlatformAccountsRepository
       .where(eq(platformAccounts.id, id))
       .returning();
     return rows.length > 0;
+  }
+
+  async updateMetadata(
+    id: string,
+    patch: Record<string, unknown>,
+  ): Promise<DecryptedPlatformAccount> {
+    const [existing] = await this.db
+      .select({ tokenMetadata: platformAccounts.tokenMetadata })
+      .from(platformAccounts)
+      .where(eq(platformAccounts.id, id))
+      .limit(1);
+    if (!existing) {
+      throw new Error(`platformAccounts.updateMetadata: no account with id=${id}`);
+    }
+    const current = (existing.tokenMetadata ?? {}) as Record<string, unknown>;
+    const merged: Record<string, unknown> = { ...current };
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null) {
+        delete merged[key];
+      } else {
+        merged[key] = value;
+      }
+    }
+    const [row] = await this.db
+      .update(platformAccounts)
+      .set({ tokenMetadata: merged })
+      .where(eq(platformAccounts.id, id))
+      .returning();
+    if (!row) {
+      throw new Error(`platformAccounts.updateMetadata: no account with id=${id}`);
+    }
+    return hydrate(row);
   }
 
   async updateToken(

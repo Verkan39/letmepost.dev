@@ -9,6 +9,8 @@ export const queryKeys = {
   },
   accounts: {
     list: () => ["accounts"] as const,
+    pinterestBoards: (accountId: string) =>
+      ["accounts", accountId, "pinterest", "boards"] as const,
   },
   apiKeys: {
     list: () => ["apiKeys"] as const,

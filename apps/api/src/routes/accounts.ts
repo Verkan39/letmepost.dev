@@ -11,6 +11,8 @@ import { rateLimit } from "../middleware/rate-limit.js";
 import { requireSession } from "../middleware/session.js";
 import { decodeOAuthState, encodeOAuthState } from "../oauth/state.js";
 import { getProvider } from "../platforms/index.js";
+import { PinterestClient } from "../platforms/pinterest/client.js";
+import type { PinterestTokenMetadata } from "../platforms/pinterest/provider.js";
 import { computeRefreshDelayMs } from "../platforms/_shared/refresh.js";
 import { DrizzlePlatformAccountsRepository } from "../repositories/platform-accounts.js";
 import { DrizzleProfilesRepository } from "../repositories/profiles.js";
@@ -301,6 +303,75 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
   });
 
   /**
+   * GET /v1/accounts/:id/pinterest/boards — proxy to /v5/boards using the
+   * stored token. Used by the dashboard's default-board picker so the user
+   * can see their actual boards (not just the first one Pinterest happened
+   * to return at connect time).
+   */
+  app.get("/:id/pinterest/boards", dual, async (c) => {
+    const account = await loadPinterestAccount(c);
+    const client = new PinterestClient(account.token);
+    const boards = await client.listBoards({ pageSize: 100 });
+    return c.json({
+      data: boards.map((b) => ({
+        id: b.id,
+        name: b.name,
+        privacy: b.privacy ?? null,
+      })),
+      defaultBoardId:
+        ((account.tokenMetadata ?? {}) as PinterestTokenMetadata)
+          .defaultBoardId ?? null,
+    });
+  });
+
+  /**
+   * PATCH /v1/accounts/:id/pinterest/default-board — change which board
+   * publishes consume when the request body omits `pinterest.boardId`.
+   * Validates the board belongs to the user before persisting (so we don't
+   * silently store a board id that 403s on next publish).
+   */
+  const PinterestDefaultBoardBody = z.object({
+    boardId: z.string().min(1),
+  });
+  app.patch("/:id/pinterest/default-board", dual, async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const parsed = PinterestDefaultBoardBody.safeParse(body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      throw new LetmepostError({
+        code: "validation_failed",
+        status: 400,
+        message: issue?.message ?? "Invalid body.",
+        rule: issue?.path.join(".") || "body",
+      });
+    }
+    const account = await loadPinterestAccount(c);
+    const client = new PinterestClient(account.token);
+    const boards = await client.listBoards({ pageSize: 100 });
+    const match = boards.find((b) => b.id === parsed.data.boardId);
+    if (!match) {
+      throw new LetmepostError({
+        code: "not_found",
+        status: 404,
+        message: "Board not found on this Pinterest account.",
+        rule: "pinterest.board.unknown",
+        platform: "pinterest",
+      });
+    }
+    const repo = new DrizzlePlatformAccountsRepository(c.var.db);
+    const updated = await repo.updateMetadata(account.id, {
+      defaultBoardId: match.id,
+      defaultBoardName: match.name,
+    });
+    const meta = (updated.tokenMetadata ?? {}) as PinterestTokenMetadata;
+    return c.json({
+      id: updated.id,
+      defaultBoardId: meta.defaultBoardId ?? null,
+      defaultBoardName: meta.defaultBoardName ?? null,
+    });
+  });
+
+  /**
    * GET /v1/accounts/oauth/:platform/callback — the OAuth provider's
    * redirect target. Anonymous (no auth middleware): the org/profile
    * context comes from the signed `state` query param that we minted in
@@ -428,6 +499,43 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
       return redirect(`connected=${platform}`);
     },
   );
+
+  /**
+   * Resolve a Pinterest account scoped to the caller's org. Used by the
+   * default-board endpoints to keep the path-id → account hydration in
+   * one place. Returns the decrypted account so the caller can hand the
+   * token to a PinterestClient.
+   */
+  async function loadPinterestAccount(c: import("hono").Context) {
+    const id = c.req.param("id");
+    if (!id) {
+      throw new LetmepostError({
+        code: "validation_failed",
+        status: 400,
+        message: "Account id missing from URL.",
+        rule: "id",
+      });
+    }
+    const { organizationId } = c.var.apiKey;
+    const repo = new DrizzlePlatformAccountsRepository(c.var.db);
+    const account = await repo.findById(id);
+    if (!account || account.organizationId !== organizationId) {
+      throw new LetmepostError({
+        code: "not_found",
+        status: 404,
+        message: "Platform account not found.",
+      });
+    }
+    if (account.platform !== "pinterest") {
+      throw new LetmepostError({
+        code: "validation_failed",
+        status: 400,
+        message: "This endpoint is Pinterest-only.",
+        rule: "platform.mismatch",
+      });
+    }
+    return account;
+  }
 
   return app;
 }

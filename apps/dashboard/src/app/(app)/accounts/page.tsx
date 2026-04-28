@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { ConnectAccountDrawer } from "@/components/app/connect-account-drawer";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
+import { PinterestDefaultBoard } from "@/components/app/pinterest-default-board";
 
 export default function AccountsListPage() {
   const queryClient = useQueryClient();
@@ -164,27 +165,32 @@ export default function AccountsListPage() {
                   />
                 </button>
               </CardHeader>
-              <CardContent className="flex items-center justify-between gap-2">
-                <ExpiryLine acc={acc} />
-                <div className="flex items-center gap-1 shrink-0">
-                  {needsReconnect(acc) ? (
+              <CardContent className="space-y-3">
+                {acc.platform === "pinterest" ? (
+                  <PinterestDefaultBoard accountId={acc.id} />
+                ) : null}
+                <div className="flex items-center justify-between gap-2">
+                  <ExpiryLine acc={acc} />
+                  <div className="flex items-center gap-1 shrink-0">
+                    {needsReconnect(acc) ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setConnectOpen(true)}
+                      >
+                        <Plug className="size-4" />
+                        Reconnect
+                      </Button>
+                    ) : null}
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      onClick={() => setConnectOpen(true)}
+                      onClick={() => setPendingDisconnect(acc)}
                     >
-                      <Plug className="size-4" />
-                      Reconnect
+                      <Trash className="size-4" />
+                      Disconnect
                     </Button>
-                  ) : null}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setPendingDisconnect(acc)}
-                  >
-                    <Trash className="size-4" />
-                    Disconnect
-                  </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

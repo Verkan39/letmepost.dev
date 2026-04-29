@@ -101,11 +101,11 @@ dataDeletion.post("/meta", async (c) => {
     .delete(platformAccounts)
     .where(
       and(
-        inArray(platformAccounts.platform, META_PLATFORMS as unknown as string[]),
+        inArray(platformAccounts.platform, META_PLATFORMS),
         eq(platformAccounts.platformAccountId, payload.user_id),
       ),
     )
-    .returning({ id: platformAccounts.id });
+    .returning();
 
   console.log(
     `[data-deletion/meta] user_id=${payload.user_id} removed=${removed.length} code=${confirmationCode}`,

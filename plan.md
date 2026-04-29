@@ -2,7 +2,7 @@
 
 ## Context
 
-**Status (April 2026):** Phases 1–5.5 landed; **Phase 6 LinkedIn MVP shipped** (personal-account text UGC + 3,000-grapheme preflight + URN validation + version-pinning client) with MDP-gated org/Company-Page posting deferred; **Phase 7 dashboard substantially complete** — sign-in/up, /onboarding silent recovery, 3-step accordion onboarding (API key + connect platform + send first post) with auto-advance + step-locking, brand-aligned theme (paper cream + forest green + Commit Mono + Instrument Serif wordmark), framer-motion blur transitions, full sidebar with org switcher + profile switcher + nav, /profiles CRUD, profile picker on connect flows, profile scope on API key create, profile filter + time-range + error-code multi-select + manual refresh + focus refetch on the Post Log (now a TanStack Table), inline OAuth/credentials connect (no detour), webhook chip multi-select + synchronous test-deliver dialog with editable JSON preview; MVP slices of Phase 8 (Twitter/X) and Phase 11 (Pinterest) publishers shipped behind the AccountProvider framework. **179+ API tests green.** Bluesky publishes end-to-end today; LinkedIn personal posts publish; Pinterest connects end-to-end via the OAuth callback handler but the publish path is gated on the media-upload service (Phase 7.5).
+**Status (April 2026):** Phases 1–5.5 landed; **Phase 6 LinkedIn MVP shipped** (personal-account text UGC + 3,000-grapheme preflight + URN validation + version-pinning client) with MDP-gated org/Company-Page posting deferred; **Phase 7 dashboard substantially complete** — sign-in/up, /onboarding silent recovery, 3-step accordion onboarding (API key + connect platform + send first post) with auto-advance + step-locking, brand-aligned theme (paper cream + forest green + Commit Mono + Instrument Serif wordmark), framer-motion blur transitions, full sidebar with org switcher + profile switcher + nav, /profiles CRUD, profile picker on connect flows, profile scope on API key create, profile filter + time-range + error-code multi-select + manual refresh + focus refetch on the Post Log (now a TanStack Table), inline OAuth/credentials connect (no detour), webhook chip multi-select + synchronous test-deliver dialog with editable JSON preview; MVP slices of Phase 9 (Twitter/X) and Phase 11 (Pinterest) publishers shipped behind the AccountProvider framework. **179+ API tests green.** Bluesky publishes end-to-end today; LinkedIn personal posts publish; Pinterest connects end-to-end via the OAuth callback handler but the publish path is gated on the media-upload service (Phase 7.5).
 
 **Production live:** API at `https://api.letmepost.dev` (Railway), dashboard at `https://dashboard.letmepost.dev`, landing at `https://letmepost.dev`. NeonDB Postgres + Upstash Redis. The OAuth callback handler ships server-side state (HMAC-signed, 10-min TTL) so Pinterest/LinkedIn round-trips complete without a server-side session table. Cross-subdomain cookies wired via `COOKIE_DOMAIN=.letmepost.dev`.
 
@@ -16,7 +16,7 @@
 
 **Immediate next slice (April 2026):** before resuming the new-platform phases, lock Bluesky and Pinterest to "perfect" — every API endpoint, every preflight rule, every webhook event verified end-to-end against production. This requires the media-upload service (Phase 7.5) as a foundation; Pinterest's publish path can't function without per-post media, and Bluesky video needs the same plumbing. Two-platform polish first, then Meta / X / YouTube once approvals clear.
 
-What's still missing from the original plan: Phase 6 LinkedIn org/Company-Page posting (MDP-gated), **Phase 7.5 Media Upload Service (new)**, Phase 9 Meta trio, Phase 10 YouTube, Phase 11 Pinterest rewrite, Phase 12 SDK pipeline, Phase 13 docs polish, Phase 14 obs + launch prep, Phase 15 launch. Phase 5.5 (Profiles) was added after the initial plan to pick up the agency / multi-brand use case without per-profile pricing — both API and dashboard are done.
+What's still missing from the original plan: Phase 6 LinkedIn org/Company-Page posting (MDP-gated), Phase 7.5 Media Upload Service (in flight), **Phase 8 Meta trio (was Phase 9 — promoted ahead of X because it's buildable today against Tester accounts while X waits on a paid-tier signup decision)**, Phase 9 Twitter/X (was Phase 8), Phase 10 YouTube, Phase 11 Pinterest extras, Phase 12 SDK pipeline, Phase 13 docs polish, Phase 14 obs + launch prep, Phase 15 launch. Phase 5.5 (Profiles) was added after the initial plan to pick up the agency / multi-brand use case without per-profile pricing — both API and dashboard are done.
 
 This plan takes us from that state to a public v1 launch. Every phase is filtered through the **seven product principles** in `PRODUCT.md` and traces to the **six research-corpus problems** we exist to solve:
 
@@ -39,9 +39,9 @@ These are calendar-gated and take months. Start them all before writing any Phas
 
 | Action | Why Day 0 | Expected wait | Buildable pre-approval? | Status (April 2026) |
 |---|---|---|---|---|
-| **Meta App Review** (IG Graph + FB Pages + Threads) | 2–8 weeks per review cycle, rejections normal, business verification is its own slog | 6–12 weeks realistic | **Yes.** App in Development Mode can publish to the developer's own account + any account registered as a Tester. Same Graph API endpoints, same response shapes as post-approval — approval only lifts the "testers only" restriction. Phase 9 is genuinely a same-day deploy on approval. | Business verification in progress; submission tomorrow |
+| **Meta App Review** (IG Graph + FB Pages + Threads) | 2–8 weeks per review cycle, rejections normal, business verification is its own slog | 6–12 weeks realistic | **Yes.** App in Development Mode can publish to the developer's own account + any account registered as a Tester. Same Graph API endpoints, same response shapes as post-approval — approval only lifts the "testers only" restriction. Phase 8 is genuinely a same-day deploy on approval. | Business verification in progress; submission tomorrow |
 | **YouTube OAuth verification** (Google Cloud) | Restricted-scope (`youtube.upload`) requires a one-time security assessment by an approved third-party CASA auditor; ~3–6 weeks first time, annual renewal after | 3–6 weeks first cycle | **Yes.** Unverified apps cap at 100 lifetime users — fine for staged rollout while the assessment runs. Same Data API v3 endpoints, same response shapes; verification only lifts the user cap and the unverified-app warning screen. | Not yet submitted |
-| **X API paid tier** | Paid billing near-instant; Elevated write + use-case review 1–3 weeks. **⚠ Feb 2026 shift:** X killed tiered pricing for new signups — Basic/Pro are closed to new developers; pay-per-use is the new floor. Budget starts accruing from Phase 8 start, not from launch. Revisit whether X stays in v1. | 1–3 weeks | **Partial.** No free write path; pay-per-use bills from the first call. | Not yet submitted |
+| **X API paid tier** | Paid billing near-instant; Elevated write + use-case review 1–3 weeks. **⚠ Feb 2026 shift:** X killed tiered pricing for new signups — Basic/Pro are closed to new developers; pay-per-use is the new floor. Budget starts accruing from Phase 9 start, not from launch. Revisit whether X stays in v1. | 1–3 weeks | **Partial.** No free write path; pay-per-use bills from the first call. | Not yet submitted |
 | **LinkedIn MDP / Community Management API** application | Many post scopes require MDP approval; we want this ready by Phase 6 | 2–6 weeks | **Partial.** Personal-account posting (`w_member_social`, Share on LinkedIn product) works on the standard dev tier without MDP. MDP / Community Management API gates **org- and company-page** posting only. ~60–70% of Phase 6 (personal posts, preflight suite, version-pinning layer, person-URN validation) is buildable day 0; the org-post codepath waits on approval. | Submitted, awaiting review |
 | **Pinterest developer account + trial access** | Needed by Phase 11 | 1–2 weeks | **Yes.** Trial Access is the sandbox — all endpoints exposed, pins private to creator until Standard approval (requires a video of the OAuth flow). | Trial Access live; Standard pending demo video |
 
@@ -217,31 +217,35 @@ Destructive actions (disconnect account, revoke key, delete endpoint, delete pro
 **Risks:** S3 IAM policy footguns (public-read object ACLs disabled by default on new buckets — set bucket policy + Object Ownership = "Bucket owner enforced"); `@aws-sdk/lib-storage` chunk size tuning for slow uploaders.
 **NOT in scope:** S3 lifecycle deletion, CloudFront, byte-range serving, image transformation (resize / re-encode), video transcoding, signed-URL upload flow (callers go through our multipart endpoint; presigned PUT is a future option once we hit bandwidth pain).
 
-## Phase 8 — Twitter/X
+## Phase 8 — Meta Trio (IG + FB + Threads)
 
-**Goal:** Second commercial platform; validates the framework is generic.
+**Order rationale (April 2026):** moved ahead of X/Twitter because Meta is buildable today against the developer's own account + Tester accounts in Dev Mode (same Graph API endpoints, approval only lifts the testers-only restriction), while X requires a paid-tier signup decision that hasn't happened. Meta's gate is calendar (App Review submitted), X's is commercial — calendar moves whether we work or not, so we pick the platform we can ship code for in parallel.
+
+**Ready-to-build gate:** Meta developer app exists; App Review submitted (post-approval just flips Dev Mode → Live Mode, no new endpoints).
+
+**Ships:** Facebook Login for Business flow covering Pages + IG Business + Threads scopes; publishers per platform — IG (Feed single, carousel, Reels, Stories), FB (Page post, photo, video, link share), Threads (text, media, reply); preflight validator suites per platform — Reels (9:16 aspect, codec + duration + size, cover-frame), Threads (500-char + reply constraints), FB link preview (OG reachability), IG URL source (publicly reachable CDN preflight — direct answer to the Google-Drive-URL failure pattern); error mappers for `OAuthException 2207052`, rate-limit code 4, IG media-publish async status polling (we await and surface, not silently-success); business-account-type preflight. The `media: [{ kind, mediaId }]` resolver path from Phase 7.5 covers IG/FB image + video sourcing — no per-platform CDN carve-out.
+
+**Problems solved:** 1, 3, 4.
+**Principles served:** 1, 2, 3.
+**Depends on:** Phases 1–6, 7.5 (the media service is the source for IG / FB / Reels uploads).
+**Effort:** 3 weeks of code + Meta App Review wait time. Build progresses on Tester accounts during the wait; approval is a same-day deploy.
+**Risks:** Biggest external blocker in the plan. Keep engineering ready-to-ship so you deploy same-day on approval. IG's async media-publish polling is the publish-path edge case most likely to bite (silently-success patterns are the original wedge — don't reintroduce them here).
+**NOT in scope:** Shopping tags, collab posts, branded content, ads, Threads DM.
+
+## Phase 9 — Twitter/X
+
+**Status (April 2026):** waits on a paid-tier signup decision. X killed Basic/Pro tiers for new signups in Feb 2026 — pay-per-use is the only option, with budget accruing from the first call. Revisit whether X stays in v1 once Phase 8 lands and we have signal on Meta-driven volume.
+
+**Goal:** Third commercial platform; the framework's already proven generic by then (Bluesky + LinkedIn + Pinterest + Meta), so the slice is about platform-specific quirks, not framework validation.
 
 **Ships:** X OAuth 2.0 PKCE, refresh-token lifecycle; `POST /v1/posts` with `platform: "x"` including threads (reply-chain sequencing), polls, quote-tweets, single/multi-media, alt-text; preflight (280-grapheme / 25,000 for premium, media count + mime + size, thread reply-chain well-formedness, URL-shortening-aware counting); X-specific error mapper (duplicate-tweet, tweet-length, media format); paid-tier rate-limit surfacing (we tell users how close to ceiling they are — a small differentiator).
 
 **Problems solved:** 1, 3.
 **Principles served:** 1, 2, 3.
-**Depends on:** Phases 1–6.
+**Depends on:** Phases 1–6, 7.5; X paid-tier signup.
 **Effort:** 2 weeks.
-**Risks:** X API policy changes; Elevated/Pro tier write quota.
+**Risks:** X API policy changes (Feb 2026 pricing flip is the latest reminder that this platform isn't stable to plan against); pay-per-use budget visibility for the team.
 **NOT in scope:** Spaces, Community posts, ads.
-
-## Phase 9 — Meta Trio (IG + FB + Threads)
-
-**Ready-to-build gate:** Meta App Review approved.
-
-**Ships:** Facebook Login for Business flow covering Pages + IG Business + Threads scopes; publishers per platform — IG (Feed single, carousel, Reels, Stories), FB (Page post, photo, video, link share), Threads (text, media, reply); preflight validator suites per platform — Reels (9:16 aspect, codec + duration + size, cover-frame), Threads (500-char + reply constraints), FB link preview (OG reachability), IG URL source (publicly reachable CDN preflight — direct answer to the Google-Drive-URL failure pattern); error mappers for `OAuthException 2207052`, rate-limit code 4, IG media-publish async status polling (we await and surface, not silently-success); business-account-type preflight.
-
-**Problems solved:** 1, 3, 4.
-**Principles served:** 1, 2, 3.
-**Depends on:** Phases 1–6; Meta approval.
-**Effort:** 3 weeks.
-**Risks:** Biggest external blocker in the plan. Keep engineering ready-to-ship so you deploy same-day on approval. Also: media CDN + transient storage is a mini-decision (R2 or S3-compatible in Railway).
-**NOT in scope:** Shopping tags, collab posts, branded content, ads, Threads DM.
 
 ## Phase 10 — YouTube
 
@@ -339,8 +343,8 @@ Destructive actions (disconnect account, revoke key, delete endpoint, delete pro
 | 12–14 | **Phase 6: LinkedIn (3 wks)** | TS SDK skeleton stubbed in week 14 |
 | 15–16 | Phase 7: Dashboard | TS SDK continues |
 | 17 | **Phase 7.5: Media + S3 + Bluesky/Pinterest hardening (1 wk)** | — |
-| 18–19 | Phase 8: X (now gated on paid-tier signup) | Py/Go generators |
-| 20–22 | **Phase 9: Meta trio (3 wks, gated on approval)** | If Meta not yet approved, swap in Phase 11 extras + Phase 13 docs |
+| 18–20 | **Phase 8: Meta trio (3 wks, build during App Review)** | Py/Go generators; if Meta approval lands mid-phase the trailing build days flip to Live Mode same-day |
+| 21–22 | Phase 9: X/Twitter (gated on paid-tier signup) | If X signup hasn't happened, swap in Phase 11 extras + Phase 13 docs |
 | 23–25 | Phase 10: YouTube (build during CASA verification) | Same swap rule |
 | 26 | Phase 11: Pinterest extras (video pins, rich pins, board ACL preflight) | — |
 | 27–29 | **Phase 13: Site + docs polish (3 wks)** | Contract test cron stabilization |
@@ -350,8 +354,8 @@ Destructive actions (disconnect account, revoke key, delete endpoint, delete pro
 Note: weeks 26–28 count as the *polish* window for docs, assuming the continuous-drip rule worked. If not, add 1–2 weeks. Realistic ship window: **7–8 months from Day 0**, accounting for Meta App Review + YouTube CASA verification variance.
 
 **Strictly sequential:** 1 → 2 → 3 → 4 → 5 → 5.5 → 6 → 7 → 7.5.
-**Can parallelize:** Phase 7 (dashboard) with Phase 8 (X) and Phase 12 (SDKs).
-**Calendar-gated:** 9 (Meta App Review), 10 (YouTube CASA verification) — build readiness, deploy same-day on approval.
+**Can parallelize:** Phase 7 (dashboard) with Phase 9 (X) and Phase 12 (SDKs); Phase 8 Meta build runs concurrently with App Review since Tester-account publishes work in Dev Mode.
+**Calendar-gated:** 8 (Meta App Review — build proceeds against Tester accounts in Dev Mode, deploy flips to Live on approval), 10 (YouTube CASA verification).
 **Always-background:** Docs narrative (Phase 13).
 
 ---

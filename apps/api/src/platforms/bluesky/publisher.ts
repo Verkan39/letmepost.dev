@@ -16,6 +16,7 @@ import {
   type ResolvedMediaItem,
   validateBlueskyFirstComment,
   validateBlueskyMedia,
+  validateBlueskyMediaShape,
   validateBlueskyText,
 } from "./preflight.js";
 
@@ -103,8 +104,22 @@ export const blueskyPublisher: Publisher<BlueskyCredentials, BlueskyPublishInput
 
     validateBlueskyText(text);
 
-    // Resolve bytes FIRST (so size preflight is honest), then preflight, then
-    // upload. If any resolve/preflight step fails, we never hit upstream.
+    // Cheap shape checks first (count, image/video exclusivity, alt-text
+    // length) — these don't need resolved bytes, so failing here saves
+    // a 4-image fetch storm when someone sends 5.
+    validateBlueskyMediaShape(
+      media.map((m) => {
+        const item: { kind: "image" | "video"; altText?: string } = {
+          kind: m.kind,
+        };
+        if (m.altText !== undefined) item.altText = m.altText;
+        return item;
+      }),
+    );
+
+    // Then resolve bytes (so size + mime preflight is honest), then run
+    // the byte-aware preflight, then upload. If any step fails, we never
+    // hit upstream.
     const loaded = await Promise.all(
       media.map((item) => loadMediaItem(item, mediaContext)),
     );

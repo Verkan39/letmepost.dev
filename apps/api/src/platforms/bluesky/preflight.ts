@@ -48,7 +48,18 @@ export interface ResolvedMediaItem {
   byteLength: number;
 }
 
-export function validateBlueskyMedia(media: ResolvedMediaItem[]): void {
+/**
+ * Pre-resolve checks: count, exclusivity, alt-text length. These don't need
+ * resolved bytes, so we run them BEFORE fetching media so a 5-image overflow
+ * (or a 4001-grapheme alt text) fails immediately instead of after pulling
+ * five JPEGs over the wire.
+ */
+export interface ShapeCheckItem {
+  kind: "image" | "video";
+  altText?: string;
+}
+
+export function validateBlueskyMediaShape(media: ShapeCheckItem[]): void {
   if (media.length === 0) return;
 
   const images = media.filter((m) => m.kind === "image");
@@ -90,6 +101,31 @@ export function validateBlueskyMedia(media: ResolvedMediaItem[]): void {
   }
 
   for (const item of media) {
+    if (item.altText !== undefined) {
+      const count = countGraphemes(item.altText);
+      if (count > BLUESKY_ALT_TEXT_MAX_GRAPHEMES) {
+        throw new LetmepostError({
+          code: "preflight_failed",
+          status: 400,
+          message: `Alt text is ${count} graphemes; Bluesky allows at most ${BLUESKY_ALT_TEXT_MAX_GRAPHEMES}.`,
+          rule: "bluesky.media.alt_text_max_graphemes",
+          platform: PLATFORM,
+          remediation: `Shorten alt text to ${BLUESKY_ALT_TEXT_MAX_GRAPHEMES} graphemes or fewer.`,
+        });
+      }
+    }
+  }
+}
+
+export function validateBlueskyMedia(media: ResolvedMediaItem[]): void {
+  if (media.length === 0) return;
+
+  // Re-run the shape-only checks against the resolved set in case a future
+  // caller skipped the pre-resolve pass. Cheap, and keeps this function
+  // self-sufficient for tests.
+  validateBlueskyMediaShape(media);
+
+  for (const item of media) {
     if (item.kind === "image" && !ALLOWED_IMAGE_MIMES.has(item.mimeType)) {
       throw new LetmepostError({
         code: "preflight_failed",
@@ -127,19 +163,7 @@ export function validateBlueskyMedia(media: ResolvedMediaItem[]): void {
       });
     }
 
-    if (item.altText !== undefined) {
-      const count = countGraphemes(item.altText);
-      if (count > BLUESKY_ALT_TEXT_MAX_GRAPHEMES) {
-        throw new LetmepostError({
-          code: "preflight_failed",
-          status: 400,
-          message: `Alt text is ${count} graphemes; Bluesky allows at most ${BLUESKY_ALT_TEXT_MAX_GRAPHEMES}.`,
-          rule: "bluesky.media.alt_text_max_graphemes",
-          platform: PLATFORM,
-          remediation: `Shorten alt text to ${BLUESKY_ALT_TEXT_MAX_GRAPHEMES} graphemes or fewer.`,
-        });
-      }
-    }
+    // alt-text length is validated in validateBlueskyMediaShape above.
   }
 }
 

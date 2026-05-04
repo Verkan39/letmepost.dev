@@ -2,6 +2,7 @@ import type {
   CreatePostResponse,
   PinterestPostOverrides,
   ThreadsPostOverrides,
+  TwitterPostOverrides,
 } from "@letmepost/schemas";
 import { LetmepostError } from "../../errors.js";
 import type { DecryptedPlatformAccount } from "../../repositories/platform-accounts.js";
@@ -47,6 +48,8 @@ export type PublishInput = {
   pinterest?: PinterestPostOverrides;
   /** Threads-specific per-post overrides (replyToId). */
   threads?: ThreadsPostOverrides;
+  /** X / Twitter-specific overrides (replyToTweetId, quoteTweetId). */
+  twitter?: TwitterPostOverrides;
 };
 
 export async function publishForAccount(
@@ -92,6 +95,12 @@ export async function publishForAccount(
           ...(input.media !== undefined ? { media: input.media } : {}),
           ...(input.mediaContext !== undefined
             ? { mediaContext: input.mediaContext }
+            : {}),
+          ...(input.twitter?.replyToTweetId !== undefined
+            ? { replyToTweetId: input.twitter.replyToTweetId }
+            : {}),
+          ...(input.twitter?.quoteTweetId !== undefined
+            ? { quoteTweetId: input.twitter.quoteTweetId }
             : {}),
         },
       );

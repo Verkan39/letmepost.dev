@@ -28,6 +28,10 @@ export interface TwitterTokenResponse {
 export interface TwitterCreateTweetInput {
   text: string;
   mediaIds?: string[];
+  /** When set, the new tweet replies to this tweet id. Builds reply chains for threads. */
+  replyToTweetId?: string;
+  /** When set, the new tweet quote-tweets this tweet id. */
+  quoteTweetId?: string;
 }
 
 export interface TwitterTweetResponse {
@@ -50,8 +54,15 @@ export class TwitterClient {
   ) {}
 
   /**
-   * POST /2/tweets — create a single tweet. Threading, polls, and
-   * quote-tweets are deferred; MVP sends only `text` + optional `media.media_ids`.
+   * POST /2/tweets — create a single tweet.
+   *
+   * Threading is built by the caller chaining replies: post tweet 1, then
+   * post tweet 2 with `replyToTweetId = id1`. We don't build a "thread"
+   * primitive here because X has no atomic multi-tweet endpoint and
+   * faking it server-side would lie about partial-failure semantics.
+   *
+   * Quote-tweet: pass `quoteTweetId`. Mutually exclusive with reply at
+   * X's API level — preflight catches the combination.
    */
   async createTweet(
     input: TwitterCreateTweetInput,
@@ -59,6 +70,12 @@ export class TwitterClient {
     const body: Record<string, unknown> = { text: input.text };
     if (input.mediaIds && input.mediaIds.length > 0) {
       body.media = { media_ids: input.mediaIds };
+    }
+    if (input.replyToTweetId) {
+      body.reply = { in_reply_to_tweet_id: input.replyToTweetId };
+    }
+    if (input.quoteTweetId) {
+      body.quote_tweet_id = input.quoteTweetId;
     }
 
     const res = await platformFetch<TwitterTweetResponse>({
@@ -71,6 +88,31 @@ export class TwitterClient {
 
     if (res.ok && res.body?.data?.id) return res.body.data;
     this.throwForError(res);
+  }
+
+  /**
+   * `POST /1.1/media/metadata/create` — attach alt-text to a previously-
+   * uploaded media id. Best-effort: if it fails (e.g. v1.1 endpoint
+   * deprecation), the tweet still goes out without alt text — losing the
+   * accessibility metadata is not a publish-breaking failure.
+   *
+   * Despite living on the v1.1 host, this endpoint is the only documented
+   * way to set alt text on uploaded media. v2 has no equivalent yet.
+   */
+  async setMediaAltText(mediaId: string, altText: string): Promise<void> {
+    await platformFetch({
+      method: "POST",
+      url: `${this.uploadBase}/media/metadata/create.json`,
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: { media_id: mediaId, alt_text: { text: altText } },
+      platform: PLATFORM,
+    });
+    // Intentionally don't inspect the response. Per X docs, success is 2xx
+    // with empty body; we don't need the response shape and we don't want
+    // to fail a publish over a metadata write.
   }
 
   /**

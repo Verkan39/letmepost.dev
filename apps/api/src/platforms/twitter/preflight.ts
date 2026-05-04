@@ -1,7 +1,9 @@
 import {
+  TWITTER_ALT_TEXT_MAX_GRAPHEMES,
   TWITTER_GIF_MAX_BYTES,
   TWITTER_IMAGE_MAX_BYTES,
   TWITTER_MAX_GRAPHEMES,
+  TWITTER_MAX_IMAGES,
   TWITTER_TCO_URL_LENGTH,
   TWITTER_VIDEO_MAX_BYTES,
 } from "@letmepost/schemas";
@@ -79,74 +81,129 @@ export interface TwitterResolvedMediaItem {
   altText?: string;
 }
 
+/**
+ * Pre-resolve checks on caller-provided shape: count + image/video
+ * exclusivity + alt-text length. None of these need bytes, so failing
+ * here saves a fetch storm when someone passes 5 image URLs.
+ */
+export interface TwitterShapeCheckItem {
+  kind: "image" | "video";
+  altText?: string;
+}
+
+export function validateTwitterMediaShape(
+  items: readonly TwitterShapeCheckItem[],
+): void {
+  if (items.length === 0) return;
+
+  const images = items.filter((m) => m.kind === "image");
+  const videos = items.filter((m) => m.kind === "video");
+
+  if (images.length > 0 && videos.length > 0) {
+    throw new LetmepostError({
+      code: "preflight_failed",
+      status: 400,
+      message:
+        "Cannot attach both images and video to the same tweet — X requires picking one.",
+      rule: "twitter.media.image_video_exclusive",
+      platform: PLATFORM,
+      remediation:
+        "Split into separate tweets: one with images, one with the video.",
+    });
+  }
+  if (videos.length > 1) {
+    throw new LetmepostError({
+      code: "preflight_failed",
+      status: 400,
+      message: `Attached ${videos.length} videos; X allows at most 1 per tweet.`,
+      rule: "twitter.media.count_max",
+      platform: PLATFORM,
+      remediation: "Attach a single video.",
+    });
+  }
+  if (images.length > TWITTER_MAX_IMAGES) {
+    throw new LetmepostError({
+      code: "preflight_failed",
+      status: 400,
+      message: `Attached ${images.length} images; X allows at most ${TWITTER_MAX_IMAGES} per tweet.`,
+      rule: "twitter.media.count_max",
+      platform: PLATFORM,
+      remediation: `Reduce to ${TWITTER_MAX_IMAGES} images or fewer.`,
+    });
+  }
+
+  for (const item of items) {
+    if (item.altText !== undefined) {
+      const count = countGraphemes(item.altText);
+      if (count > TWITTER_ALT_TEXT_MAX_GRAPHEMES) {
+        throw new LetmepostError({
+          code: "preflight_failed",
+          status: 400,
+          message: `Alt text is ${count} graphemes; X allows at most ${TWITTER_ALT_TEXT_MAX_GRAPHEMES}.`,
+          rule: "twitter.media.alt_text_max_graphemes",
+          platform: PLATFORM,
+          remediation: `Shorten alt text to ${TWITTER_ALT_TEXT_MAX_GRAPHEMES} graphemes or fewer.`,
+        });
+      }
+    }
+  }
+}
+
 export function validateTwitterMedia(
   items: readonly TwitterResolvedMediaItem[],
 ): void {
   if (items.length === 0) return;
+  validateTwitterMediaShape(items);
 
-  // MVP: single media item only. Multi-media + alt-text land post-MVP.
-  // TODO(phase-8): multi-image (up to 4) + alt-text + video-thumbnails.
-  if (items.length > 1) {
-    throw new LetmepostError({
-      code: "preflight_failed",
-      status: 400,
-      message: `Attached ${items.length} media items; X MVP supports a single image OR video per tweet.`,
-      rule: "twitter.media.single_only",
-      platform: PLATFORM,
-      remediation:
-        "Attach one image or one video; multi-image tweets land post-MVP.",
-    });
-  }
+  for (const item of items) {
+    if (item.kind === "image") {
+      const isGif = ALLOWED_GIF_MIMES.has(item.mimeType);
+      const isStatic = ALLOWED_IMAGE_MIMES.has(item.mimeType);
+      if (!isGif && !isStatic) {
+        throw new LetmepostError({
+          code: "preflight_failed",
+          status: 400,
+          message: `Image mime type '${item.mimeType}' is not allowed on X.`,
+          rule: "twitter.media.mime_allowed",
+          platform: PLATFORM,
+          remediation: `Use one of: ${[...ALLOWED_IMAGE_MIMES, ...ALLOWED_GIF_MIMES].join(", ")}.`,
+        });
+      }
+      const ceiling = isGif ? TWITTER_GIF_MAX_BYTES : TWITTER_IMAGE_MAX_BYTES;
+      if (item.byteLength > ceiling) {
+        throw new LetmepostError({
+          code: "preflight_failed",
+          status: 400,
+          message: `Image is ${item.byteLength} bytes; X allows at most ${ceiling}.`,
+          rule: isGif ? "twitter.media.gif_size_max" : "twitter.media.image_size_max",
+          platform: PLATFORM,
+          remediation: `Re-encode under ${ceiling} bytes.`,
+        });
+      }
+      continue;
+    }
 
-  const item = items[0]!;
-
-  if (item.kind === "image") {
-    const isGif = ALLOWED_GIF_MIMES.has(item.mimeType);
-    const isStatic = ALLOWED_IMAGE_MIMES.has(item.mimeType);
-    if (!isGif && !isStatic) {
+    // Video.
+    if (!ALLOWED_VIDEO_MIMES.has(item.mimeType)) {
       throw new LetmepostError({
         code: "preflight_failed",
         status: 400,
-        message: `Image mime type '${item.mimeType}' is not allowed on X.`,
+        message: `Video mime type '${item.mimeType}' is not allowed on X.`,
         rule: "twitter.media.mime_allowed",
         platform: PLATFORM,
-        remediation: `Use one of: ${[...ALLOWED_IMAGE_MIMES, ...ALLOWED_GIF_MIMES].join(", ")}.`,
+        remediation: `Use one of: ${[...ALLOWED_VIDEO_MIMES].join(", ")}.`,
       });
     }
-    const ceiling = isGif ? TWITTER_GIF_MAX_BYTES : TWITTER_IMAGE_MAX_BYTES;
-    if (item.byteLength > ceiling) {
+    if (item.byteLength > TWITTER_VIDEO_MAX_BYTES) {
       throw new LetmepostError({
         code: "preflight_failed",
         status: 400,
-        message: `Image is ${item.byteLength} bytes; X allows at most ${ceiling}.`,
-        rule: isGif ? "twitter.media.gif_size_max" : "twitter.media.image_size_max",
+        message: `Video is ${item.byteLength} bytes; X allows at most ${TWITTER_VIDEO_MAX_BYTES}.`,
+        rule: "twitter.media.video_size_max",
         platform: PLATFORM,
-        remediation: `Re-encode under ${ceiling} bytes.`,
+        remediation: `Compress under ${TWITTER_VIDEO_MAX_BYTES} bytes.`,
       });
     }
-    return;
-  }
-
-  // Video.
-  if (!ALLOWED_VIDEO_MIMES.has(item.mimeType)) {
-    throw new LetmepostError({
-      code: "preflight_failed",
-      status: 400,
-      message: `Video mime type '${item.mimeType}' is not allowed on X.`,
-      rule: "twitter.media.mime_allowed",
-      platform: PLATFORM,
-      remediation: `Use one of: ${[...ALLOWED_VIDEO_MIMES].join(", ")}.`,
-    });
-  }
-  if (item.byteLength > TWITTER_VIDEO_MAX_BYTES) {
-    throw new LetmepostError({
-      code: "preflight_failed",
-      status: 400,
-      message: `Video is ${item.byteLength} bytes; X allows at most ${TWITTER_VIDEO_MAX_BYTES}.`,
-      rule: "twitter.media.video_size_max",
-      platform: PLATFORM,
-      remediation: `Compress under ${TWITTER_VIDEO_MAX_BYTES} bytes.`,
-    });
   }
 }
 

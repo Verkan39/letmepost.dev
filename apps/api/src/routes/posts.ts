@@ -80,6 +80,7 @@ posts.post(
       scheduledAt,
       pinterest,
       threads,
+      twitter,
     } = c.req.valid("json");
     const { organizationId } = c.var.apiKey;
     const repo = new DrizzlePlatformAccountsRepository(c.var.db);
@@ -210,6 +211,7 @@ posts.post(
         ...(firstComment !== undefined ? { firstComment } : {}),
         ...(pinterest !== undefined ? { pinterest } : {}),
         ...(threads !== undefined ? { threads } : {}),
+        ...(twitter !== undefined ? { twitter } : {}),
         mediaContext: {
           db: c.var.db,
           organizationId,

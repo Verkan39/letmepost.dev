@@ -24,6 +24,8 @@ export const TWITTER_TCO_URL_LENGTH = 23;
 export const TWITTER_IMAGE_MAX_BYTES = 5_000_000;
 export const TWITTER_GIF_MAX_BYTES = 15_000_000;
 export const TWITTER_VIDEO_MAX_BYTES = 512_000_000;
+export const TWITTER_MAX_IMAGES = 4;
+export const TWITTER_ALT_TEXT_MAX_GRAPHEMES = 1_000;
 
 // Threads (Threads Graph API v1.0, standalone OAuth at threads.net).
 // Caller-facing limits are taken from Meta's published Threads API docs;
@@ -157,6 +159,31 @@ export const ThreadsPostOverrides = z.object({
 });
 export type ThreadsPostOverrides = z.infer<typeof ThreadsPostOverrides>;
 
+/**
+ * Per-post X / Twitter extension. Two compose-time options:
+ *   - `replyToTweetId` builds a reply chain (X threads are reply chains).
+ *     Pass the previous tweet id; the new tweet sets `reply.in_reply_to_tweet_id`.
+ *   - `quoteTweetId` quote-tweets an existing tweet.
+ *
+ * These are mutually exclusive at the API level — X rejects a tweet that
+ * sets both. Preflight enforces it locally so the user gets a clean
+ * preflight_failed instead of a code-100 round-trip.
+ */
+export const TwitterPostOverrides = z
+  .object({
+    replyToTweetId: z.string().min(1).optional(),
+    quoteTweetId: z.string().min(1).optional(),
+  })
+  .refine(
+    (v) => !(v.replyToTweetId && v.quoteTweetId),
+    {
+      message:
+        "Pass either `replyToTweetId` or `quoteTweetId`, not both — X rejects tweets that combine the two.",
+      path: ["replyToTweetId"],
+    },
+  );
+export type TwitterPostOverrides = z.infer<typeof TwitterPostOverrides>;
+
 export const CreatePostRequest = z.object({
   account: AccountRef,
   text: z.string().min(1),
@@ -173,6 +200,8 @@ export const CreatePostRequest = z.object({
   pinterest: PinterestPostOverrides.optional(),
   /** Threads-specific overrides — reply_to_id. */
   threads: ThreadsPostOverrides.optional(),
+  /** X / Twitter overrides — reply chain + quote tweet. */
+  twitter: TwitterPostOverrides.optional(),
 });
 export type CreatePostRequest = z.infer<typeof CreatePostRequest>;
 

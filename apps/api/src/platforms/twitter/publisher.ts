@@ -1,5 +1,4 @@
 import type { CreatePostResponse, MediaInput } from "@letmepost/schemas";
-import { LetmepostError } from "../../errors.js";
 import {
   loadMediaItem as sharedLoadMediaItem,
   type MediaResolverContext,
@@ -8,6 +7,7 @@ import type { Publisher } from "../_shared/publisher.js";
 import { TwitterClient } from "./client.js";
 import {
   validateTwitterMedia,
+  validateTwitterMediaShape,
   validateTwitterText,
   type TwitterResolvedMediaItem,
 } from "./preflight.js";
@@ -25,10 +25,14 @@ export type TwitterCredentials = {
 
 export type TwitterPublishInput = {
   text: string;
-  /** Single media item; MVP. */
+  /** Up to 4 images, OR a single video, OR a single GIF. */
   media?: MediaInput[];
   /** Required only if any media item references a `mediaId`. */
   mediaContext?: MediaResolverContext;
+  /** Tweet id this tweet replies under (for reply chains / threads). */
+  replyToTweetId?: string;
+  /** Tweet id this tweet quotes. Mutually exclusive with replyToTweetId. */
+  quoteTweetId?: string;
 };
 
 function loadMediaItem(
@@ -53,33 +57,36 @@ export const twitterPublisher: Publisher<
   TwitterPublishInput
 > = {
   async publish(creds, input): Promise<CreatePostResponse> {
-    const { text, media = [], mediaContext } = input;
+    const { text, media = [], mediaContext, replyToTweetId, quoteTweetId } =
+      input;
 
     validateTwitterText(text);
 
-    // TODO(phase-8): threads, polls, quote-tweets, alt-text, multi-media.
-    if (media.length > 1) {
-      throw new LetmepostError({
-        code: "preflight_failed",
-        status: 400,
-        message: "MVP supports a single media item on X tweets.",
-        rule: "twitter.media.single_only",
-        platform: "twitter",
-        remediation:
-          "Attach one media item; multi-media + threads land in a follow-up slice.",
-      });
-    }
+    // Cheap shape checks first (count, image/video exclusivity, alt-text
+    // length). Bails out before any URL fetch when the request shape is
+    // wrong (e.g. 5 images, image+video mix).
+    validateTwitterMediaShape(
+      media.map((m) => {
+        const item: { kind: "image" | "video"; altText?: string } = {
+          kind: m.kind,
+        };
+        if (m.altText !== undefined) item.altText = m.altText;
+        return item;
+      }),
+    );
 
     const loaded = await Promise.all(
       media.map((item) => loadMediaItem(item, mediaContext)),
     );
     validateTwitterMedia(
       loaded.map((l): TwitterResolvedMediaItem => {
-        return {
+        const item: TwitterResolvedMediaItem = {
           kind: l.kind,
           mimeType: l.mimeType,
           byteLength: l.byteLength,
         };
+        if (l.altText !== undefined) item.altText = l.altText;
+        return item;
       }),
     );
 
@@ -89,14 +96,34 @@ export const twitterPublisher: Publisher<
       creds.uploadBase,
     );
 
-    const mediaIds: string[] = [];
-    for (const item of loaded) {
-      const id = await client.uploadMedia(item.bytes, item.mimeType);
-      mediaIds.push(id);
-    }
+    // Upload media in parallel, then attach alt text in parallel after.
+    // Alt-text writes are best-effort — they go through the v1.1 metadata
+    // endpoint, which is on a separate deprecation track from /2/tweets;
+    // a metadata failure should not fail the publish.
+    const uploaded = await Promise.all(
+      loaded.map(async (item) => ({
+        item,
+        mediaId: await client.uploadMedia(item.bytes, item.mimeType),
+      })),
+    );
+    await Promise.all(
+      uploaded.map(({ item, mediaId }) =>
+        item.altText !== undefined && item.altText.length > 0
+          ? client
+              .setMediaAltText(mediaId, item.altText)
+              .catch(() => {
+                // Swallow: the tweet still goes out without alt text.
+                // Worth logging but not surfacing to the caller.
+              })
+          : Promise.resolve(),
+      ),
+    );
+    const mediaIds = uploaded.map((u) => u.mediaId);
 
     const createArgs: Parameters<TwitterClient["createTweet"]>[0] = { text };
     if (mediaIds.length > 0) createArgs.mediaIds = mediaIds;
+    if (replyToTweetId !== undefined) createArgs.replyToTweetId = replyToTweetId;
+    if (quoteTweetId !== undefined) createArgs.quoteTweetId = quoteTweetId;
     const tweet = await client.createTweet(createArgs);
 
     const response: CreatePostResponse = {

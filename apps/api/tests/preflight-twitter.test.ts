@@ -128,13 +128,45 @@ describe("validateTwitterMedia", () => {
     ).not.toThrow();
   });
 
-  it("rejects 2 media items with twitter.media.single_only (MVP)", () => {
+  it("accepts up to 4 images on a single tweet", () => {
+    expect(() =>
+      validateTwitterMedia([image(), image(), image(), image()]),
+    ).not.toThrow();
+  });
+
+  it("rejects 5 images with twitter.media.count_max", () => {
     try {
-      validateTwitterMedia([image(), image()]);
+      validateTwitterMedia([image(), image(), image(), image(), image()]);
       throw new Error("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(LetmepostError);
-      expect((err as LetmepostError).rule).toBe("twitter.media.single_only");
+      expect((err as LetmepostError).rule).toBe("twitter.media.count_max");
+    }
+  });
+
+  it("rejects mixing image + video on the same tweet", () => {
+    try {
+      validateTwitterMedia([image(), video()]);
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(LetmepostError);
+      expect((err as LetmepostError).rule).toBe(
+        "twitter.media.image_video_exclusive",
+      );
+    }
+  });
+
+  it("rejects alt text > 1000 graphemes", () => {
+    try {
+      validateTwitterMedia([
+        image({ altText: "a".repeat(1001) }),
+      ]);
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(LetmepostError);
+      expect((err as LetmepostError).rule).toBe(
+        "twitter.media.alt_text_max_graphemes",
+      );
     }
   });
 

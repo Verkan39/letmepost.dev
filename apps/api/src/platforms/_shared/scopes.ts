@@ -65,6 +65,60 @@ const SCOPES: Record<Platform, PlatformScopeSet> = {
     ],
     extended: ["pins:read_secret"],
   },
+  facebook: {
+    kind: "oauth",
+    // Facebook Login for Business scopes. The single connect grants both
+    // FB Page publish AND linked Instagram Business publish — Pages are
+    // discovered via `GET /me/accounts`, IG Business via the Page's
+    // `instagram_business_account` field. Same OAuth, two letmepost
+    // platforms (`facebook` + `instagram`) get rows from one connect.
+    //
+    //   pages_show_list             — list the Pages the user manages.
+    //   pages_manage_posts          — create posts on Pages.
+    //   pages_read_engagement       — required pre-req for posts on some apps.
+    //   business_management         — needed for Pages connected via Business.
+    //   instagram_basic             — read IG Business account info per Page.
+    //   instagram_content_publish   — two-step container publish on IG.
+    write: [
+      "pages_show_list",
+      "pages_manage_posts",
+      "pages_read_engagement",
+      "business_management",
+      "instagram_basic",
+      "instagram_content_publish",
+    ],
+    // Insights / messaging are big extended sets we don't request by
+    // default. Listed individually so the docs page can render the full
+    // surface without having to enumerate Meta's catalog.
+    extended: [
+      "pages_read_user_content",
+      "pages_manage_engagement",
+      "instagram_manage_comments",
+      "instagram_manage_insights",
+    ],
+  },
+  instagram: {
+    kind: "oauth",
+    // IG Business is connected via the Facebook OAuth flow above — the
+    // 'instagram' platform doesn't have its own connect endpoint. Listed
+    // here for parity (the route /v1/accounts/connect/instagram is
+    // disabled at the dispatcher; users connect via 'meta' / 'facebook').
+    write: ["instagram_basic", "instagram_content_publish"],
+    extended: ["instagram_manage_comments", "instagram_manage_insights"],
+  },
+  threads: {
+    kind: "oauth",
+    // Threads Graph API standalone OAuth (separate from Facebook Login for
+    // Business). `threads_basic` is mandatory — the bare-minimum scope that
+    // lets the token call `GET /me`. `threads_content_publish` is what
+    // unlocks the create-container + publish flow.
+    //
+    // Reply / read scopes are extended-only because v1 of the publisher
+    // doesn't read replies — the publisher *posts* replies via reply_to_id
+    // on the request body, which requires no extra scope (it's a write).
+    write: ["threads_basic", "threads_content_publish"],
+    extended: ["threads_manage_replies", "threads_read_replies"],
+  },
   twitter: {
     kind: "oauth",
     // X OAuth 2.0 scopes: posting needs `tweet.write`; `tweet.read` +

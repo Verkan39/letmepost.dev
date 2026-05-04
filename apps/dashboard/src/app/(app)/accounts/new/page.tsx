@@ -33,8 +33,15 @@ import {
 
 const LABELS: Record<ConnectablePlatform, string> = {
   bluesky: "Bluesky",
+  facebook: "Facebook (+ Instagram)",
+  // Instagram is an option for completeness even though `/connect/instagram`
+  // is not actually wired — connecting Facebook fans out to IG Business
+  // accounts linked to each Page. Surfaced as a label so users searching
+  // for "Instagram" don't think we don't support it.
+  instagram: "Instagram",
   linkedin: "LinkedIn",
   pinterest: "Pinterest",
+  threads: "Threads",
   twitter: "Twitter / X",
 };
 

@@ -125,6 +125,8 @@
      Dark mode brightens the dim ones (X, Threads, Pinterest, LinkedIn) so
      they don't disappear against the dark surface. */
   --brand-bluesky: #1083fe;
+  --brand-facebook: #1877f2;
+  --brand-instagram: #e4405f;
   --brand-linkedin: #0a66c2;
   --brand-pinterest: #bd081c;
   --brand-threads: #000000;
@@ -180,8 +182,11 @@
   --sidebar-ring: hsl(150 50% 55%);
 
   /* Brand overrides — pure black X / Threads are invisible, dim Pinterest
-     red has sub-3:1 contrast on the deep ink bg. Lifted for ≥4.5:1. */
+     red and FB blue have sub-3:1 contrast on the deep ink bg. Lifted for
+     ≥4.5:1. IG's hot-pink reads fine in both modes. */
   --brand-bluesky: #4da8ff;
+  --brand-facebook: #4d99f5;
+  --brand-instagram: #ff5d7a;
   --brand-linkedin: #4d99e0;
   --brand-pinterest: #ff4d6f;
   --brand-threads: #ffffff;

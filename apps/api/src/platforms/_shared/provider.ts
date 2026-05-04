@@ -51,8 +51,14 @@ export type ConnectField = {
  * here; the repository encrypts on insert. `tokenMetadata` is a per-platform
  * bag — e.g. Bluesky stashes accessJwt/refreshJwt/did; LinkedIn stashes
  * refresh_token + granted scopes.
+ *
+ * `platform` is optional and only set by fan-out providers (Meta) where
+ * one OAuth grant produces rows on multiple letmepost platforms (FB Pages
+ * + linked IG Business accounts). Non-fan-out providers leave it
+ * undefined; the framework defaults it to the connect-route's platform.
  */
 export type ConnectedAccount = {
+  platform?: Platform;
   platformAccountId: string;
   displayName: string | null;
   token: string;
@@ -110,8 +116,16 @@ export interface AccountProvider {
    * Finish the connect handshake. For OAuth, `input` carries `{ code, state }`;
    * for credentials, it carries the form payload. Each provider validates and
    * normalizes shape. On success the framework upserts into platform_accounts.
+   *
+   * Returns one or more accounts. Most providers return a single record;
+   * fan-out providers (Meta — one FBLB OAuth → N Page rows + M IG Business
+   * rows) return an array. Each entry's `platform` overrides the connect
+   * route's platform when set.
    */
-  completeConnect(ctx: ConnectContext, input: unknown): Promise<ConnectedAccount>;
+  completeConnect(
+    ctx: ConnectContext,
+    input: unknown,
+  ): Promise<ConnectedAccount | ConnectedAccount[]>;
 
   /**
    * Refresh the stored token. Called by the refresh scheduler and on-demand

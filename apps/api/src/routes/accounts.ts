@@ -215,10 +215,25 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
 
       const profileId = await resolveProfileId(c.var.db, organizationId, requestedProfileId);
 
-      const connected = await provider.completeConnect(
+      const connectedRaw = await provider.completeConnect(
         { organizationId, baseUrl },
         body,
       );
+      // Credentials providers (Bluesky) always return a single record. The
+      // POST /complete path is the credentials surface; OAuth fan-out
+      // happens on the GET callback. If a credentials provider ever
+      // returns an array here, treat the first as primary — matches the
+      // user's mental model ("connect this account").
+      const connected = Array.isArray(connectedRaw)
+        ? connectedRaw[0]
+        : connectedRaw;
+      if (!connected) {
+        throw new LetmepostError({
+          code: "internal_error",
+          status: 500,
+          message: "Provider returned no account on completeConnect.",
+        });
+      }
 
       const repo = new DrizzlePlatformAccountsRepository(c.var.db);
       const existing = await repo.findByOrgAndPlatform(
@@ -617,38 +632,58 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
         profileId,
       );
 
-      // Upsert the platform_account row — same pattern as POST /complete.
+      // Fan-out support: providers may return one or many. Meta's FBLB
+      // grant produces one row per Page + one row per linked IG Business
+      // account; every other provider returns a single record. Normalize
+      // to an array up front so the upsert loop is uniform.
+      const connectedList = Array.isArray(connected) ? connected : [connected];
+      if (connectedList.length === 0) {
+        return redirect(
+          `connect_error=no_accounts_granted&platform=${platform}`,
+        );
+      }
+
       const repo = new DrizzlePlatformAccountsRepository(c.var.db);
-      const existing = await repo.findByOrgAndPlatform(
-        organizationId,
-        platform,
-        connected.platformAccountId,
+      const persisted = [] as Array<{ id: string; platform: string }>;
+      for (const entry of connectedList) {
+        // Default to the connect-route's platform when fan-out doesn't
+        // override (single-record providers leave .platform undefined).
+        const targetPlatform = entry.platform ?? platform;
+        const existing = await repo.findByOrgAndPlatform(
+          organizationId,
+          targetPlatform,
+          entry.platformAccountId,
+        );
+        const account = existing
+          ? await repo.updateToken(existing.id, {
+              token: entry.token,
+              tokenMetadata: entry.tokenMetadata,
+              tokenExpiresAt: entry.tokenExpiresAt,
+            })
+          : await repo.create({
+              organizationId,
+              profileId: resolvedProfileId,
+              platform: targetPlatform,
+              platformAccountId: entry.platformAccountId,
+              displayName: entry.displayName,
+              token: entry.token,
+              tokenMetadata: entry.tokenMetadata,
+              tokenExpiresAt: entry.tokenExpiresAt,
+            });
+
+        await scheduleInitialRefresh({
+          accountId: account.id,
+          organizationId,
+          horizonMs: provider.expiringHorizonMs,
+          tokenExpiresAt: account.tokenExpiresAt,
+        });
+
+        persisted.push({ id: account.id, platform: targetPlatform });
+      }
+
+      return redirect(
+        `connected=${platform}&accounts=${persisted.length}`,
       );
-      const account = existing
-        ? await repo.updateToken(existing.id, {
-            token: connected.token,
-            tokenMetadata: connected.tokenMetadata,
-            tokenExpiresAt: connected.tokenExpiresAt,
-          })
-        : await repo.create({
-            organizationId,
-            profileId: resolvedProfileId,
-            platform,
-            platformAccountId: connected.platformAccountId,
-            displayName: connected.displayName,
-            token: connected.token,
-            tokenMetadata: connected.tokenMetadata,
-            tokenExpiresAt: connected.tokenExpiresAt,
-          });
-
-      await scheduleInitialRefresh({
-        accountId: account.id,
-        organizationId,
-        horizonMs: provider.expiringHorizonMs,
-        tokenExpiresAt: account.tokenExpiresAt,
-      });
-
-      return redirect(`connected=${platform}`);
     },
   );
 

@@ -22,12 +22,17 @@ export function authFailed(params: {
 /**
  * Build a `platform_rejected` error (502) for a non-auth upstream failure —
  * e.g. platform validates the post asynchronously and refuses it.
+ *
+ * `rule` is optional but encouraged when the rejection maps cleanly to a
+ * known cause (e.g. IG's `2207052` → `instagram.media.reachable`); rule
+ * ids let the dashboard's Post Log filter and the docs site cross-link.
  */
 export function rejected(params: {
   platform: string;
   platformResponse?: unknown;
   upstreamMessage?: string;
   remediation?: string;
+  rule?: string;
 }): LetmepostError {
   const base = `${params.platform} rejected the post`;
   const message = params.upstreamMessage ? `${base}: ${params.upstreamMessage}` : `${base}.`;
@@ -38,6 +43,7 @@ export function rejected(params: {
     platform: params.platform,
     remediation:
       params.remediation ?? "Inspect platformResponse for the upstream error detail.",
+    ...(params.rule !== undefined ? { rule: params.rule } : {}),
     ...(params.platformResponse !== undefined
       ? { platformResponse: params.platformResponse }
       : {}),

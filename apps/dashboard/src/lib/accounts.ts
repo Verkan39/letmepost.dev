@@ -54,8 +54,11 @@ export type Account = {
  */
 export const CONNECTABLE_PLATFORMS = [
   "bluesky",
+  "facebook",
+  "instagram",
   "linkedin",
   "pinterest",
+  "threads",
   "twitter",
 ] as const;
 export type ConnectablePlatform = (typeof CONNECTABLE_PLATFORMS)[number];

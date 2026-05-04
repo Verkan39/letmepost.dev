@@ -1,14 +1,19 @@
 import type {
   CreatePostResponse,
   PinterestPostOverrides,
+  ThreadsPostOverrides,
 } from "@letmepost/schemas";
 import { LetmepostError } from "../../errors.js";
 import type { DecryptedPlatformAccount } from "../../repositories/platform-accounts.js";
 import { blueskyPublisher } from "../bluesky/publisher.js";
+import { facebookPublisher } from "../facebook/publisher.js";
+import { instagramPublisher } from "../instagram/publisher.js";
 import { linkedinPublisher } from "../linkedin/publisher.js";
 import { PinterestClient } from "../pinterest/client.js";
 import { pinterestPublisher } from "../pinterest/publisher.js";
 import type { PinterestTokenMetadata } from "../pinterest/provider.js";
+import { threadsPublisher } from "../threads/publisher.js";
+import type { ThreadsTokenMetadata } from "../threads/provider.js";
 import { twitterPublisher } from "../twitter/publisher.js";
 import type { MediaResolverContext } from "./media.js";
 
@@ -40,6 +45,8 @@ export type PublishInput = {
   mediaContext?: MediaResolverContext;
   /** Pinterest-specific per-post overrides (board, destination URL, title). */
   pinterest?: PinterestPostOverrides;
+  /** Threads-specific per-post overrides (replyToId). */
+  threads?: ThreadsPostOverrides;
 };
 
 export async function publishForAccount(
@@ -88,6 +95,54 @@ export async function publishForAccount(
             : {}),
         },
       );
+    case "facebook":
+      return facebookPublisher.publish(
+        {
+          accessToken: account.token,
+          pageId: account.platformAccountId,
+        },
+        {
+          text: input.text,
+          ...(input.media !== undefined ? { media: input.media } : {}),
+          ...(input.mediaContext !== undefined
+            ? { mediaContext: input.mediaContext }
+            : {}),
+        },
+      );
+    case "instagram":
+      return instagramPublisher.publish(
+        {
+          accessToken: account.token,
+          igUserId: account.platformAccountId,
+        },
+        {
+          text: input.text,
+          ...(input.media !== undefined ? { media: input.media } : {}),
+          ...(input.mediaContext !== undefined
+            ? { mediaContext: input.mediaContext }
+            : {}),
+        },
+      );
+    case "threads": {
+      const meta = (account.tokenMetadata ?? {}) as ThreadsTokenMetadata;
+      // The Threads userId is pinned as platformAccountId at connect-time, but
+      // we keep tokenMetadata.userId as the canonical reference because future
+      // re-auth flows could rotate platformAccountId during a recovery path.
+      const userId = meta.userId ?? account.platformAccountId;
+      return threadsPublisher.publish(
+        { accessToken: account.token, userId },
+        {
+          text: input.text,
+          ...(input.media !== undefined ? { media: input.media } : {}),
+          ...(input.threads?.replyToId !== undefined
+            ? { replyToId: input.threads.replyToId }
+            : {}),
+          ...(input.mediaContext !== undefined
+            ? { mediaContext: input.mediaContext }
+            : {}),
+        },
+      );
+    }
     case "pinterest": {
       const meta = (account.tokenMetadata ?? {}) as PinterestTokenMetadata;
       const boardId = input.pinterest?.boardId ?? meta.defaultBoardId;

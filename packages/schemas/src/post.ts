@@ -25,6 +25,44 @@ export const TWITTER_IMAGE_MAX_BYTES = 5_000_000;
 export const TWITTER_GIF_MAX_BYTES = 15_000_000;
 export const TWITTER_VIDEO_MAX_BYTES = 512_000_000;
 
+// Threads (Threads Graph API v1.0, standalone OAuth at threads.net).
+// Caller-facing limits are taken from Meta's published Threads API docs;
+// values that are absent from the docs (alt-text grapheme cap) match the
+// nearest analogue (Bluesky) so callers don't see surprising platform
+// disparities for the same media payload.
+export const THREADS_MAX_GRAPHEMES = 500;
+export const THREADS_MIN_CAROUSEL = 2;
+export const THREADS_MAX_CAROUSEL = 20;
+export const THREADS_IMAGE_MAX_BYTES = 8_000_000;
+export const THREADS_VIDEO_MAX_BYTES = 1_000_000_000;
+export const THREADS_ALT_TEXT_MAX_GRAPHEMES = 1000;
+
+// Facebook Pages (Graph API, Facebook Login for Business).
+// FB's hard server-side cap on a Page post is 63,206 chars, and the API
+// will reject with code 100 above that. We pre-check at 63,206 graphemes
+// (close enough; FB's counter is UTF-16 codeunits but graphemes ≤ codeunits
+// so we never over-permit a payload that would 100 upstream).
+export const FACEBOOK_MAX_GRAPHEMES = 63_206;
+export const FACEBOOK_IMAGE_MAX_BYTES = 4_000_000; // photo upload via /photos
+export const FACEBOOK_VIDEO_MAX_BYTES = 4_000_000_000; // /videos endpoint accepts up to 4GB
+
+// Instagram Business (Graph API). All Instagram publishing goes through
+// the two-step container flow: create with media_url → poll status →
+// publish. URLs MUST be publicly reachable; private/Drive URLs surface
+// as `OAuthException 2207052`, the canonical opaque-rejection in the
+// research corpus.
+export const INSTAGRAM_MAX_GRAPHEMES = 2_200;
+export const INSTAGRAM_MIN_CAROUSEL = 2;
+export const INSTAGRAM_MAX_CAROUSEL = 10;
+// JPEG only on Instagram (PNG/WebP/HEIC etc. are rejected). Container size
+// limit is documented at 8 MB on the photo endpoint.
+export const INSTAGRAM_IMAGE_MAX_BYTES = 8_000_000;
+// Reels: 9:16 aspect, MP4/MOV, ≤ 90s, ≤ 1 GB, codec H.264 + AAC. We
+// enforce size + mime at preflight; aspect/duration require a probe step
+// (deferred — would need ffprobe in the worker).
+export const INSTAGRAM_VIDEO_MAX_BYTES = 1_000_000_000;
+export const INSTAGRAM_REELS_MAX_DURATION_SECONDS = 90;
+
 /**
  * A single media item on a post. The caller provides bytes via one of three
  * sources:
@@ -109,6 +147,16 @@ export const PinterestPostOverrides = z.object({
 });
 export type PinterestPostOverrides = z.infer<typeof PinterestPostOverrides>;
 
+/**
+ * Per-post Threads extension. `replyToId` is the platform thread id to
+ * reply under (Threads's `reply_to_id` parameter). Threads doesn't have
+ * scheduled-publish or first-comment, so the surface stays minimal.
+ */
+export const ThreadsPostOverrides = z.object({
+  replyToId: z.string().min(1).optional(),
+});
+export type ThreadsPostOverrides = z.infer<typeof ThreadsPostOverrides>;
+
 export const CreatePostRequest = z.object({
   account: AccountRef,
   text: z.string().min(1),
@@ -123,6 +171,8 @@ export const CreatePostRequest = z.object({
   scheduledAt: z.string().datetime().optional(),
   /** Pinterest-specific overrides — board, destination URL, title. */
   pinterest: PinterestPostOverrides.optional(),
+  /** Threads-specific overrides — reply_to_id. */
+  threads: ThreadsPostOverrides.optional(),
 });
 export type CreatePostRequest = z.infer<typeof CreatePostRequest>;
 

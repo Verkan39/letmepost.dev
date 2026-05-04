@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import {
   House,
@@ -16,6 +17,9 @@ import {
   CaretUpDown,
   Check,
   Plus,
+  Sun,
+  Moon,
+  Monitor,
 } from "@phosphor-icons/react";
 
 import { authClient } from "@/lib/auth-client";
@@ -39,6 +43,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -239,6 +245,11 @@ export function AppSidebar() {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>{session?.user.email}</DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+              Theme
+            </DropdownMenuLabel>
+            <ThemeRadioGroup />
+            <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={handleSignOut}>
               <SignOut className="size-4" />
               <span>Sign out</span>
@@ -249,5 +260,37 @@ export function AppSidebar() {
 
       <NewOrgDialog open={newOrgOpen} onOpenChange={setNewOrgOpen} />
     </Sidebar>
+  );
+}
+
+/**
+ * Theme picker for the account dropdown — explicit Light / Dark / System
+ * radio rather than a cycle button. `mounted` gates rendering so the SSR
+ * pass doesn't hydrate against a different `theme` value than the client.
+ */
+function ThemeRadioGroup() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  // Render an inert placeholder until next-themes has read localStorage —
+  // matches the row height so the dropdown doesn't shift on hydrate.
+  if (!mounted) {
+    return <div aria-hidden className="h-[84px]" />;
+  }
+  return (
+    <DropdownMenuRadioGroup value={theme ?? "system"} onValueChange={setTheme}>
+      <DropdownMenuRadioItem value="light">
+        <Sun className="size-4" />
+        <span>Light</span>
+      </DropdownMenuRadioItem>
+      <DropdownMenuRadioItem value="dark">
+        <Moon className="size-4" />
+        <span>Dark</span>
+      </DropdownMenuRadioItem>
+      <DropdownMenuRadioItem value="system">
+        <Monitor className="size-4" />
+        <span>System</span>
+      </DropdownMenuRadioItem>
+    </DropdownMenuRadioGroup>
   );
 }

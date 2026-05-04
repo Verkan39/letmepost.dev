@@ -1,8 +1,9 @@
 /**
- * Inline brand SVGs for the four MVP-supported platforms. Paths sourced
- * from simple-icons (CC0). Each icon is single-color (currentColor) so the
- * caller controls the rendered color via `style={{ color }}` — that lets the
- * onboarding grid go grayscale → brand color on hover with one CSS filter.
+ * Inline brand SVGs for the v1 connectable platforms. Paths sourced from
+ * simple-icons (CC0). Each icon is single-color (currentColor) so the
+ * caller controls the rendered color via `style={{ color }}` — that lets
+ * the onboarding grid go grayscale → brand color on hover with one CSS
+ * filter.
  */
 
 import type { ConnectablePlatform } from "@/lib/accounts";
@@ -48,6 +49,19 @@ export function PinterestIcon({ className }: IconProps) {
   );
 }
 
+export function ThreadsIcon({ className }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 192 192"
+      fill="currentColor"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M141.537 88.988a66.667 66.667 0 0 0-2.518-1.143c-1.482-27.307-16.403-42.94-41.457-43.1h-.34c-14.986 0-27.449 6.396-35.12 18.036l13.779 9.452c5.733-8.695 14.726-10.548 21.348-10.548h.229c8.249.053 14.474 2.452 18.503 7.129 2.932 3.405 4.893 8.111 5.864 14.05-7.314-1.243-15.224-1.626-23.68-1.14-23.82 1.371-39.134 15.264-38.105 34.572.522 9.793 5.4 18.216 13.735 23.715 7.047 4.648 16.124 6.92 25.557 6.402 12.458-.683 22.231-5.436 29.057-14.127 5.184-6.6 8.46-15.153 9.93-25.94 6.04 3.644 10.518 8.443 12.992 14.21 4.21 9.808 4.456 25.929-8.701 39.074-11.531 11.521-25.388 16.504-46.336 16.658-23.234-.172-40.8-7.62-52.213-22.138-10.685-13.594-16.207-33.244-16.413-58.401.206-25.156 5.728-44.806 16.413-58.4 11.413-14.518 28.978-21.966 52.212-22.138 23.404.173 41.277 7.658 53.116 22.241 5.806 7.151 10.184 16.143 13.079 26.589l16.169-4.308c-3.513-12.852-9.036-23.94-16.539-33.196C148.235 9.234 125.589.187 97.18 0h-.113C68.718.187 46.325 9.27 30.47 26.99 16.364 42.762 9.087 64.708 8.844 92.232L8.84 96l.004 3.768c.243 27.524 7.52 49.47 21.625 65.243C46.325 182.73 68.718 191.813 97.066 192h.113c25.198-.175 42.964-6.783 57.605-21.42 19.144-19.13 18.566-43.114 12.255-57.825-4.526-10.553-13.156-19.118-24.962-24.767ZM98.44 129.507c-10.44.588-21.286-4.098-21.82-14.135-.397-7.442 5.296-15.746 22.461-16.735 1.966-.114 3.895-.169 5.79-.169 6.235 0 12.068.606 17.371 1.765-1.978 24.702-13.58 28.713-23.802 29.274Z" />
+    </svg>
+  );
+}
+
 export function TwitterXIcon({ className }: IconProps) {
   return (
     <svg
@@ -64,14 +78,19 @@ export function TwitterXIcon({ className }: IconProps) {
 export type PlatformBrand = {
   id: ConnectablePlatform;
   label: string;
-  /** Brand color (hex) for the colored hover state. */
+  /** Brand color — usually a CSS var so it can flip per theme. */
   color: string;
   Icon: (props: IconProps) => React.ReactElement;
 };
 
+// Brand colors come from CSS vars in globals.css (--brand-*) so they flip
+// between light and dark mode. The dark-mode overrides brighten X / Threads
+// (pure black) and Pinterest / LinkedIn (sub-3:1 contrast) so brand icons
+// stay legible on the deep ink background.
 export const PLATFORM_BRANDS: PlatformBrand[] = [
-  { id: "bluesky", label: "Bluesky", color: "#1083FE", Icon: BlueskyIcon },
-  { id: "linkedin", label: "LinkedIn", color: "#0A66C2", Icon: LinkedInIcon },
-  { id: "pinterest", label: "Pinterest", color: "#BD081C", Icon: PinterestIcon },
-  { id: "twitter", label: "X", color: "#000000", Icon: TwitterXIcon },
+  { id: "bluesky", label: "Bluesky", color: "var(--brand-bluesky)", Icon: BlueskyIcon },
+  { id: "linkedin", label: "LinkedIn", color: "var(--brand-linkedin)", Icon: LinkedInIcon },
+  { id: "pinterest", label: "Pinterest", color: "var(--brand-pinterest)", Icon: PinterestIcon },
+  { id: "threads", label: "Threads", color: "var(--brand-threads)", Icon: ThreadsIcon },
+  { id: "twitter", label: "X", color: "var(--brand-twitter)", Icon: TwitterXIcon },
 ];

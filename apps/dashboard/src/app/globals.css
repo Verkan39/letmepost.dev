@@ -120,6 +120,15 @@
   --sidebar-accent-foreground: hsl(150 45% 22%);
   --sidebar-border: hsl(28 14% 82%);
   --sidebar-ring: hsl(150 45% 32%);
+
+  /* Platform brand colors — light mode uses each brand's true tone.
+     Dark mode brightens the dim ones (X, Threads, Pinterest, LinkedIn) so
+     they don't disappear against the dark surface. */
+  --brand-bluesky: #1083fe;
+  --brand-linkedin: #0a66c2;
+  --brand-pinterest: #bd081c;
+  --brand-threads: #000000;
+  --brand-twitter: #000000;
 }
 
 /* Dark — deep ink with warm cream text, lighter forest so it pops on dark.
@@ -169,6 +178,14 @@
   --sidebar-accent-foreground: hsl(150 50% 70%);
   --sidebar-border: hsl(24 8% 22%);
   --sidebar-ring: hsl(150 50% 55%);
+
+  /* Brand overrides — pure black X / Threads are invisible, dim Pinterest
+     red has sub-3:1 contrast on the deep ink bg. Lifted for ≥4.5:1. */
+  --brand-bluesky: #4da8ff;
+  --brand-linkedin: #4d99e0;
+  --brand-pinterest: #ff4d6f;
+  --brand-threads: #ffffff;
+  --brand-twitter: #ffffff;
 }
 
 @layer base {

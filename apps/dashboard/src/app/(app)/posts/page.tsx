@@ -203,7 +203,7 @@ export default function PostsPage() {
   const isLoading = query.isLoading && items === null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-page-wide>
       <FadeIn className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-lg font-semibold">Post log</h1>

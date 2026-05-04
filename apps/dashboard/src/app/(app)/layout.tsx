@@ -7,7 +7,6 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
 
 export default function AppLayout({
   children,
@@ -23,7 +22,7 @@ export default function AppLayout({
             <SidebarTrigger />
             <Breadcrumbs />
           </header>
-          <div className="flex-1 p-6 md:p-8 max-w-5xl">
+          <div className="flex-1 p-6 md:p-8 [&>*]:max-w-5xl [&:has([data-page-wide])>*]:max-w-none">
             <PageTransition>{children}</PageTransition>
           </div>
         </SidebarInset>

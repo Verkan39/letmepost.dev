@@ -97,7 +97,10 @@ export function PostsTable({ posts }: { posts: PostListItem[] }) {
         id: "text",
         header: "Text",
         cell: ({ row }) => (
-          <span className="text-sm text-foreground/90 line-clamp-1">
+          <span
+            className="text-sm text-foreground/90 truncate block max-w-[60ch]"
+            title={row.original.text}
+          >
             {row.original.text}
           </span>
         ),

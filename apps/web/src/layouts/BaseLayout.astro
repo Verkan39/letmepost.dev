@@ -35,9 +35,31 @@ const ogImageUrl = new URL(ogImage, Astro.site).toString();
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light" />
-    <meta name="theme-color" content="#F2EDE3" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#F2EDE3" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#171411" media="(prefers-color-scheme: dark)" />
     <meta name="msapplication-TileColor" content="#F2EDE3" />
+
+    <!-- Pre-paint theme bootstrap — runs synchronously before <body> renders
+         to avoid a flash of the wrong theme. Reads stored preference (or
+         falls back to system) and sets data-theme on <html>. -->
+    <script is:inline>
+      (function () {
+        try {
+          var pref = localStorage.getItem("lmp-theme") || "system";
+          var resolved =
+            pref === "system"
+              ? window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light"
+              : pref;
+          document.documentElement.setAttribute("data-theme", resolved);
+          document.documentElement.dataset.themePref = pref;
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "light");
+        }
+      })();
+    </script>
 
     <title>{fullTitle}</title>
     <meta name="description" content={description} />

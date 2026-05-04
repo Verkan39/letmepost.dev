@@ -1,28 +1,30 @@
 @import "tailwindcss";
 
 /* -------------------------------------------------------------------------- */
-/* Design tokens — exposed to Tailwind as utilities (bg-accent, text-muted,…) */
+/* Design tokens — light defaults exposed to Tailwind as utilities             */
+/* (bg-accent, text-muted, …). Dark variants override below.                   */
 /* -------------------------------------------------------------------------- */
 @theme {
-  /* Paper — warm cream */
+  /* Paper — warm cream. Anchors mirror dashboard `:root` light tokens
+     (--background / --card / --secondary / --muted-foreground / etc). */
   --color-bg: hsl(30 25% 98%);
   --color-bg-elev: hsl(30 20% 96%);
-  --color-bg-card: hsl(30 20% 94.5%);
+  --color-bg-card: hsl(30 18% 93%);
   --color-bg-card-hover: hsl(30 20% 91%);
 
   /* Ink */
   --color-text: hsl(24 10% 10%);
   --color-text-secondary: hsl(24 8% 30%);
-  --color-text-muted: hsl(24 6% 48%);
+  --color-text-muted: hsl(24 6% 42%);
 
   /* Borders */
   --color-border: hsl(28 14% 82%);
   --color-border-strong: hsl(28 12% 68%);
 
-  /* Accent — forest green */
+  /* Accent — forest green. accent-soft alpha matches dashboard --accent. */
   --color-accent: hsl(150 45% 32%);
   --color-accent-hover: hsl(150 48% 26%);
-  --color-accent-soft: hsl(150 45% 32% / 0.12);
+  --color-accent-soft: hsl(150 45% 32% / 0.10);
   --color-accent-text: hsl(30 25% 98%);
 
   /* Code surface */
@@ -30,9 +32,9 @@
   --color-code-text: hsl(30 20% 96%);
   --color-code-muted: hsl(24 6% 58%);
 
-  /* Semantic */
-  --color-success: hsl(142 55% 40%);
-  --color-error: hsl(0 70% 50%);
+  /* Semantic — dashboard --success / --destructive */
+  --color-success: hsl(142 55% 36%);
+  --color-error: hsl(0 70% 45%);
 
   /* HTTP method colors */
   --color-http-post: hsl(142 55% 38%);
@@ -51,6 +53,49 @@
   --radius-md: 0;
   --radius-lg: 0;
   --radius-xl: 0;
+}
+
+/* Dark token set — palette mirrors the dashboard's globals.css `.dark` block
+   so the landing and the operator console feel like the same product. */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Anchors mirror dashboard --background / --card / --secondary / --muted */
+  --color-bg: hsl(24 12% 8%);
+  --color-bg-elev: hsl(24 11% 11%);
+  --color-bg-card: hsl(24 11% 11%);
+  --color-bg-card-hover: hsl(24 10% 15%);
+
+  /* --foreground / --muted-foreground from dashboard. text-secondary is a
+     landing-only token (between primary text and muted) — no dashboard
+     equivalent, picked to sit between 94% and 62% lightness. */
+  --color-text: hsl(30 22% 94%);
+  --color-text-secondary: hsl(30 15% 78%);
+  --color-text-muted: hsl(30 12% 62%);
+
+  --color-border: hsl(24 8% 22%);
+  --color-border-strong: hsl(24 8% 32%);
+
+  /* Dashboard --primary / --accent. accent-soft uses dashboard's 0.14 alpha. */
+  --color-accent: hsl(150 50% 55%);
+  --color-accent-hover: hsl(150 55% 62%);
+  --color-accent-soft: hsl(150 50% 55% / 0.14);
+  --color-accent-text: hsl(24 12% 8%);
+
+  /* Code window — elevated surface in dark (not a hole as in light mode). */
+  --color-code-bg: hsl(24 11% 14%);
+  --color-code-text: hsl(30 22% 94%);
+  --color-code-muted: hsl(30 12% 55%);
+
+  /* Dashboard --success / --destructive. */
+  --color-success: hsl(142 55% 55%);
+  --color-error: hsl(0 65% 58%);
+
+  /* HTTP method colors — landing-only; brightened for legibility on dark. */
+  --color-http-post: hsl(142 55% 55%);
+  --color-http-get: hsl(30 12% 62%);
+  --color-http-put: hsl(150 50% 55%);
+  --color-http-delete: hsl(0 65% 58%);
 }
 
 /* -------------------------------------------------------------------------- */

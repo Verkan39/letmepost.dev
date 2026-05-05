@@ -55,8 +55,8 @@ const endpoints = [
   },
   {
     method: "POST",
-    path: "/v1/posts/validate",
-    desc: "Run preflight without publishing. Test rules in CI. Get every violation back at once.",
+    path: "/v1/media",
+    desc: "Multipart upload once, reference by mediaId on every post. Bytes stay on our CDN.",
   },
   {
     method: "POST",

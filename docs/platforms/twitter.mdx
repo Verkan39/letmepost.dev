@@ -9,7 +9,7 @@ X (Twitter) v2 API via OAuth 2.0 with PKCE. The publisher posts text, up to four
 
 ## Connect
 
-`POST /v1/accounts/connect/twitter`. OAuth 2.0 PKCE. After complete we call `GET /2/users/me` to pin the user id.
+`POST /v1/accounts/connect/twitter`. OAuth 2.0 PKCE. The publisher signs a state token that carries the PKCE `code_verifier` through the redirect — the dashboard never has to stash it client-side. After the X callback, the code+verifier exchange runs server-side. The synthetic `twitter-<uuid>` platform account id will resolve to the real X user id once the `/2/users/me` lookup ships in the next slice.
 
 ## Scopes
 

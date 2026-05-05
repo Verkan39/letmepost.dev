@@ -38,7 +38,7 @@ Bluesky doesn't have OAuth; it uses scoped app passwords. Generate one at [bsky.
 curl -X POST https://api.letmepost.dev/v1/accounts/connect/bluesky/complete \\
   -H "Authorization: Bearer $LMP_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '{ "handle": "you.bsky.social", "appPassword": "abcd-efgh-ijkl-mnop" }'
+  -d '{ "identifier": "you.bsky.social", "appPassword": "abcd-efgh-ijkl-mnop" }'
 ```
 
 We never store your main account password. Revoke an app password at any time on bsky.app and the connection breaks cleanly with `platform_auth_failed`.

@@ -15,7 +15,7 @@ Generate an app password at [bsky.app/settings/app-passwords](https://bsky.app/s
 curl -X POST https://api.letmepost.dev/v1/accounts/connect/bluesky/complete \\
   -H "Authorization: Bearer $LMP_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '{ "handle": "you.bsky.social", "appPassword": "abcd-efgh-ijkl-mnop" }'
+  -d '{ "identifier": "you.bsky.social", "appPassword": "abcd-efgh-ijkl-mnop" }'
 ```
 
 The `complete` response carries the `id` you'll send posts against. App passwords can be revoked at any time on bsky.app — when that happens the connection breaks cleanly with [`platform_auth_failed`](/errors/platform_auth_failed).

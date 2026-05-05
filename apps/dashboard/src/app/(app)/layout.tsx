@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { AppSidebar } from "@/components/app/app-sidebar";
 import { AuthGuard } from "@/components/app/auth-guard";
 import { Breadcrumbs } from "@/components/app/breadcrumbs";
@@ -8,6 +9,18 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { ProfileProvider } from "@/lib/profiles";
+
+/**
+ * Default title for any route under `(app)` that doesn't override via its
+ * own `layout.tsx`. The home route at `/` inherits this — every other
+ * route has a sibling `layout.tsx` that swaps in the route-specific title.
+ *
+ * The root layout's template is `%s · letmepost.dev`, so the rendered
+ * `<title>` becomes `Dashboard · letmepost.dev` etc.
+ */
+export const metadata: Metadata = {
+  title: "Dashboard",
+};
 
 export default function AppLayout({
   children,

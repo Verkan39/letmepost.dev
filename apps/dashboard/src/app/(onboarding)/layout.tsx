@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import { LogoMark } from "@/components/app/logo";
+
+export const metadata: Metadata = {
+  title: "Welcome",
+};
 
 export default function OnboardingLayout({
   children,

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Copy, Plug, Plus, Trash } from "@phosphor-icons/react";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import type { Account } from "@/lib/accounts";
+import { useActiveProfile } from "@/lib/profiles";
 import { queryKeys } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +35,8 @@ export default function AccountsListPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { activeProfile, activeProfileId, isLoading: profilesLoading } =
+    useActiveProfile();
   const [pendingDisconnect, setPendingDisconnect] = useState<Account | null>(
     null,
   );
@@ -42,7 +45,9 @@ export default function AccountsListPage() {
   // The API's OAuth callback (GET /v1/accounts/oauth/:platform/callback)
   // redirects here with `?connected=<platform>` on success or
   // `?connect_error=<reason>&platform=<p>` on failure. Surface a toast
-  // and clean the query so a refresh doesn't re-fire it.
+  // and clean the query so a refresh doesn't re-fire it. Invalidate by the
+  // top-level "accounts" prefix so every profile-scoped variant refetches —
+  // we don't know which profile the OAuth state row carried.
   useEffect(() => {
     const connected = searchParams.get("connected");
     const error = searchParams.get("connect_error");
@@ -50,7 +55,7 @@ export default function AccountsListPage() {
     if (!connected && !error) return;
     if (connected) {
       toast.success(`Connected ${connected}.`);
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.list() });
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
     } else if (error) {
       toast.error(
         platform
@@ -62,10 +67,21 @@ export default function AccountsListPage() {
     router.replace("/accounts", { scroll: false });
   }, [searchParams, router, queryClient]);
 
+  // Don't fire the list query until we know which profile to scope to —
+  // otherwise the first request goes out unfiltered, caches the org-wide
+  // list under `["accounts", null]`, and a subsequent profile pick has to
+  // wait for the refetch to overwrite the wrong data on screen.
   const query = useQuery({
-    queryKey: queryKeys.accounts.list(),
-    queryFn: () =>
-      apiFetch<{ data: Account[] }>("/v1/accounts").then((r) => r.data ?? []),
+    queryKey: queryKeys.accounts.list(activeProfileId),
+    queryFn: () => {
+      const qs = activeProfileId
+        ? `?profileId=${encodeURIComponent(activeProfileId)}`
+        : "";
+      return apiFetch<{ data: Account[] }>(`/v1/accounts${qs}`).then(
+        (r) => r.data ?? [],
+      );
+    },
+    enabled: !profilesLoading,
   });
   const accounts = query.data ?? null;
   const error = query.error
@@ -100,7 +116,9 @@ export default function AccountsListPage() {
         <div>
           <h1 className="text-lg font-semibold">Accounts</h1>
           <p className="text-xs text-muted-foreground">
-            Connected social platform accounts. Tokens are encrypted at rest.
+            {activeProfile
+              ? `Connected platform accounts in ${activeProfile.name}. Tokens encrypted at rest.`
+              : "Connected social platform accounts. Tokens are encrypted at rest."}
           </p>
         </div>
         <Button onClick={() => setConnectOpen(true)}>
@@ -124,9 +142,15 @@ export default function AccountsListPage() {
       ) : accounts.length === 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>No accounts yet</CardTitle>
+            <CardTitle>
+              {activeProfile
+                ? `No accounts in ${activeProfile.name}`
+                : "No accounts yet"}
+            </CardTitle>
             <CardDescription>
-              Connect your first platform to start publishing through the API.
+              {activeProfile
+                ? `Connect a platform to start publishing under ${activeProfile.name}. Each profile keeps its own set of accounts.`
+                : "Connect your first platform to start publishing through the API."}
             </CardDescription>
           </CardHeader>
           <CardContent>

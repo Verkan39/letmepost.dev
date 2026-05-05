@@ -281,11 +281,22 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
   );
 
   /** GET /v1/accounts — list. Bearer or session; orgId comes off c.var.apiKey
-   *  (set on both auth paths by `apiKeyOrSession`). */
+   *  (set on both auth paths by `apiKeyOrSession`).
+   *
+   *  Optional `?profileId=<uuid>` narrows to a single profile — used by
+   *  the dashboard's profile switcher. Omitting it preserves the legacy
+   *  org-wide list for direct API consumers. We don't fail when the
+   *  profileId looks malformed; we just match nothing, which is safer
+   *  than a 400 surfacing as a broken dashboard tab. */
   app.get("/", dual, async (c) => {
     const { organizationId } = c.var.apiKey;
+    const profileIdParam = c.req.query("profileId");
+    const profileId =
+      typeof profileIdParam === "string" && profileIdParam.length > 0
+        ? profileIdParam
+        : null;
     const repo = new DrizzlePlatformAccountsRepository(c.var.db);
-    const rows = await repo.listByOrg(organizationId);
+    const rows = await repo.listByOrgAndProfile(organizationId, profileId);
     return c.json({ data: rows.map(publicView) });
   });
 

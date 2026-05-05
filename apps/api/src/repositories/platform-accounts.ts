@@ -54,6 +54,16 @@ export interface PlatformAccountsRepository {
     platformAccountId: string,
   ): Promise<DecryptedPlatformAccount | null>;
   listByOrg(organizationId: string): Promise<DecryptedPlatformAccount[]>;
+  /**
+   * Same as listByOrg but additionally narrows to a single profile —
+   * scoped lists for the dashboard's profile switcher. Pass `null` for
+   * the legacy "all profiles in this org" behavior; explicitly passing a
+   * profileId returns only that profile's accounts.
+   */
+  listByOrgAndProfile(
+    organizationId: string,
+    profileId: string | null,
+  ): Promise<DecryptedPlatformAccount[]>;
   delete(id: string): Promise<boolean>;
   updateToken(
     id: string,
@@ -157,6 +167,23 @@ export class DrizzlePlatformAccountsRepository
       .select()
       .from(platformAccounts)
       .where(eq(platformAccounts.organizationId, organizationId));
+    return rows.map(hydrate);
+  }
+
+  async listByOrgAndProfile(
+    organizationId: string,
+    profileId: string | null,
+  ): Promise<DecryptedPlatformAccount[]> {
+    if (profileId === null) return this.listByOrg(organizationId);
+    const rows = await this.db
+      .select()
+      .from(platformAccounts)
+      .where(
+        and(
+          eq(platformAccounts.organizationId, organizationId),
+          eq(platformAccounts.profileId, profileId),
+        ),
+      );
     return rows.map(hydrate);
   }
 

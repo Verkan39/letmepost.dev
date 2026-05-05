@@ -9,7 +9,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { OnboardingConnect } from "@/components/app/onboarding-connect";
-import { queryKeys } from "@/lib/query-keys";
 
 /**
  * Right-side drawer wrapper around `OnboardingConnect`. Same descriptor-
@@ -46,9 +45,12 @@ export function ConnectAccountDrawer({
         <div className="p-4">
           <OnboardingConnect
             onConnected={() => {
-              queryClient.invalidateQueries({
-                queryKey: queryKeys.accounts.list(),
-              });
+              // Top-level prefix invalidation matches every profile-scoped
+              // variant (`["accounts", profileId]`). The newly-connected
+              // account may belong to a non-active profile if the user
+              // explicitly picked one in the form, so we don't risk being
+              // too narrow.
+              queryClient.invalidateQueries({ queryKey: ["accounts"] });
               onOpenChange(false);
             }}
           />

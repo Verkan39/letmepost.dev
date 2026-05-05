@@ -2,17 +2,189 @@
 import Logo from "./Logo.astro";
 import { Icon } from "astro-icon/components";
 import ThemeToggle from "./ThemeToggle.astro";
+import { PLATFORMS, APIS } from "../data/platforms.ts";
+
+const docsLinks = [
+  {
+    label: "Quickstart",
+    href: "https://docs.letmepost.dev/quickstart",
+    icon: "ph:rocket",
+  },
+  {
+    label: "SDKs",
+    href: "https://docs.letmepost.dev/sdks/typescript",
+    icon: "ph:package",
+  },
+  {
+    label: "CLI",
+    href: "https://docs.letmepost.dev/cli",
+    icon: "ph:terminal-window",
+  },
+  {
+    label: "API Reference",
+    href: "https://docs.letmepost.dev/api-reference",
+    icon: "ph:code",
+  },
+  {
+    label: "MCP Server",
+    href: "https://docs.letmepost.dev/mcp",
+    icon: "ph:sparkle",
+  },
+] as const;
+
+// Split the platforms across two columns balanced by row count so the
+// dropdown stays a fixed shape regardless of how many platforms ship.
+const half = Math.ceil(PLATFORMS.length / 2);
+const platformsLeft = PLATFORMS.slice(0, half);
+const platformsRight = PLATFORMS.slice(half);
 ---
 
-<header class="border-b border-border bg-transparent">
-  <div class="container flex items-center justify-between h-[52px]">
+<header class="bg-transparent relative">
+  <div class="container-wide flex items-center h-[52px] gap-6">
     <Logo />
-    <nav aria-label="Primary" class="flex items-center gap-5 text-[0.85rem]">
+    {/* Brand-cluster nav — sits right next to the logo so the Docs /
+        Product / Pricing items feel like part of the wordmark rather
+        than a stranded right-rail group. */}
+    <nav
+      aria-label="Primary"
+      class="flex items-center gap-3 text-[0.85rem]"
+    >
+      {/* ─── Docs dropdown ─────────────────────────────────────── */}
+      <div class="lmp-dropdown" data-dropdown>
+        <button
+          type="button"
+          class="lmp-dropdown-trigger inline-flex items-center gap-1 no-underline text-text-muted transition-colors hover:text-accent max-[640px]:hidden"
+          aria-haspopup="true"
+          aria-expanded="false"
+          data-dropdown-trigger
+        >
+          Docs
+          <Icon
+            name="ph:caret-down"
+            width={11}
+            height={11}
+            class="lmp-dropdown-caret transition-transform"
+          />
+        </button>
+        <div
+          class="lmp-dropdown-menu"
+          role="menu"
+          aria-label="Docs"
+          data-dropdown-menu
+        >
+          <ul class="lmp-dropdown-list">
+            {docsLinks.map((link) => (
+              <li>
+                <a
+                  href={link.href}
+                  class="lmp-dropdown-item"
+                  role="menuitem"
+                >
+                  <Icon name={link.icon} width={15} height={15} />
+                  <span>{link.label}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      {/* ─── Product dropdown ──────────────────────────────────── */}
+      <div class="lmp-dropdown" data-dropdown>
+        <button
+          type="button"
+          class="lmp-dropdown-trigger inline-flex items-center gap-1 no-underline text-text-muted transition-colors hover:text-accent max-[640px]:hidden"
+          aria-haspopup="true"
+          aria-expanded="false"
+          data-dropdown-trigger
+        >
+          Product
+          <Icon
+            name="ph:caret-down"
+            width={11}
+            height={11}
+            class="lmp-dropdown-caret transition-transform"
+          />
+        </button>
+        <div
+          class="lmp-dropdown-menu lmp-dropdown-wide"
+          role="menu"
+          aria-label="Product"
+          data-dropdown-menu
+        >
+          <div class="lmp-dropdown-grid">
+            <div>
+              <div class="lmp-dropdown-section">Platforms</div>
+              <div class="lmp-dropdown-cols">
+                <ul class="lmp-dropdown-list">
+                  {platformsLeft.map((p) => (
+                    <li>
+                      <a
+                        href={`/platforms/${p.slug}`}
+                        class="lmp-dropdown-item"
+                        role="menuitem"
+                      >
+                        <Icon name={`ph:${p.icon}`} width={15} height={15} />
+                        <span>{p.name}</span>
+                        {p.status === "live" ? (
+                          <span class="lmp-dropdown-badge" aria-label="Live">live</span>
+                        ) : null}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+                <ul class="lmp-dropdown-list">
+                  {platformsRight.map((p) => (
+                    <li>
+                      <a
+                        href={`/platforms/${p.slug}`}
+                        class="lmp-dropdown-item"
+                        role="menuitem"
+                      >
+                        <Icon name={`ph:${p.icon}`} width={15} height={15} />
+                        <span>{p.name}</span>
+                        {p.status === "live" ? (
+                          <span class="lmp-dropdown-badge" aria-label="Live">live</span>
+                        ) : null}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <div>
+              <div class="lmp-dropdown-section">APIs</div>
+              <ul class="lmp-dropdown-list">
+                {APIS.map((api) => (
+                  <li>
+                    <a
+                      href={`/api/${api.slug}`}
+                      class="lmp-dropdown-item"
+                      role="menuitem"
+                    >
+                      <Icon name={`ph:${api.icon}`} width={15} height={15} />
+                      <span>{api.name}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <a
-        href="/#platforms"
+        href="/pricing"
         class="no-underline text-text-muted transition-colors hover:text-accent max-[520px]:hidden"
-        >Platforms</a
+        >Pricing</a
       >
+    </nav>
+    {/* Utility-cluster — pushed to the right via ml-auto so it sticks
+        to the far edge regardless of the brand cluster's width. */}
+    <nav
+      aria-label="Utility"
+      class="ml-auto flex items-center gap-5 text-[0.85rem]"
+    >
       <a
         href="/status"
         class="no-underline text-text-muted transition-colors hover:text-accent max-[520px]:hidden"
@@ -31,3 +203,184 @@ import ThemeToggle from "./ThemeToggle.astro";
     </nav>
   </div>
 </header>
+
+<style>
+  /* Dropdown plumbing: button toggles `[data-open]` on the wrapper, CSS
+     reveals the panel. Hover also reveals so mouse users don't need a
+     click. The wide menu absolutely-positions to the right of the trigger
+     so it doesn't crowd the logo, but stays within the viewport on
+     narrower screens via `right: 0`. */
+
+  .lmp-dropdown {
+    position: relative;
+  }
+
+  /* The menu butts directly up against the navbar's bottom edge —
+     no visual gap, so the cursor can move from the trigger straight
+     into the menu without leaving any hovered region. Without this,
+     even a 4px gap was enough to close the menu mid-traverse.
+     No border — the soft drop-shadow alone separates the menu from
+     the page, in line with the rest of the borderless landing
+     chrome (header / footer). */
+  .lmp-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 220px;
+    background: var(--color-bg);
+    box-shadow: 0 14px 38px hsl(0 0% 0% / 0.14);
+    padding: 8px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-4px);
+    transition:
+      opacity 120ms ease,
+      transform 120ms ease;
+    z-index: 50;
+  }
+
+  .lmp-dropdown-wide {
+    /* Two-column product menu — anchor to the right so it doesn't shove
+       off the page when the trigger is in the middle of the navbar. */
+    left: auto;
+    right: 0;
+    min-width: 540px;
+  }
+
+  .lmp-dropdown[data-open] .lmp-dropdown-menu,
+  .lmp-dropdown:hover .lmp-dropdown-menu,
+  .lmp-dropdown:focus-within .lmp-dropdown-menu {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .lmp-dropdown[data-open] .lmp-dropdown-caret,
+  .lmp-dropdown:hover .lmp-dropdown-caret,
+  .lmp-dropdown:focus-within .lmp-dropdown-caret {
+    transform: rotate(180deg);
+  }
+
+  .lmp-dropdown-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .lmp-dropdown-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.45rem 0.65rem;
+    width: 100%;
+    color: var(--color-text);
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: background 80ms ease;
+    border-radius: 0;
+  }
+
+  .lmp-dropdown-item:hover {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+
+  .lmp-dropdown-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.2rem;
+    padding: 0.4rem 0.4rem 0.6rem;
+  }
+
+  .lmp-dropdown-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.35rem 1rem;
+  }
+
+  .lmp-dropdown-section {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-text-muted);
+    padding: 0.35rem 0.65rem 0.5rem;
+  }
+
+  .lmp-dropdown-badge {
+    margin-left: auto;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-success, var(--color-accent));
+    background: var(--color-accent-soft);
+    padding: 0.1rem 0.35rem;
+    line-height: 1;
+  }
+
+  @media (max-width: 720px) {
+    .lmp-dropdown-wide {
+      min-width: 92vw;
+    }
+    .lmp-dropdown-grid {
+      grid-template-columns: 1fr;
+    }
+    .lmp-dropdown-cols {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<script>
+  // Click-to-toggle for keyboard + mobile users. CSS hover handles
+  // mouse users on desktop. Click anywhere outside to close.
+  function setupDropdowns() {
+    const dropdowns = document.querySelectorAll<HTMLElement>("[data-dropdown]");
+    dropdowns.forEach((dropdown) => {
+      const trigger = dropdown.querySelector<HTMLButtonElement>(
+        "[data-dropdown-trigger]",
+      );
+      if (!trigger) return;
+
+      trigger.addEventListener("click", (e) => {
+        e.preventDefault();
+        const open = dropdown.hasAttribute("data-open");
+        // Close every other dropdown first so two can't be open at once.
+        dropdowns.forEach((d) => d.removeAttribute("data-open"));
+        if (!open) {
+          dropdown.setAttribute("data-open", "");
+          trigger.setAttribute("aria-expanded", "true");
+        } else {
+          trigger.setAttribute("aria-expanded", "false");
+        }
+      });
+    });
+
+    document.addEventListener("click", (e) => {
+      const target = e.target as Element | null;
+      if (!target) return;
+      if (target.closest("[data-dropdown]")) return;
+      dropdowns.forEach((d) => {
+        d.removeAttribute("data-open");
+        const trigger = d.querySelector<HTMLButtonElement>(
+          "[data-dropdown-trigger]",
+        );
+        trigger?.setAttribute("aria-expanded", "false");
+      });
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      dropdowns.forEach((d) => {
+        d.removeAttribute("data-open");
+        const trigger = d.querySelector<HTMLButtonElement>(
+          "[data-dropdown-trigger]",
+        );
+        trigger?.setAttribute("aria-expanded", "false");
+      });
+    });
+  }
+
+  setupDropdowns();
+  // Astro view transitions — re-bind after navigations.
+  document.addEventListener("astro:after-swap", setupDropdowns);
+</script>

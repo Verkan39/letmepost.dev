@@ -1,0 +1,255 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { Code } from "astro:components";
+import { Icon } from "astro-icon/components";
+import { APIS, type ApiSurface } from "../../data/platforms.ts";
+
+export function getStaticPaths() {
+  return APIS.map((api) => ({
+    params: { slug: api.slug },
+    props: { api },
+  }));
+}
+
+interface Props {
+  api: ApiSurface;
+}
+
+const { api } = Astro.props;
+
+// Per-API code sample. Switch on slug since the surface differs.
+const codeSamples: Record<string, { filename: string; lang: "ts" | "bash"; code: string }> = {
+  publishing: {
+    filename: "publish.ts",
+    lang: "ts",
+    code: `// One POST. Eight platforms. Idempotency keys make retries safe.
+
+await fetch("https://api.letmepost.dev/v1/posts", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer lmp_live_…",
+    "Idempotency-Key": crypto.randomUUID(),
+  },
+  body: JSON.stringify({
+    account: { platform: "bluesky", id: "acc_…" },
+    text: "Shipping letmepost.dev",
+    // Schedule for later — same shape, returns 202 instead of 201.
+    // scheduledAt: "2026-06-01T12:00:00Z",
+  }),
+});`,
+  },
+  media: {
+    filename: "upload.sh",
+    lang: "bash",
+    code: `# Upload bytes once. Reference by mediaId on every post.
+
+curl -X POST https://api.letmepost.dev/v1/media \\
+  -H "Authorization: Bearer $LMP_KEY" \\
+  -F file=@./hero.jpg
+
+# Response: { "id": "med_a1b2c3...", "url": "https://media.letmepost.dev/..." }
+
+# Then use it on a post:
+curl -X POST https://api.letmepost.dev/v1/posts \\
+  -H "Authorization: Bearer $LMP_KEY" \\
+  -H "Idempotency-Key: $(uuidgen)" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "account": { "platform": "bluesky", "id": "acc_..." },
+    "text": "Look at this",
+    "media": [{ "kind": "image", "mediaId": "med_a1b2c3..." }]
+  }'`,
+  },
+  webhooks: {
+    filename: "verify.ts",
+    lang: "ts",
+    code: `// HMAC-SHA256 signature on every delivery. Verify before processing.
+
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+export function verifyLetmepost(req: Request, secret: string, raw: string) {
+  const sig = req.headers.get("x-letmepost-signature") ?? "";
+  const expected = createHmac("sha256", secret).update(raw).digest("hex");
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    throw new Error("bad signature");
+  }
+}
+
+// Subscribe via POST /v1/webhook-endpoints
+// Events: post.queued, post.published, post.failed, post.rejected,
+//          token.expiring, token.revoked, version.deprecated`,
+  },
+};
+
+const sample = codeSamples[api.slug] ?? codeSamples.publishing;
+
+const features: Record<string, { icon: string; title: string; body: string }[]> = {
+  publishing: [
+    {
+      icon: "lightning",
+      title: "Preflight, not postflight",
+      body: "Every documented platform constraint runs locally before the upstream call. No `body: {}` mystery failures.",
+    },
+    {
+      icon: "shuffle",
+      title: "Idempotency by default",
+      body: "`Idempotency-Key` on every write. 24-hour replay window. Body-hash conflict detection on key reuse.",
+    },
+    {
+      icon: "clock",
+      title: "Scheduled posts",
+      body: "`scheduledAt: <ISO-8601>` queues a delayed job; webhooks confirm the publish when it lands.",
+    },
+    {
+      icon: "circle-half",
+      title: "Per-platform overrides",
+      body: "`pinterest.boardId`, `twitter.replyToTweetId`, `threads.replyToId` — escape hatches without breaking the unified shape.",
+    },
+  ],
+  media: [
+    {
+      icon: "lightning",
+      title: "One upload, many posts",
+      body: "Upload bytes once via `POST /v1/media`. Reference the returned id from `media: [{ mediaId }]` on every post that uses it.",
+    },
+    {
+      icon: "lock-key",
+      title: "Tenancy-scoped",
+      body: "Media rows are scoped per-org and per-profile. Cross-tenant probing returns 404 — never 403, so nobody can enumerate ids that aren't theirs.",
+    },
+    {
+      icon: "video-camera",
+      title: "Required for video",
+      body: "Inline base64 doesn't scale past tiny payloads. Bluesky, Twitter, and Pinterest video pins all require the mediaId path.",
+    },
+  ],
+  webhooks: [
+    {
+      icon: "broadcast",
+      title: "8 event types",
+      body: "post.queued, post.published, post.failed, post.rejected, post.validated, token.expiring, token.revoked, version.deprecated.",
+    },
+    {
+      icon: "fingerprint",
+      title: "HMAC-signed",
+      body: "Every payload signed with a per-endpoint secret. Verify in your handler with timing-safe comparison.",
+    },
+    {
+      icon: "arrows-clockwise",
+      title: "Retried with backoff",
+      body: "Failed deliveries retry with exponential backoff. Persistent failures land in a dead-letter queue you can inspect from the dashboard.",
+    },
+  ],
+};
+
+const featureList = features[api.slug] ?? features.publishing;
+---
+
+<BaseLayout
+  title={api.name}
+  description={`${api.name} — ${api.tagline}`}
+>
+  <!-- Hero -->
+  <section class="pt-22 pb-12 max-[640px]:pt-14 max-[640px]:pb-8">
+    <div class="container">
+      <a
+        href="/"
+        class="text-[0.72rem] uppercase tracking-[0.1em] text-text-muted no-underline hover:text-accent inline-flex items-center gap-1 mb-5"
+      >
+        <Icon name="ph:arrow-left" width={11} height={11} />
+        All APIs
+      </a>
+
+      <div class="flex items-center gap-3 mb-5">
+        <Icon name={`ph:${api.icon}`} width={32} height={32} class="text-text" />
+        <h1 class="!m-0">{api.name}</h1>
+      </div>
+
+      <div
+        class="inline-flex items-center gap-2 text-[0.72rem] uppercase tracking-[0.1em] mb-7 py-[0.3rem] px-[0.6rem] border border-border-strong"
+      >
+        <span
+          class="w-[7px] h-[7px] inline-block bg-success"
+          aria-hidden="true"
+        ></span>
+        Live
+        <span class="opacity-60 ml-1">· {api.tagline}</span>
+      </div>
+
+      <p
+        class="text-[1.1rem] leading-[1.6] max-w-[42rem] mt-3 mb-8 text-text-secondary"
+      >
+        {api.pitch}
+      </p>
+
+      <div class="flex gap-[0.6rem] flex-wrap">
+        <a class="btn btn-primary" href="https://dashboard.letmepost.dev">
+          Start building free
+          <Icon name="ph:arrow-up-right" width={13} height={13} />
+        </a>
+        <a
+          class="btn btn-secondary"
+          href="https://docs.letmepost.dev/api-reference"
+        >
+          API reference
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Code sample -->
+  <section class="pt-8 pb-12">
+    <div class="container">
+      <div class="border border-border bg-code-bg">
+        <div
+          class="flex items-center gap-[0.45rem] py-[0.65rem] px-[0.9rem] border-b border-[hsl(24_10%_16%)] text-[0.7rem] text-code-muted tracking-[0.02em]"
+        >
+          <span class="w-[11px] h-[11px] rounded-full inline-block shrink-0 bg-[#ff5f57]" aria-hidden="true"></span>
+          <span class="w-[11px] h-[11px] rounded-full inline-block shrink-0 bg-[#febc2e]" aria-hidden="true"></span>
+          <span class="w-[11px] h-[11px] rounded-full inline-block shrink-0 bg-[#28c840]" aria-hidden="true"></span>
+          <span class="ml-[0.6rem]">{sample.filename}</span>
+        </div>
+        <Code code={sample.code} lang={sample.lang} theme="github-dark-dimmed" />
+      </div>
+    </div>
+  </section>
+
+  <!-- What it does -->
+  <section class="pt-8 pb-12">
+    <div class="container">
+      <h2 class="!mt-0">What's in the box.</h2>
+      <p class="text-text-muted">{api.detail}</p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+        {featureList.map((feat) => (
+          <div class="border border-border p-5">
+            <Icon name={`ph:${feat.icon}`} width={22} height={22} class="text-accent mb-3" />
+            <h3 class="!m-0 !mb-2 !text-[0.95rem] !font-bold">{feat.title}</h3>
+            <p class="text-text-muted m-0 text-[0.86rem]">{feat.body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="pt-8 pb-18 max-[640px]:pb-12">
+    <div class="container">
+      <h2 class="!mt-0">Ship it.</h2>
+      <p class="text-text-muted">
+        Mint an API key. Send your first request. We're around if you hit anything weird.
+      </p>
+      <div class="flex gap-[0.6rem] flex-wrap">
+        <a class="btn btn-primary" href="https://dashboard.letmepost.dev">
+          Get an API key
+          <Icon name="ph:arrow-up-right" width={13} height={13} />
+        </a>
+        <a class="btn btn-secondary" href="https://docs.letmepost.dev/api-reference">
+          Read the API reference
+        </a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

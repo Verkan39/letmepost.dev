@@ -1,0 +1,207 @@
+/**
+ * Source-of-truth list of platforms surfaced on the landing site —
+ * navbar, /platforms cards, and the dynamic /platforms/[slug] pages
+ * all key off this. Adding a platform here scaffolds:
+ *
+ *   1. A new entry under the navbar's PLATFORMS column
+ *   2. A new /platforms/<slug> page generated from the shared shell
+ *   3. A row on the index landing's platform-status list
+ *
+ * Keep this in sync with `packages/schemas/src/platforms.ts` and the
+ * provider registry in `apps/api/src/platforms/index.ts`. When real-API
+ * status flips (under_review → live), update `status` here in the same
+ * commit that ships the launch.
+ */
+
+export type PlatformStatus = "live" | "under_review" | "planned";
+
+export type Platform = {
+  /** URL slug — `/platforms/<slug>`. */
+  slug: string;
+  /** Display name in the navbar + page headers. */
+  name: string;
+  /** Phosphor icon id (without the `ph:` prefix). */
+  icon: string;
+  /** Live-launch status; drives the colored dot + the page hero copy. */
+  status: PlatformStatus;
+  /** One-liner shown under the card on /platforms-overview. */
+  tagline: string;
+  /** Hero subhead on the /platforms/<slug> page. */
+  pitch: string;
+  /** Key technical detail surfaced under the hero (API version, scope set, etc.). */
+  detail: string;
+  /** Whether posts to this platform support video uploads in v1. */
+  videoSupport: boolean;
+  /** Whether posts to this platform support multi-image carousels in v1. */
+  carouselSupport: boolean;
+  /** Optional anchor for a platform-specific gotcha worth surfacing. */
+  gotcha?: string;
+};
+
+export const PLATFORMS: readonly Platform[] = [
+  {
+    slug: "bluesky",
+    name: "Bluesky",
+    icon: "butterfly",
+    status: "live",
+    tagline: "AT Proto · live for everyone today",
+    pitch:
+      "App-password connect, no OAuth review, no app gates. The AT Proto stack ships v1's most permissive on-ramp — sign in with an app password and the API is live.",
+    detail:
+      "AT Proto · 300-grapheme posts · 4 images or 1 video · video routes through the dedicated transcoding service automatically",
+    videoSupport: true,
+    carouselSupport: true,
+  },
+  {
+    slug: "twitter",
+    name: "Twitter / X",
+    icon: "x-logo",
+    status: "under_review",
+    tagline: "v2 API + chunked video upload",
+    pitch:
+      "OAuth 2.0 PKCE handled server-side. Up to four images, an MP4 video via chunked upload, reply chains, quote tweets — one POST surface for all of it.",
+    detail:
+      "v2 API · 280-grapheme tweets (t.co-aware) · 4 images OR 1 video OR 1 GIF · alt text best-effort via v1.1 metadata",
+    videoSupport: true,
+    carouselSupport: true,
+    gotcha:
+      "X retired the free posting tier in 2025 — Pay Per Use is the cheapest entry point. letmepost works on any tier with `tweet.write`.",
+  },
+  {
+    slug: "linkedin",
+    name: "LinkedIn",
+    icon: "linkedin-logo",
+    status: "under_review",
+    tagline: "Versioned REST · the wedge platform",
+    pitch:
+      "LinkedIn sunset five API versions in six months from 2024–25. We pin the version header, monitor sunsets, and upgrade internally — your code keeps working when LinkedIn ships a breaking change at 2 a.m.",
+    detail:
+      "Versioned REST · 3,000-grapheme commentary · personal posts in v1 · org posts via Marketing Developer Platform (MDP)",
+    videoSupport: false,
+    carouselSupport: false,
+    gotcha:
+      "Org / Company Page posting requires MDP approval. v1 ships personal posting; org publishing lands in the next phase.",
+  },
+  {
+    slug: "pinterest",
+    name: "Pinterest",
+    icon: "pinterest-logo",
+    status: "under_review",
+    tagline: "v5 API · image + video pins",
+    pitch:
+      "Image pins go through `media_source.url` directly — single round-trip and the pin is live. Video pins run register-media → S3 multipart → poll → createPin transparently.",
+    detail:
+      "v5 API · image + video pins · cover image required for video · destination URL reachability checked locally",
+    videoSupport: true,
+    carouselSupport: false,
+    gotcha:
+      "Trial Access apps must point at the sandbox host. Production access requires Standard Access approval.",
+  },
+  {
+    slug: "threads",
+    name: "Threads",
+    icon: "threads-logo",
+    status: "under_review",
+    tagline: "Meta Threads Graph API · 2–20 carousels",
+    pitch:
+      "Standalone OAuth at threads.net (not Facebook Login). Text, single image, single video, or a 2–20-child mixed-media carousel — Threads's two-step async publish is hidden from the caller.",
+    detail:
+      "Threads Graph API · 500-grapheme posts · 60-day token · containers expire after 24 h",
+    videoSupport: true,
+    carouselSupport: true,
+  },
+  {
+    slug: "instagram",
+    name: "Instagram",
+    icon: "instagram-logo",
+    status: "under_review",
+    tagline: "Meta Graph · IG Business via FB Login",
+    pitch:
+      "One Facebook OAuth grants both Pages and IG Business access. Single-image, single-video (Reels), or 2–10 mixed-media carousels. URL reachability — the canonical `OAuthException 2207052` — caught locally before upstream.",
+    detail:
+      "Meta Graph · 2,200-grapheme captions · JPEG-only photo path · 2–10 mixed-media carousels",
+    videoSupport: true,
+    carouselSupport: true,
+    gotcha:
+      "Connect via `/v1/accounts/connect/facebook`, not `/instagram` — one consent fans out to Pages + linked IG Business.",
+  },
+  {
+    slug: "facebook",
+    name: "Facebook Pages",
+    icon: "facebook-logo",
+    status: "under_review",
+    tagline: "Meta Graph · Pages + IG fan-out",
+    pitch:
+      "Facebook Login for Business. Text-only, single photo, multi-photo, or video posts to your Pages. The same OAuth grant lights up linked IG Business accounts in one step.",
+    detail:
+      "Meta Graph · text up to 63,206 chars · single video OR up to 10 photos · video posts via /videos endpoint",
+    videoSupport: true,
+    carouselSupport: true,
+  },
+  {
+    slug: "youtube",
+    name: "YouTube",
+    icon: "youtube-logo",
+    status: "planned",
+    tagline: "Data API v3 · CASA verification gate",
+    pitch:
+      "YouTube uploads via Data API v3 are gated by Google's CASA security review (typically 6–12 weeks). letmepost ships the publisher and waits on review; flip-the-switch is one config change once Google clears the audit.",
+    detail:
+      "Data API v3 · video upload + metadata · CASA-gated; OAuth scope `youtube.upload`",
+    videoSupport: true,
+    carouselSupport: false,
+    gotcha:
+      "Awaiting CASA verification approval. Self-host users with their own Google project + CASA cert can use it today.",
+  },
+] as const;
+
+export type ApiSurface = {
+  slug: string;
+  name: string;
+  /** Phosphor icon id (without the `ph:` prefix). */
+  icon: string;
+  /** Status — every API on this list is live unless marked otherwise. */
+  status: PlatformStatus;
+  /** One-liner shown next to the dropdown label. */
+  tagline: string;
+  /** Hero subhead on the API page. */
+  pitch: string;
+  /** Bullet shown on the page detail line. */
+  detail: string;
+};
+
+export const APIS: readonly ApiSurface[] = [
+  {
+    slug: "publishing",
+    name: "Publishing API",
+    icon: "paper-plane-tilt",
+    status: "live",
+    tagline: "POST /v1/posts — text, media, schedule",
+    pitch:
+      "One POST endpoint, eight platforms. Idempotency keys on every write. Preflight validation before the upstream call. Schedule with `scheduledAt`; webhooks confirm publish.",
+    detail:
+      "POST /v1/posts · idempotency · preflight rules · scheduled posts · per-platform overrides",
+  },
+  {
+    slug: "media",
+    name: "Media API",
+    icon: "image",
+    status: "live",
+    tagline: "POST /v1/media — multipart upload",
+    pitch:
+      "Upload bytes once, reference by `mediaId` on every post that uses them. Cuts publish-time latency, deduplicates assets across posts, and unlocks video on platforms (Bluesky, Twitter, Pinterest) where inline base64 doesn't scale.",
+    detail:
+      "POST /v1/media · multipart · S3-backed · scoped per-org · referenced from `media: [{ mediaId }]`",
+  },
+  {
+    slug: "webhooks",
+    name: "Webhooks",
+    icon: "broadcast",
+    status: "live",
+    tagline: "HMAC-signed delivery for every state transition",
+    pitch:
+      "Subscribe once, receive `post.queued`, `post.published`, `post.failed`, `post.rejected`, `token.expiring`, `token.revoked`, `version.deprecated`. Every payload HMAC-signed with a per-endpoint secret you rotate.",
+    detail:
+      "POST /v1/webhook-endpoints · 8 event types · HMAC-SHA256 · exponential backoff · dead-letter inspection",
+  },
+] as const;

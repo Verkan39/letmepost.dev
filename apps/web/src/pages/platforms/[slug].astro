@@ -1,0 +1,303 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { Code } from "astro:components";
+import { Icon } from "astro-icon/components";
+import { PLATFORMS, type Platform } from "../../data/platforms.ts";
+
+export function getStaticPaths() {
+  return PLATFORMS.map((platform) => ({
+    params: { slug: platform.slug },
+    props: { platform },
+  }));
+}
+
+interface Props {
+  platform: Platform;
+}
+
+const { platform } = Astro.props;
+
+const STATUS_COPY: Record<Platform["status"], { label: string; color: string }> = {
+  live: { label: "Live", color: "var(--color-success, var(--color-accent))" },
+  under_review: { label: "Under review", color: "var(--color-accent)" },
+  planned: { label: "Planned", color: "var(--color-text-muted)" },
+};
+const status = STATUS_COPY[platform.status];
+
+// Per-platform code sample. Bluesky is the only platform shipping today
+// so it uses a real example body; the others use the same shape with
+// the platform's slug — accurate to the API contract, just not yet
+// publishable end-to-end.
+const platformValue = platform.slug === "twitter" ? "twitter" : platform.slug;
+const codeSample = `// One POST. Same shape on every platform.
+// Idempotency keys make retries safe; preflight runs before upstream.
+
+await fetch("https://api.letmepost.dev/v1/posts", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer lmp_live_…",
+    "Idempotency-Key": crypto.randomUUID(),
+  },
+  body: JSON.stringify({
+    account: { platform: "${platformValue}", id: "acc_…" },
+    text: "Shipping to ${platform.name} via letmepost.dev",
+${
+  platform.videoSupport
+    ? `    media: [{ kind: "video", mediaId: "med_…" }],\n`
+    : `    media: [{ kind: "image", mediaId: "med_…", altText: "…" }],\n`
+}  }),
+});`;
+
+const contentTypes: { label: string; icon: string; supported: boolean }[] = [
+  { label: "Text", icon: "text-aa", supported: true },
+  { label: "Images", icon: "image", supported: true },
+  { label: "Video", icon: "video-camera", supported: platform.videoSupport },
+  {
+    label: "Carousel",
+    icon: "frame-corners",
+    supported: platform.carouselSupport,
+  },
+];
+
+const howItWorks = [
+  {
+    n: "01",
+    title: "Mint an API key",
+    body: "Sign in to the dashboard and create a Bearer key. Per-org by default; scope to a single profile if you want extra isolation.",
+  },
+  {
+    n: "02",
+    title: `Connect a ${platform.name} account`,
+    body:
+      platform.slug === "bluesky"
+        ? "Generate an app password at bsky.app/settings/app-passwords and submit it via /v1/accounts/connect/bluesky/complete. No OAuth review."
+        : platform.slug === "facebook" || platform.slug === "instagram"
+          ? "POST /v1/accounts/connect/facebook starts Facebook Login for Business. One consent grants Pages + linked IG Business in a single fan-out."
+          : `POST /v1/accounts/connect/${platform.slug} returns the OAuth authorize URL. Redirect the user; the callback completes the handshake and stores the encrypted token.`,
+  },
+  {
+    n: "03",
+    title: "Send a post",
+    body: "POST /v1/posts with the connected account id. Preflight rules run locally; webhooks fire on every state transition.",
+  },
+];
+
+const features = [
+  {
+    icon: "lightning",
+    title: "Preflight, not postflight",
+    body: `Every documented ${platform.name} constraint runs locally before the upstream call — no opaque platform 400s.`,
+  },
+  {
+    icon: "lock-key",
+    title: "Tokens encrypted at rest",
+    body: "AES-256-GCM envelope encryption with per-row data-keys. Refresh handled on the platform's schedule.",
+  },
+  {
+    icon: "shuffle",
+    title: "Idempotency by default",
+    body: "Idempotency-Key on every write. Retries are safe; double-posting from a worker restart isn't a thing.",
+  },
+];
+---
+
+<BaseLayout
+  title={`${platform.name} API`}
+  description={`Publish to ${platform.name} via letmepost.dev — preflight validation, idempotency keys, transparent errors.`}
+>
+  <!-- Hero -->
+  <section class="pt-22 pb-12 max-[640px]:pt-14 max-[640px]:pb-8">
+    <div class="container">
+      <a
+        href="/#platforms"
+        class="text-[0.72rem] uppercase tracking-[0.1em] text-text-muted no-underline hover:text-accent inline-flex items-center gap-1 mb-5"
+      >
+        <Icon name="ph:arrow-left" width={11} height={11} />
+        All platforms
+      </a>
+
+      <div class="flex items-center gap-3 mb-5">
+        <Icon name={`ph:${platform.icon}`} width={32} height={32} class="text-text" />
+        <h1 class="!m-0">{platform.name}</h1>
+      </div>
+
+      <div
+        class="inline-flex items-center gap-2 text-[0.72rem] uppercase tracking-[0.1em] mb-7 py-[0.3rem] px-[0.6rem] border border-border-strong"
+      >
+        <span
+          class="w-[7px] h-[7px] inline-block"
+          style={`background: ${status.color};`}
+          aria-hidden="true"
+        ></span>
+        {status.label}
+        <span class="opacity-60 ml-1">· {platform.tagline}</span>
+      </div>
+
+      <p
+        class="text-[1.1rem] leading-[1.6] max-w-[42rem] mt-3 mb-8 text-text-secondary"
+      >
+        {platform.pitch}
+      </p>
+
+      <div class="flex gap-[0.6rem] flex-wrap">
+        <a class="btn btn-primary" href="https://dashboard.letmepost.dev">
+          Start building free
+          <Icon name="ph:arrow-up-right" width={13} height={13} />
+        </a>
+        <a class="btn btn-secondary" href="https://docs.letmepost.dev/quickstart">
+          Quickstart
+        </a>
+      </div>
+
+      <p class="text-[0.78rem] mt-3 text-text-muted">
+        No credit card required · Free during alpha ·
+        <a href="https://docs.letmepost.dev/api-reference" class="text-accent">API reference →</a>
+      </p>
+    </div>
+  </section>
+
+  <!-- Code sample -->
+  <section class="pt-8 pb-12">
+    <div class="container">
+      <div class="border border-border bg-code-bg">
+        <div
+          class="flex items-center gap-[0.45rem] py-[0.65rem] px-[0.9rem] border-b border-[hsl(24_10%_16%)] text-[0.7rem] text-code-muted tracking-[0.02em]"
+        >
+          <span class="w-[11px] h-[11px] rounded-full inline-block shrink-0 bg-[#ff5f57]" aria-hidden="true"></span>
+          <span class="w-[11px] h-[11px] rounded-full inline-block shrink-0 bg-[#febc2e]" aria-hidden="true"></span>
+          <span class="w-[11px] h-[11px] rounded-full inline-block shrink-0 bg-[#28c840]" aria-hidden="true"></span>
+          <span class="ml-[0.6rem]">post-to-{platform.slug}.ts</span>
+        </div>
+        <Code code={codeSample} lang="ts" theme="github-dark-dimmed" />
+      </div>
+    </div>
+  </section>
+
+  <!-- Constraints + gotcha -->
+  <section class="pt-8 pb-12 max-[640px]:pt-6">
+    <div class="container">
+      <h2 class="!mt-0">What ships on day one.</h2>
+      <p class="text-text-muted">
+        {platform.detail}
+      </p>
+
+      {platform.gotcha ? (
+        <div
+          class="border-l-4 mt-6 py-3 px-4"
+          style="border-color: var(--color-accent); background: var(--color-accent-soft);"
+        >
+          <div class="text-[0.72rem] uppercase tracking-[0.1em] text-accent font-bold mb-1">Heads up</div>
+          <p class="m-0 text-[0.92rem] text-text-secondary">{platform.gotcha}</p>
+        </div>
+      ) : null}
+    </div>
+  </section>
+
+  <!-- Demo placeholder -->
+  <section class="pt-8 pb-12">
+    <div class="container">
+      <div class="text-[0.72rem] uppercase tracking-[0.1em] text-text-muted mb-3 font-bold">Playground</div>
+      <div
+        class="border border-dashed border-border-strong p-8 text-center"
+      >
+        <Icon
+          name="ph:play-circle"
+          width={32}
+          height={32}
+          class="mx-auto mb-3 text-text-muted"
+        />
+        <h3 class="!mt-0 !mb-1 !text-base">Live {platform.name} demo coming soon</h3>
+        <p class="text-text-muted text-[0.9rem] m-0">
+          Connect an account and send a real post through the API — no signup form, no credit card. Watch this space.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Content types -->
+  <section class="pt-8 pb-12">
+    <div class="container">
+      <div class="text-[0.72rem] uppercase tracking-[0.1em] text-text-muted mb-3 font-bold">Content types</div>
+      <div class="flex gap-2 flex-wrap">
+        {contentTypes.map((ct) => (
+          <span
+            class={`inline-flex items-center gap-[0.45rem] py-[0.4rem] px-[0.7rem] text-[0.82rem] border ${
+              ct.supported
+                ? "border-border-strong text-text"
+                : "border-border text-text-muted opacity-50 line-through"
+            }`}
+          >
+            <Icon name={`ph:${ct.icon}`} width={14} height={14} />
+            {ct.label}
+          </span>
+        ))}
+      </div>
+      <p class="text-[0.78rem] mt-4 text-text-muted">
+        Crossed-out types aren't supported on {platform.name} in v1 — see <a href="https://docs.letmepost.dev/preflight" class="text-accent">preflight rules</a> for the exact ceilings.
+      </p>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="pt-8 pb-12">
+    <div class="container">
+      <h2 class="!mt-0">How it works.</h2>
+      <p class="text-text-muted">Three steps. Minutes, not days.</p>
+
+      <ol class="list-none p-0 mt-6 mb-4">
+        {howItWorks.map((step) => (
+          <li class="flex gap-[1.1rem] py-5">
+            <div class="text-accent font-extrabold text-[0.85rem] min-w-9 pt-[0.1rem] tracking-[0.04em]">
+              {step.n}
+            </div>
+            <div>
+              <h3 class="!m-0 !mb-[0.35rem] !text-base !font-bold">
+                {step.title}
+              </h3>
+              <p class="text-text-muted m-0 text-[0.92rem]">{step.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </section>
+
+  <!-- Features grid -->
+  <section class="pt-8 pb-12">
+    <div class="container">
+      <h2 class="!mt-0">Why letmepost vs going direct.</h2>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+        {features.map((feat) => (
+          <div class="border border-border p-5">
+            <Icon name={`ph:${feat.icon}`} width={22} height={22} class="text-accent mb-3" />
+            <h3 class="!m-0 !mb-2 !text-[0.95rem] !font-bold">{feat.title}</h3>
+            <p class="text-text-muted m-0 text-[0.86rem]">{feat.body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="pt-8 pb-18 max-[640px]:pb-12">
+    <div class="container">
+      <h2 class="!mt-0">Ready to ship?</h2>
+      <p class="text-text-muted">
+        Star the repo. Connect a {platform.name} account. Send your first post in under 90 seconds.
+      </p>
+      <div class="flex gap-[0.6rem] flex-wrap">
+        <a class="btn btn-primary" href="https://dashboard.letmepost.dev">
+          Start building free
+          <Icon name="ph:arrow-up-right" width={13} height={13} />
+        </a>
+        <a
+          class="btn btn-secondary"
+          href={`https://docs.letmepost.dev/platforms/${platform.slug === "facebook" ? "facebook" : platform.slug}`}
+        >
+          {platform.name} docs
+        </a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

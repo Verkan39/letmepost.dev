@@ -125,6 +125,9 @@
                   "preflight/bluesky-media-mime_allowed",
                   "preflight/bluesky-media-image_size_max",
                   "preflight/bluesky-media-video_size_max",
+                  "preflight/bluesky-video-quota_exhausted",
+                  "preflight/bluesky-video-job_failed",
+                  "preflight/bluesky-video-transcode_timeout",
                   "preflight/bluesky-first_comment-non_empty",
                   "preflight/bluesky-first_comment-max_graphemes"
                 ]
@@ -187,12 +190,20 @@
                   "preflight/pinterest-board-required",
                   "preflight/pinterest-media-required",
                   "preflight/pinterest-media-single_only",
-                  "preflight/pinterest-media-image_only",
                   "preflight/pinterest-image-mime_allowed",
                   "preflight/pinterest-image-size_max",
                   "preflight/pinterest-image_url-reachable",
                   "preflight/pinterest-destination_url-reachable",
-                  "preflight/pinterest-url-reachable"
+                  "preflight/pinterest-url-reachable",
+                  "preflight/pinterest-video-cover_required",
+                  "preflight/pinterest-video-mime_allowed",
+                  "preflight/pinterest-video-size_max",
+                  "preflight/pinterest-cover_image_url-reachable",
+                  "preflight/pinterest-cover_image-mime_allowed",
+                  "preflight/pinterest-media-register_failed",
+                  "preflight/pinterest-video-upload_failed",
+                  "preflight/pinterest-video-transcode_failed",
+                  "preflight/pinterest-video-transcode_timeout"
                 ]
               },
               {
@@ -200,11 +211,15 @@
                 "pages": [
                   "preflight/twitter-text-non_empty",
                   "preflight/twitter-text-max_graphemes",
-                  "preflight/twitter-media-single_only",
+                  "preflight/twitter-media-count_max",
+                  "preflight/twitter-media-image_video_exclusive",
+                  "preflight/twitter-media-alt_text_max_graphemes",
                   "preflight/twitter-media-mime_allowed",
                   "preflight/twitter-media-image_size_max",
                   "preflight/twitter-media-gif_size_max",
-                  "preflight/twitter-media-video_size_max"
+                  "preflight/twitter-media-video_size_max",
+                  "preflight/twitter-media-video_processing_failed",
+                  "preflight/twitter-media-processing_timeout"
                 ]
               },
               {

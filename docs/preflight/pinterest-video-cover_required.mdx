@@ -1,0 +1,53 @@
+---
+title: pinterest.video.cover_required
+description: Pinterest video pins must include a publicly reachable cover image URL.
+---
+
+## What it checks
+
+If `media[0].kind === "video"` and `pinterest.coverImageUrl` is missing or empty, preflight fails before any upload work runs.
+
+## Why
+
+Pinterest mandates a still-frame URL on every video pin — it's the poster shown before play. Without one, `POST /v5/pins` returns a vague 400 ("missing cover_image_url") with no indication that the failure was preventable. Catching it locally surfaces a clear rule + a `pinterest.coverImageUrl` field to point at.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "pinterest.video.cover_required",
+    "platform": "pinterest",
+    "message": "Pinterest video pins require a cover image — the still frame shown before play.",
+    "remediation": "Pass `pinterest: { coverImageUrl: '<public-https-url>' }` on the request body."
+  }
+}
+```
+
+## Remediation
+
+Generate a still frame and host it somewhere publicly reachable. Quick option with `ffmpeg`:
+
+```sh
+ffmpeg -i input.mp4 -ss 1 -vframes 1 -q:v 2 cover.jpg
+```
+
+Then upload the cover via `POST /v1/media` and reference its public URL — or pass any public CDN URL you already host:
+
+```json video-pin.json
+{
+  "account": { "platform": "pinterest", "id": "..." },
+  "text": "Walkthrough",
+  "media": [{ "kind": "video", "mediaId": "med_…" }],
+  "pinterest": {
+    "boardId": "<board id>",
+    "coverImageUrl": "https://cdn.example.com/cover.jpg"
+  }
+}
+```
+
+## Related
+
+- [`pinterest.cover_image_url.reachable`](/preflight/pinterest-cover_image_url-reachable) — the URL must return 2xx
+- [`pinterest.cover_image.mime_allowed`](/preflight/pinterest-cover_image-mime_allowed) — must be jpeg / png / webp

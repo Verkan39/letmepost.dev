@@ -1,0 +1,36 @@
+---
+title: twitter.media.alt_text_max_graphemes
+description: Alt text on a tweet's media is capped at 1000 graphemes.
+---
+
+## What it checks
+
+For every media item that carries `altText`: `countGraphemes(altText) <= 1000`.
+
+Counted with `Intl.Segmenter`, so a compound emoji (`👨‍👩‍👧‍👦`) is one grapheme — same counter the platform uses.
+
+## Why
+
+X's v1.1 metadata endpoint (`/1.1/media/metadata/create`) caps alt text at 1000 characters. Beyond that the metadata write fails — and because alt-text writes are best-effort by design (they live on a separate deprecation track from `/2/tweets`), a silent failure means the tweet posts without accessibility metadata you intended to attach. Preflight makes that explicit.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "twitter.media.alt_text_max_graphemes",
+    "platform": "twitter",
+    "message": "Alt text is 1432 graphemes; X allows at most 1000.",
+    "remediation": "Shorten alt text to 1000 graphemes or fewer."
+  }
+}
+```
+
+## Remediation
+
+Trim the alt text. If you need more context, put it in the tweet body — alt text is for screen readers, the body is for everyone.
+
+## Related
+
+- [`twitter.text.max_graphemes`](/preflight/twitter-text-max_graphemes)

@@ -1,0 +1,40 @@
+---
+title: pinterest.video.mime_allowed
+description: Video bytes must be mp4, mov, or m4v.
+---
+
+## What it checks
+
+After bytes resolve, the publisher inspects the resolved `mimeType` and rejects anything outside Pinterest's video allowlist.
+
+Allowed: `video/mp4`, `video/quicktime`, `video/m4v`.
+
+## Why
+
+Pinterest's video upload pipeline accepts these container types only. Anything else surfaces from `POST /v5/media` as a vague registration failure or fails later during transcode — preflight catches it locally.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "pinterest.video.mime_allowed",
+    "platform": "pinterest",
+    "message": "Video mime type 'video/webm' is not allowed on Pinterest.",
+    "remediation": "Use one of: video/mp4, video/quicktime, video/m4v."
+  }
+}
+```
+
+## Remediation
+
+Re-mux to mp4:
+
+```sh
+ffmpeg -i input.webm -c:v libx264 -c:a aac -movflags +faststart output.mp4
+```
+
+## Related
+
+- [`pinterest.video.size_max`](/preflight/pinterest-video-size_max)

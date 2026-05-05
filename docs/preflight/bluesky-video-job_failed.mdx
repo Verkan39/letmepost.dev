@@ -1,0 +1,58 @@
+---
+title: bluesky.video.job_failed
+description: Bluesky's video pipeline rejected the file during transcode or scanning.
+---
+
+## What it checks
+
+After `uploadVideo`, the publisher polls `app.bsky.video.getJobStatus`. If the response carries `state: "JOB_STATE_FAILED"`, the upload made it onto the service but transcoding (or scanning) decided not to keep it.
+
+## Why
+
+Bluesky's video service runs an encode pass + a scanning pass. Either can reject a file. Common causes:
+
+- Codec other than h.264 video / AAC audio
+- Corrupt mp4 container (often happens when re-muxing without `+faststart`)
+- Clip exceeds Bluesky's 60 s duration cap (caught here, not in size preflight, because duration isn't in the byte length)
+- Content scanning rejected the file
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "platform_rejected",
+    "rule": "bluesky.video.job_failed",
+    "platform": "bluesky",
+    "message": "bluesky rejected the post: Unsupported codec.",
+    "remediation": "Bluesky's video pipeline failed to encode the file. Common causes: unsupported codec, corrupted mp4 container, video > 60s. Re-encode and retry.",
+    "platformResponse": {
+      "jobId": "job-…",
+      "did": "did:plc:…",
+      "state": "JOB_STATE_FAILED",
+      "error": "TranscodeError",
+      "message": "Unsupported codec."
+    }
+  }
+}
+```
+
+## Remediation
+
+Re-encode to a known-good profile:
+
+```sh
+ffmpeg -i input.mov \
+  -c:v libx264 -profile:v high -pix_fmt yuv420p -crf 23 \
+  -c:a aac -b:a 128k \
+  -movflags +faststart \
+  -t 60 \
+  output.mp4
+```
+
+If the file still fails after a clean re-encode, the upstream message in `platformResponse.message` is your best lead — it's the verbatim string from Bluesky's transcoder.
+
+## Related
+
+- [`bluesky.media.video_size_max`](/preflight/bluesky-media-video_size_max)
+- [`bluesky.video.transcode_timeout`](/preflight/bluesky-video-transcode_timeout)

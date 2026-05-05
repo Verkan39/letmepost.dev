@@ -1,0 +1,40 @@
+---
+title: pinterest.video.size_max
+description: Pinterest video pins are capped at ~2 GB per upload.
+---
+
+## What it checks
+
+`byteLength <= 2_000_000_000` for resolved video bytes.
+
+## Why
+
+Pinterest's video upload spec puts the per-upload ceiling at ~2 GB. Going over surfaces as a registration failure or an S3 upload reject — neither maps cleanly to an actionable error.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "pinterest.video.size_max",
+    "platform": "pinterest",
+    "message": "Video is 2400000000 bytes; Pinterest allows at most 2000000000.",
+    "remediation": "Compress under 2000000000 bytes (~2 GB)."
+  }
+}
+```
+
+## Remediation
+
+Drop the bitrate. For 1080p H.264, 5 Mbps is typically enough:
+
+```sh
+ffmpeg -i input.mp4 -c:v libx264 -b:v 5M -c:a aac -b:a 128k -movflags +faststart output.mp4
+```
+
+For very long clips, split into multiple pins or trim the video.
+
+## Related
+
+- [`pinterest.video.mime_allowed`](/preflight/pinterest-video-mime_allowed)

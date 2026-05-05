@@ -1,0 +1,40 @@
+---
+title: pinterest.cover_image_url.reachable
+description: The cover image URL on a video pin must return 2xx and a supported image mime.
+---
+
+## What it checks
+
+Before registering the video upload, the publisher GETs `pinterest.coverImageUrl`. The response must:
+
+- Return 2xx
+- Carry a content-type in `image/jpeg`, `image/png`, or `image/webp` (mime check fires under [`pinterest.cover_image.mime_allowed`](/preflight/pinterest-cover_image-mime_allowed) when present)
+
+## Why
+
+Pinterest fetches the cover image on its end during pin creation. If the URL is unreachable, returns 4xx/5xx, or serves something that isn't an image, `POST /v5/pins` fails with a generic upstream error. Catching it locally points at the URL specifically.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "pinterest.cover_image_url.reachable",
+    "platform": "pinterest",
+    "message": "URL returned 404: https://cdn.example.com/cover.jpg",
+    "remediation": "Pinterest must be able to fetch the cover image URL; verify it is public and returns 2xx."
+  }
+}
+```
+
+## Remediation
+
+- Verify the URL is publicly reachable from outside your network (no auth, no IP allowlist).
+- Don't use Google Drive share links, Dropbox preview URLs, or signed S3 URLs that have expired — same general failure mode as [`instagram.media.reachable`](/preflight/instagram-media-reachable) (`OAuthException 2207052`).
+- When in doubt, upload the cover via `POST /v1/media` and use the returned public URL.
+
+## Related
+
+- [`pinterest.cover_image.mime_allowed`](/preflight/pinterest-cover_image-mime_allowed)
+- [`pinterest.video.cover_required`](/preflight/pinterest-video-cover_required)

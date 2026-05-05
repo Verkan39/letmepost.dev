@@ -1,0 +1,38 @@
+---
+title: twitter.media.count_max
+description: Tweets accept up to 4 images, OR 1 video, OR 1 GIF.
+---
+
+## What it checks
+
+- `images.length <= 4`
+- `videos.length <= 1`
+
+Counted before bytes resolve, so 5 image URLs fail before any fetch fires.
+
+## Why
+
+X's `/2/tweets` endpoint accepts at most 4 image media ids on a single tweet, and at most 1 video. Going over the cap surfaces upstream as a media validation error with no clean way to map back to which item was the offender — preflight catches it locally with the count surfaced in the message.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "twitter.media.count_max",
+    "platform": "twitter",
+    "message": "Attached 5 images; X allows at most 4 per tweet.",
+    "remediation": "Reduce to 4 images or fewer."
+  }
+}
+```
+
+## Remediation
+
+- Trim the array to 4 images (or 1 video, or 1 GIF).
+- Multi-tweet threads carry separate media — split the post into a reply chain via `twitter.replyToTweetId` if you need more than 4 attachments overall.
+
+## Related
+
+- [`twitter.media.image_video_exclusive`](/preflight/twitter-media-image_video_exclusive) — can't mix images with a video on one tweet

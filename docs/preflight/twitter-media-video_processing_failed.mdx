@@ -1,0 +1,54 @@
+---
+title: twitter.media.video_processing_failed
+description: X's chunked upload finalize step or status poll reported a failed transcode.
+---
+
+## What it checks
+
+After the FINALIZE leg of the chunked upload (`command=FINALIZE` on `/1.1/media/upload.json`), X may return `processing_info.state: "failed"` either inline or on a subsequent STATUS poll. We surface that terminal state with the upstream error message intact.
+
+## Why
+
+X's video pipeline does its own validation: codec must be H.264, audio AAC, the mp4 container must be playable, duration ≤ 140 s for the `tweet_video` category, etc. None of these are byte-counted preflight checks — only the upload pipeline can verify them. When it rejects, this rule fires.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "platform_rejected",
+    "rule": "twitter.media.video_processing_failed",
+    "platform": "twitter",
+    "message": "twitter rejected the post: The video is invalid.",
+    "remediation": "X rejected the video during processing — check codec (h.264 + AAC), duration (≤140s for tweet_video), and aspect ratio.",
+    "platformResponse": {
+      "state": "failed",
+      "error": {
+        "code": 3,
+        "name": "InvalidMedia",
+        "message": "The video is invalid."
+      }
+    }
+  }
+}
+```
+
+## Remediation
+
+Re-encode to a known-good profile:
+
+```sh
+ffmpeg -i input.mov \
+  -c:v libx264 -profile:v high -pix_fmt yuv420p -crf 23 \
+  -c:a aac -b:a 128k \
+  -movflags +faststart \
+  -t 140 \
+  output.mp4
+```
+
+Read the upstream `error.message` field — that's the verbatim reason from X's transcoder. "Invalid video" usually means codec or container; "duration too long" means trim under 140 s.
+
+## Related
+
+- [`twitter.media.video_size_max`](/preflight/twitter-media-video_size_max) — file-size cap
+- [`twitter.media.processing_timeout`](/preflight/twitter-media-processing_timeout) — STATUS poll deadline

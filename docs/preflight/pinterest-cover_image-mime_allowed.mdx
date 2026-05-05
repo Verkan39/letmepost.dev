@@ -1,0 +1,45 @@
+---
+title: pinterest.cover_image.mime_allowed
+description: Cover image content-type must be jpeg, png, or webp.
+---
+
+## What it checks
+
+The reachability probe of `pinterest.coverImageUrl` records the response's `Content-Type` header. If it isn't one of the allowlisted image mimes, preflight fails before the video upload runs.
+
+Allowed: `image/jpeg`, `image/png`, `image/webp`.
+
+## Why
+
+Pinterest's pin endpoint expects the cover URL to serve a real image — HEIC, GIF, AVIF, or `application/octet-stream` from a misconfigured CDN all surface upstream as opaque pin failures. Preflight maps that to a clear remediation.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "pinterest.cover_image.mime_allowed",
+    "platform": "pinterest",
+    "message": "Cover image mime type 'image/heic' is not allowed on Pinterest.",
+    "remediation": "Use one of: image/jpeg, image/png, image/webp."
+  }
+}
+```
+
+## Remediation
+
+Re-encode the cover image to JPEG:
+
+```sh
+sips -s format jpeg cover.heic --out cover.jpg
+# or
+ffmpeg -i cover.heic cover.jpg
+```
+
+Then host the JPEG (or PNG / WebP) URL.
+
+## Related
+
+- [`pinterest.cover_image_url.reachable`](/preflight/pinterest-cover_image_url-reachable)
+- [`pinterest.video.cover_required`](/preflight/pinterest-video-cover_required)

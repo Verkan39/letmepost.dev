@@ -1,0 +1,45 @@
+---
+title: twitter.media.image_video_exclusive
+description: A tweet can carry images OR a video, not both.
+---
+
+## What it checks
+
+If the same `media` array contains at least one item with `kind: "image"` and at least one with `kind: "video"`, preflight fails before bytes resolve.
+
+## Why
+
+X enforces this at the API level — `/2/tweets` rejects mixed-media payloads. Catching it locally surfaces a clean rule id instead of a generic 400 from upstream.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "twitter.media.image_video_exclusive",
+    "platform": "twitter",
+    "message": "Cannot attach both images and video to the same tweet — X requires picking one.",
+    "remediation": "Split into separate tweets: one with images, one with the video."
+  }
+}
+```
+
+## Remediation
+
+Two tweets in a reply chain — first one with images, second one with the video, threaded via `twitter.replyToTweetId`:
+
+```json
+{ "media": [{ "kind": "image", "mediaId": "med_…" }] }
+```
+
+```json
+{
+  "media": [{ "kind": "video", "mediaId": "med_…" }],
+  "twitter": { "replyToTweetId": "<id of first tweet>" }
+}
+```
+
+## Related
+
+- [`twitter.media.count_max`](/preflight/twitter-media-count_max)

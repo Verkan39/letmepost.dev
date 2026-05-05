@@ -1,0 +1,51 @@
+---
+title: pinterest.video.transcode_failed
+description: Pinterest's video pipeline rejected the file during transcoding.
+---
+
+## What it checks
+
+After uploading bytes to Pinterest's presigned S3 endpoint, the publisher polls `GET /v5/media/{id}` until status reaches a terminal state. `failed` surfaces with this rule.
+
+## Why
+
+Pinterest validates the uploaded video — codec, container, duration ≤ 5 min, aspect ratio. Failures don't come back from the upload itself (S3 returns 204 either way); they only show up on the status poll. Catching the terminal-failed state as a structured rule lets the dashboard's Post Log filter on it.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "platform_rejected",
+    "rule": "pinterest.video.transcode_failed",
+    "platform": "pinterest",
+    "message": "pinterest rejected the post.",
+    "remediation": "Pinterest's video transcode failed. Common causes: codec other than h.264 + AAC, mp4 container errors, video > 5 min. Re-encode and retry.",
+    "platformResponse": {
+      "media_id": "vid-…",
+      "media_type": "video",
+      "status": "failed"
+    }
+  }
+}
+```
+
+## Remediation
+
+Re-encode to a known-good profile:
+
+```sh
+ffmpeg -i input.mov \
+  -c:v libx264 -profile:v high -pix_fmt yuv420p -crf 23 \
+  -c:a aac -b:a 128k \
+  -movflags +faststart \
+  -t 300 \
+  output.mp4
+```
+
+If the same file works elsewhere, it's most often a duration > 5 min that Pinterest rejects.
+
+## Related
+
+- [`pinterest.video.size_max`](/preflight/pinterest-video-size_max)
+- [`pinterest.video.transcode_timeout`](/preflight/pinterest-video-transcode_timeout)

@@ -1,11 +1,11 @@
 ---
 title: Twitter / X
-description: Twitter / X v2 API. OAuth 2.0 with PKCE. Single-media tweets in v1.
+description: Twitter / X v2 API. OAuth 2.0 PKCE. Up to 4 images, video via chunked upload, reply chains, quote tweets.
 icon: x-twitter
 iconType: brands
 ---
 
-X (Twitter) v2 API via OAuth 2.0 with PKCE. v1 of the publisher targets single-image and single-video tweets; the 4-up surface ships in a follow-up slice.
+X (Twitter) v2 API via OAuth 2.0 with PKCE. The publisher posts text, up to four images, a single GIF, or a single MP4 video; threads as reply chains; and quote tweets. Media uploads route through X's v1.1 endpoint — simple base64 for images, the chunked **INIT/APPEND/FINALIZE/STATUS** dance for video.
 
 ## Connect
 
@@ -28,7 +28,9 @@ X access tokens are short-lived (~2 hours) but `offline.access` issues a refresh
 
 ## Posting
 
-```json tweet.json
+Single image:
+
+```json single-image.json
 {
   "account": { "platform": "twitter", "id": "..." },
   "text": "shipped",
@@ -36,23 +38,78 @@ X access tokens are short-lived (~2 hours) but `offline.access` issues a refresh
 }
 ```
 
+Up to four images per tweet:
+
+```json multi-image.json
+{
+  "account": { "platform": "twitter", "id": "..." },
+  "text": "four shots",
+  "media": [
+    { "kind": "image", "mediaId": "med_a…", "altText": "front" },
+    { "kind": "image", "mediaId": "med_b…", "altText": "back" },
+    { "kind": "image", "mediaId": "med_c…", "altText": "left" },
+    { "kind": "image", "mediaId": "med_d…", "altText": "right" }
+  ]
+}
+```
+
+A single video — chunked upload runs transparently; small clips return immediately, larger ones poll FINALIZE → STATUS until X reports `succeeded`:
+
+```json video.json
+{
+  "account": { "platform": "twitter", "id": "..." },
+  "text": "demo clip",
+  "media": [{ "kind": "video", "mediaId": "med_…" }]
+}
+```
+
+Reply chain — chain tweets by passing the previous tweet id on each follow-up:
+
+```json reply.json
+{
+  "account": { "platform": "twitter", "id": "..." },
+  "text": "(2/3) more details",
+  "twitter": { "replyToTweetId": "1700000000000000001" }
+}
+```
+
+Quote tweet — mutually exclusive with `replyToTweetId`; preflight rejects setting both:
+
+```json quote.json
+{
+  "account": { "platform": "twitter", "id": "..." },
+  "text": "this is huge",
+  "twitter": { "quoteTweetId": "1700000000000000001" }
+}
+```
+
 ## Constraints
 
-- Text: 280 graphemes ([`twitter.text.max_graphemes`](/preflight/twitter-text-max_graphemes))
-- Single media only in v1 ([`twitter.media.single_only`](/preflight/twitter-media-single_only))
+- Text: 280 graphemes, **t.co-aware** ([`twitter.text.max_graphemes`](/preflight/twitter-text-max_graphemes)) — every URL counts as 23 characters regardless of real length
+- Up to 4 images **OR** 1 video **OR** 1 GIF per tweet ([`twitter.media.count_max`](/preflight/twitter-media-count_max), [`twitter.media.image_video_exclusive`](/preflight/twitter-media-image_video_exclusive))
 - Image mimes: jpeg, png, webp, gif
-- Video mime: mp4
+- Video mime: mp4 (H.264 + AAC recommended)
 - Image size: 5 MB max ([`twitter.media.image_size_max`](/preflight/twitter-media-image_size_max))
 - GIF size: 15 MB max ([`twitter.media.gif_size_max`](/preflight/twitter-media-gif_size_max))
-- Video size: 512 MB max ([`twitter.media.video_size_max`](/preflight/twitter-media-video_size_max))
-- URLs in tweet text count as 23 characters regardless of real length (t.co wrapping)
+- Video size: 512 MB max ([`twitter.media.video_size_max`](/preflight/twitter-media-video_size_max)); chunked upload uses 4 MiB segments
+- Alt text: 1000 graphemes max ([`twitter.media.alt_text_max_graphemes`](/preflight/twitter-media-alt_text_max_graphemes))
+
+Alt text is best-effort. The v1.1 metadata endpoint (`/1.1/media/metadata/create`) lives on a separate deprecation track from `/2/tweets`; if the metadata write fails, the tweet still goes out — you keep the post, you just lose the accessibility text.
 
 ## Preflight rules
 
 - [`twitter.text.non_empty`](/preflight/twitter-text-non_empty)
 - [`twitter.text.max_graphemes`](/preflight/twitter-text-max_graphemes)
-- [`twitter.media.single_only`](/preflight/twitter-media-single_only)
+- [`twitter.media.count_max`](/preflight/twitter-media-count_max)
+- [`twitter.media.image_video_exclusive`](/preflight/twitter-media-image_video_exclusive)
+- [`twitter.media.alt_text_max_graphemes`](/preflight/twitter-media-alt_text_max_graphemes)
 - [`twitter.media.mime_allowed`](/preflight/twitter-media-mime_allowed)
 - [`twitter.media.image_size_max`](/preflight/twitter-media-image_size_max)
 - [`twitter.media.gif_size_max`](/preflight/twitter-media-gif_size_max)
 - [`twitter.media.video_size_max`](/preflight/twitter-media-video_size_max)
+- [`twitter.media.video_processing_failed`](/preflight/twitter-media-video_processing_failed) — surfaces upstream rejections from the FINALIZE / STATUS poll
+- [`twitter.media.processing_timeout`](/preflight/twitter-media-processing_timeout)
+
+## Tier requirements
+
+X retired the free posting tier in 2025; new developers go through **Pay Per Use** or one of the paid tiers. letmepost works on any tier with `tweet.write`. The dashboard surfaces remaining rate-limit headroom on every response so you can see how close you are to the per-app and per-user ceilings without polling a separate endpoint.

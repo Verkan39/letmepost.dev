@@ -51,7 +51,7 @@ const endpoints = [
   {
     method: "POST",
     path: "/v1/posts",
-    desc: "One call. Seven platforms at v1. Text, media, carousels — scheduled or now.",
+    desc: "One call. Seven platforms at v1. Text, images, video, carousels — scheduled or now.",
   },
   {
     method: "POST",
@@ -90,7 +90,7 @@ const methodClasses: Record<string, string> = {
 const faqs = [
   {
     q: "What actually works today?",
-    a: 'Bluesky is live end-to-end — connect an account, send a post, get a webhook back. Pinterest and Twitter/X publishers are built and tested but waiting on platform review (Pinterest Standard access; X Elevated write tier). LinkedIn, Meta (Instagram / Facebook / Threads), and YouTube are review-gated and typically clear 3–12 weeks from submission (YouTube via the CASA verification track). See the <a href="https://github.com/rosekamallove/letmepost.dev/blob/main/plan.md">plan</a> for dates.',
+    a: 'Bluesky is live end-to-end — connect an account, send a post, get a webhook back, attach images or video (videos route through the dedicated transcoding service, transparently). Pinterest and Twitter/X publishers are built and tested but waiting on platform review (Pinterest Standard access; X is on the Pay Per Use tier). Meta (Instagram / Facebook / Threads), LinkedIn, and YouTube are review-gated and typically clear 3–12 weeks from submission (YouTube via the CASA verification track). See the <a href="https://github.com/rosekamallove/letmepost.dev/blob/main/plan.md">plan</a> for dates.',
   },
   {
     q: "Why another social media API?",

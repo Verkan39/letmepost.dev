@@ -1,0 +1,41 @@
+---
+title: pinterest.video.upload_failed
+description: The S3 multipart upload Pinterest handed us back rejected the bytes.
+---
+
+## What it checks
+
+After `POST /v5/media` returns a presigned S3 endpoint + form-field bag, the publisher streams the video bytes to that endpoint as `multipart/form-data`. S3 returns 204 on success — anything else surfaces here verbatim.
+
+## Why
+
+The most common causes are signed-URL clock skew, a mime mismatch between what we declared and what we sent, or the registered slot expiring before the upload finished. S3 returns XML on errors; we pass the body through so the AWS-style error code is visible.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "platform_rejected",
+    "rule": "pinterest.video.upload_failed",
+    "platform": "pinterest",
+    "message": "pinterest rejected the post: <Error>...",
+    "remediation": "Pinterest's S3 upload rejected the bytes. Common causes: signed-URL clock skew, file mime mismatch, or the file size exceeded the registered slot. Retry; if it persists the registered slot has expired.",
+    "platformResponse": {
+      "status": 403,
+      "body": "<Error><Code>SignatureDoesNotMatch</Code>...</Error>"
+    }
+  }
+}
+```
+
+## Remediation
+
+- Retry the publish. The publisher re-registers a fresh slot on each attempt, so an expired one self-heals.
+- If `SignatureDoesNotMatch` repeats, check your server's clock — significant drift makes presigned URLs reject.
+- If the body mentions an "EntityTooLarge" or similar size error, the file may be larger than what was registered; preflight should already catch this via [`pinterest.video.size_max`](/preflight/pinterest-video-size_max).
+
+## Related
+
+- [`pinterest.media.register_failed`](/preflight/pinterest-media-register_failed)
+- [`pinterest.video.size_max`](/preflight/pinterest-video-size_max)

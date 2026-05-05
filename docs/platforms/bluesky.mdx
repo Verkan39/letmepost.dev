@@ -60,6 +60,18 @@ With media:
 - Alt text: 2000 graphemes max
 - First comment: supported; same constraints as the parent post
 
+## Video uploads
+
+Bluesky video does **not** go through `com.atproto.repo.uploadBlob` — that's the most common reason naive integrations break. Videos route to a dedicated transcoding service (`video.bsky.app`) that produces the playable blob ref needed for `app.bsky.embed.video`. The publisher runs the documented flow transparently:
+
+1. Mint a short-lived service auth JWT via `com.atproto.server.getServiceAuth`, scoped narrowly to `app.bsky.video.uploadVideo` on `did:web:video.bsky.app`.
+2. Probe `app.bsky.video.getUploadLimits` so a daily-quota exhaustion fails loudly with [`bluesky.video.quota_exhausted`](/preflight/bluesky-video-quota_exhausted) instead of a 200 → silent FAILED.
+3. Stream the bytes to `app.bsky.video.uploadVideo`. Bluesky deduplicates by content hash, so re-uploading the same clip can short-circuit straight to `JOB_STATE_COMPLETED`.
+4. Poll `app.bsky.video.getJobStatus` until COMPLETED or FAILED.
+5. Embed the returned blob ref as `app.bsky.embed.video` on the post record.
+
+Failure modes — [`bluesky.video.job_failed`](/preflight/bluesky-video-job_failed), [`bluesky.video.transcode_timeout`](/preflight/bluesky-video-transcode_timeout) — surface with the upstream reason when available.
+
 ## Preflight rules
 
 - [`bluesky.text.non_empty`](/preflight/bluesky-text-non_empty)
@@ -70,6 +82,9 @@ With media:
 - [`bluesky.media.mime_allowed`](/preflight/bluesky-media-mime_allowed)
 - [`bluesky.media.image_size_max`](/preflight/bluesky-media-image_size_max)
 - [`bluesky.media.video_size_max`](/preflight/bluesky-media-video_size_max)
+- [`bluesky.video.quota_exhausted`](/preflight/bluesky-video-quota_exhausted)
+- [`bluesky.video.job_failed`](/preflight/bluesky-video-job_failed)
+- [`bluesky.video.transcode_timeout`](/preflight/bluesky-video-transcode_timeout)
 - [`bluesky.first_comment.non_empty`](/preflight/bluesky-first_comment-non_empty)
 - [`bluesky.first_comment.max_graphemes`](/preflight/bluesky-first_comment-max_graphemes)
 

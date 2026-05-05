@@ -1,0 +1,35 @@
+---
+title: twitter.media.processing_timeout
+description: X's STATUS endpoint didn't reach succeeded/failed within our 5-minute deadline.
+---
+
+## What it checks
+
+After FINALIZE returns `processing_info` indicating async transcode, the publisher polls `?command=STATUS&media_id=…` honoring the upstream-provided `check_after_secs`. If the state is still `pending` or `in_progress` when our 5-minute deadline lapses, we surface this.
+
+## Why
+
+Real X transcodes finish in seconds for short clips, occasionally a few minutes for long ones. Holding the publish open longer than that is worse for the caller than failing fast — the bytes are already uploaded, so a retry can short-circuit on dedupe rather than re-streaming.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "platform_unavailable",
+    "rule": "twitter.media.processing_timeout",
+    "platform": "twitter",
+    "message": "X did not finish processing media 1700000000 within 300000ms.",
+    "remediation": "X's video transcoder is occasionally slow; retry the publish or shorten the clip."
+  }
+}
+```
+
+## Remediation
+
+- Retry the publish — X's pipeline may have finished by then.
+- If timeouts repeat, shorten the clip or reduce bitrate.
+
+## Related
+
+- [`twitter.media.video_processing_failed`](/preflight/twitter-media-video_processing_failed) — terminal-failed state

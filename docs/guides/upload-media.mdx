@@ -70,23 +70,24 @@ A few platforms refuse inline bytes outright (URL-only ingest paths). When that 
 
 Each platform has its own ceilings. The full set is enforced in preflight; here's the headline shape:
 
-| platform   | image max | video max | mime allowed                        | carousel size |
-|------------|-----------|-----------|-------------------------------------|---------------|
-| Bluesky    | 976 KB    | 100 MB    | jpeg, png, webp, gif / mp4          | up to 4 imgs / 1 vid |
-| Threads    | 8 MB      | 1 GB      | jpeg, png, webp / mp4, mov          | 2–20 mixed    |
-| Instagram  | 8 MB      | 1 GB      | **jpeg only** / mp4, mov            | 2–10 mixed    |
-| Facebook   | 4 MB      | 4 GB      | jpeg, png / mp4, mov                | up to 10      |
-| Pinterest  | 20 MB     | —         | jpeg, png / —                       | single only   |
-| Twitter / X | 5 MB     | 512 MB    | jpeg, png, webp / mp4 (gif: 15 MB)  | single (v1)   |
-| LinkedIn   | (uploads handled per-asset by LinkedIn) | | | |
+| platform    | image max | video max | mime allowed                        | media count                  |
+|-------------|-----------|-----------|-------------------------------------|------------------------------|
+| Bluesky     | 976 KB    | 100 MB    | jpeg, png, webp, gif / mp4          | up to 4 imgs OR 1 vid        |
+| Threads     | 8 MB      | 1 GB      | jpeg, png, webp / mp4, mov          | 2–20 mixed                   |
+| Instagram   | 8 MB      | 1 GB      | **jpeg only** / mp4, mov            | 2–10 mixed                   |
+| Facebook    | 4 MB      | 4 GB      | jpeg, png / mp4, mov                | up to 10                     |
+| Pinterest   | 20 MB     | 2 GB      | jpeg, png / mp4, mov, m4v           | 1 image OR 1 video pin       |
+| Twitter / X | 5 MB      | 512 MB    | jpeg, png, webp / mp4 (gif: 15 MB)  | up to 4 imgs OR 1 vid OR 1 GIF |
+| LinkedIn    | (uploads handled per-asset by LinkedIn) | | | |
 
 The exact constants live in `packages/schemas/src/post.ts`. Each ceiling has a preflight rule with its own page; e.g. [`instagram.media.image_size_max`](/preflight/instagram-media-image_size_max).
 
 ## Notes per platform
 
 - **Instagram is JPEG-only on the photo path.** PNG, WebP, HEIC, and GIF all surface as opaque IG `code 100` errors upstream — preflight catches them with [`instagram.media.mime_allowed`](/preflight/instagram-media-mime_allowed) and points you at the remediation.
-- **Bluesky enforces image-vs-video exclusivity.** A single post can have images *or* a video, not both. See [`bluesky.media.image_video_exclusive`](/preflight/bluesky-media-image_video_exclusive).
-- **Pinterest is single-image only in v1.** Multi-pin and video pins are deferred.
+- **Bluesky enforces image-vs-video exclusivity.** A single post can have images *or* a video, not both. See [`bluesky.media.image_video_exclusive`](/preflight/bluesky-media-image_video_exclusive). Video uploads route to `video.bsky.app`, NOT `com.atproto.repo.uploadBlob` — handled transparently.
+- **Pinterest video pins need a cover image URL.** Pinterest mandates a still-frame URL for the pre-play poster. Pass `pinterest.coverImageUrl` on the request body — preflight catches missing covers via [`pinterest.video.cover_required`](/preflight/pinterest-video-cover_required) instead of letting Pinterest 400 with a vague reason.
+- **Twitter video uploads are chunked.** 4 MiB segments via INIT/APPEND/FINALIZE/STATUS. The publisher polls until X reports `succeeded`; failures surface as [`twitter.media.video_processing_failed`](/preflight/twitter-media-video_processing_failed) with the upstream reason intact.
 - **Threads is the most permissive carousel.** 2–20 children, mixed images and videos.
 
 ## Alt text

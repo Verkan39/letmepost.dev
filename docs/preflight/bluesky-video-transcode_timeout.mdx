@@ -1,0 +1,36 @@
+---
+title: bluesky.video.transcode_timeout
+description: Bluesky's transcoder didn't finish within our 6-minute deadline.
+---
+
+## What it checks
+
+The publisher polls `app.bsky.video.getJobStatus` every 2 seconds for up to 6 minutes. If the job is still in a non-terminal state (CREATED / ENCODING_IN_PROGRESS / SCANNING) when the deadline hits, we surface this rule rather than holding the request open indefinitely.
+
+## Why
+
+Most Bluesky video transcodes finish in seconds. Long clips, heavy-bitrate sources, or service-side congestion can push past the deadline. Holding a synchronous publish open for 10+ minutes is worse UX than failing fast and letting the caller retry — Bluesky deduplicates by content hash, so a retry skips re-uploading the bytes.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "platform_unavailable",
+    "rule": "bluesky.video.transcode_timeout",
+    "platform": "bluesky",
+    "message": "Bluesky video job job-… did not finish within 360000ms.",
+    "remediation": "The transcode is still running upstream; retry the publish in a minute or two, or shorten the clip."
+  }
+}
+```
+
+## Remediation
+
+- Retry the publish. The upload is content-addressed; the second attempt skips the bytes phase.
+- If timeouts are persistent, shorten the clip (Bluesky caps duration at 60 s anyway) or reduce bitrate.
+
+## Related
+
+- [`bluesky.video.job_failed`](/preflight/bluesky-video-job_failed)
+- [`bluesky.media.video_size_max`](/preflight/bluesky-media-video_size_max)

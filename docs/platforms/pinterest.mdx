@@ -1,11 +1,11 @@
 ---
 title: Pinterest
-description: Pinterest v5 API. Single-image pins in v1; carousels and video pins ship later.
+description: Pinterest v5 API. Image pins via direct URL, video pins via register-media + S3 multipart + status poll.
 icon: pinterest
 iconType: brands
 ---
 
-Pinterest v5 API. The connect flow doubles as the cheapest integration in v1 — the API is well-documented, OAuth is standard, and the publish surface is small.
+Pinterest v5 API. Image pins go through `media_source.url` directly — one round-trip and the pin is live. Video pins need Pinterest's two-step async upload: register a slot, multipart-POST the bytes to the presigned S3 endpoint Pinterest hands back, poll `GET /v5/media/{id}` until status flips to `succeeded`, then create the pin with `media_source: { source_type: "video_id" }`.
 
 ## Connect
 
@@ -29,7 +29,9 @@ Extended: `pins:read_secret` (off by default) for callers that publish to secret
 
 ## Posting
 
-```json pin.json
+Image pin:
+
+```json image-pin.json
 {
   "account": { "platform": "pinterest", "id": "..." },
   "text": "Pin description",
@@ -44,23 +46,57 @@ Extended: `pins:read_secret` (off by default) for callers that publish to secret
 
 The `pinterest` extension is optional. If you set a default board on the account, `pinterest.boardId` can be omitted; if you don't supply `destinationUrl` we fall back to the image's letmepost URL.
 
+Video pin — `coverImageUrl` is **required** because Pinterest mandates a still-frame URL for the pre-play poster. Preflight rejects video pins without it ([`pinterest.video.cover_required`](/preflight/pinterest-video-cover_required)) so you don't lose the upload to a vague upstream 400:
+
+```json video-pin.json
+{
+  "account": { "platform": "pinterest", "id": "..." },
+  "text": "Walkthrough",
+  "media": [{ "kind": "video", "mediaId": "med_…" }],
+  "pinterest": {
+    "boardId": "<board id>",
+    "destinationUrl": "https://example.com/walkthrough",
+    "coverImageUrl": "https://cdn.example.com/cover.jpg"
+  }
+}
+```
+
+Behind the scenes the publisher runs four steps for video, each surfaced as a distinct preflight rule when it fails:
+
+1. `POST /v5/media` — register an upload slot. Failures: [`pinterest.media.register_failed`](/preflight/pinterest-media-register_failed) (usually a missing scope on the connected account).
+2. Multipart POST to the presigned S3 endpoint. Failures: [`pinterest.video.upload_failed`](/preflight/pinterest-video-upload_failed) (signature skew, mime mismatch, slot expired).
+3. Poll `GET /v5/media/{id}` every 2 s up to a 5-minute deadline. Failures: [`pinterest.video.transcode_failed`](/preflight/pinterest-video-transcode_failed), [`pinterest.video.transcode_timeout`](/preflight/pinterest-video-transcode_timeout).
+4. `POST /v5/pins` with `media_source: { source_type: "video_id", media_id, cover_image_url }`.
+
 ## Constraints
 
-- Single image only in v1 ([`pinterest.media.single_only`](/preflight/pinterest-media-single_only))
-- Image-only ([`pinterest.media.image_only`](/preflight/pinterest-media-image_only))
+- Image pin: single media item only (carousel pins are not v1)
 - Image mimes: jpeg, png ([`pinterest.image.mime_allowed`](/preflight/pinterest-image-mime_allowed))
 - Image size: 20 MB max ([`pinterest.image.size_max`](/preflight/pinterest-image-size_max))
+- Video mimes: mp4, mov, m4v ([`pinterest.video.mime_allowed`](/preflight/pinterest-video-mime_allowed))
+- Video size: 2 GB max ([`pinterest.video.size_max`](/preflight/pinterest-video-size_max))
 - Image URL must be reachable ([`pinterest.image_url.reachable`](/preflight/pinterest-image_url-reachable))
+- Cover image URL must be reachable + a supported image mime ([`pinterest.cover_image_url.reachable`](/preflight/pinterest-cover_image_url-reachable))
 - Destination URL must be reachable ([`pinterest.destination_url.reachable`](/preflight/pinterest-destination_url-reachable))
 
 ## Preflight rules
 
 - [`pinterest.board.required`](/preflight/pinterest-board-required)
 - [`pinterest.media.required`](/preflight/pinterest-media-required)
-- [`pinterest.media.single_only`](/preflight/pinterest-media-single_only)
-- [`pinterest.media.image_only`](/preflight/pinterest-media-image_only)
 - [`pinterest.image.mime_allowed`](/preflight/pinterest-image-mime_allowed)
 - [`pinterest.image.size_max`](/preflight/pinterest-image-size_max)
 - [`pinterest.image_url.reachable`](/preflight/pinterest-image_url-reachable)
+- [`pinterest.video.cover_required`](/preflight/pinterest-video-cover_required)
+- [`pinterest.video.mime_allowed`](/preflight/pinterest-video-mime_allowed)
+- [`pinterest.video.size_max`](/preflight/pinterest-video-size_max)
+- [`pinterest.cover_image_url.reachable`](/preflight/pinterest-cover_image_url-reachable)
+- [`pinterest.cover_image.mime_allowed`](/preflight/pinterest-cover_image-mime_allowed)
 - [`pinterest.destination_url.reachable`](/preflight/pinterest-destination_url-reachable)
-- [`pinterest.url.reachable`](/preflight/pinterest-url-reachable)
+- [`pinterest.media.register_failed`](/preflight/pinterest-media-register_failed)
+- [`pinterest.video.upload_failed`](/preflight/pinterest-video-upload_failed)
+- [`pinterest.video.transcode_failed`](/preflight/pinterest-video-transcode_failed)
+- [`pinterest.video.transcode_timeout`](/preflight/pinterest-video-transcode_timeout)
+
+## Trial Access
+
+Pinterest gates pin creation on production (`api.pinterest.com`) until your app passes Standard Access review — Trial Access apps must point at the sandbox host. letmepost reads `PINTEREST_API_BASE` from env, so during the trial window you set it to `https://api-sandbox.pinterest.com/v5` and clear it back to default the moment your app goes Standard.

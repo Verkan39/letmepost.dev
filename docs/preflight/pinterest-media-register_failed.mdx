@@ -1,0 +1,35 @@
+---
+title: pinterest.media.register_failed
+description: Pinterest refused to register a video upload slot.
+---
+
+## What it checks
+
+`POST /v5/media` is the first step of Pinterest's video flow. If it returns non-2xx, no presigned URL came back, or the response shape is malformed, this rule fires.
+
+## Why
+
+Most often this is a missing scope on the connected account: the OAuth grant predates `pins:write` / `boards:write`, or the user revoked the scope on Pinterest's side. The upstream message is opaque ("not authorized") — preflight maps it to a remediation that mentions the scope set explicitly.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "platform_rejected",
+    "rule": "pinterest.media.register_failed",
+    "platform": "pinterest",
+    "message": "pinterest rejected the post: insufficient_scope.",
+    "remediation": "Pinterest refused to register a video upload slot — most commonly missing the boards:write / pins:write scope on the connected account."
+  }
+}
+```
+
+## Remediation
+
+- Disconnect and reconnect the Pinterest account from the dashboard. The reconnect re-requests the current scope set, including any added since the original grant.
+- Confirm the account isn't on Trial Access pointing at production. See the platform notes — Trial Access apps must use `https://api-sandbox.pinterest.com/v5` until Standard Access clears.
+
+## Related
+
+- [Pinterest platform docs](/platforms/pinterest) — full scope list

@@ -1,12 +1,32 @@
 ---
 title: pinterest.media.required
-description: Every pin needs an image. Pinterest is media-first.
+description: Every pin needs media. Pinterest is media-first.
 ---
 
 ## What it checks
 
-`media.length === 1` with `kind: "image"`.
+`media.length >= 1`. Pinterest pins always carry exactly one media item — image or video.
 
 ## Remediation
 
-Attach a single image. v1 Pinterest support is single-image only — see [`pinterest.media.single_only`](/preflight/pinterest-media-single_only) and [`pinterest.media.image_only`](/preflight/pinterest-media-image_only) for the cousin rules.
+Attach an image, or a video with a cover image URL:
+
+```json image-pin.json
+{
+  "media": [{ "kind": "image", "mediaId": "med_…" }]
+}
+```
+
+```json video-pin.json
+{
+  "media": [{ "kind": "video", "mediaId": "med_…" }],
+  "pinterest": { "coverImageUrl": "https://cdn.example.com/cover.jpg" }
+}
+```
+
+Single-pin-per-request still applies — see [`pinterest.media.single_only`](/preflight/pinterest-media-single_only).
+
+## Related
+
+- [`pinterest.video.cover_required`](/preflight/pinterest-video-cover_required) — video pins need a cover URL
+- [`pinterest.media.single_only`](/preflight/pinterest-media-single_only)

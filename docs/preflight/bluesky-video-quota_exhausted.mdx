@@ -1,0 +1,42 @@
+---
+title: bluesky.video.quota_exhausted
+description: The Bluesky account is out of daily video upload quota.
+---
+
+## What it checks
+
+Before streaming the bytes, the publisher calls `app.bsky.video.getUploadLimits` on the video service. If `canUpload` comes back `false`, we fail loudly here instead of POSTing to `uploadVideo` and watching the job state flip to FAILED minutes later.
+
+## Why
+
+Bluesky enforces a per-user daily cap on video uploads + total bytes. The exact ceilings shift over time and aren't documented as constants — the upload-limits endpoint is the source of truth. Hitting the cap silently is one of the canonical opaque-failure patterns we built the preflight surface to avoid.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "bluesky.video.quota_exhausted",
+    "platform": "bluesky",
+    "message": "Daily video upload limit reached.",
+    "remediation": "Bluesky enforces a per-user daily cap on video uploads + total bytes. Wait for the quota to reset or use a different account.",
+    "platformResponse": {
+      "canUpload": false,
+      "remainingDailyVideos": 0,
+      "remainingDailyBytes": 0
+    }
+  }
+}
+```
+
+## Remediation
+
+- Wait for the quota window to reset (rolling 24 h).
+- Connect a different Bluesky account.
+- Trim the post — text-only or image-only posts don't draw from the video quota.
+
+## Related
+
+- [`bluesky.media.video_size_max`](/preflight/bluesky-media-video_size_max) — per-file cap
+- [`bluesky.video.job_failed`](/preflight/bluesky-video-job_failed) — terminal-state failure during transcode

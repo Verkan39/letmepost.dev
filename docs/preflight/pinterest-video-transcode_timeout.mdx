@@ -1,0 +1,35 @@
+---
+title: pinterest.video.transcode_timeout
+description: Pinterest didn't finish transcoding within our 5-minute deadline.
+---
+
+## What it checks
+
+After uploading bytes, the publisher polls `GET /v5/media/{id}` every 2 s for up to 5 minutes. If the status is still `processing` (or `registered`) at the deadline, this rule fires.
+
+## Why
+
+Pinterest's video transcode is usually fast (under a minute for short clips), but the upstream queue depth varies. Holding a synchronous publish open longer than 5 minutes is worse UX than failing fast — Pinterest keeps the registered media id around, so a follow-up retry can short-circuit.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "platform_unavailable",
+    "rule": "pinterest.video.transcode_timeout",
+    "platform": "pinterest",
+    "message": "Pinterest media vid-… did not finish transcoding within 300000ms.",
+    "remediation": "Pinterest is still processing the video; retry the publish in a minute or two."
+  }
+}
+```
+
+## Remediation
+
+- Retry the publish in a few minutes.
+- For consistent timeouts, shorten the clip or drop the bitrate.
+
+## Related
+
+- [`pinterest.video.transcode_failed`](/preflight/pinterest-video-transcode_failed)

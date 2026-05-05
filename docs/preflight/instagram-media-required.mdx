@@ -1,0 +1,35 @@
+---
+title: instagram.media.required
+description: Instagram has no text-only post surface. Every IG post needs at least one media item.
+---
+
+## What it checks
+
+`media.length >= 1` on Instagram posts. The caption (`text` field) is optional, but media is mandatory.
+
+## Why
+
+Instagram's Graph API has no "text-only feed post" endpoint. Every IG publish goes through the create-container flow, and the container requires either an `image_url` or a `video_url`. Without one, there's no API to call.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "instagram.media.required",
+    "platform": "instagram",
+    "message": "Instagram does not support text-only posts. Attach at least one image or video via `media: [...]`.",
+    "remediation": "Provide a media item — Instagram's API has no text-only feed surface."
+  }
+}
+```
+
+## Remediation
+
+Add at least one image or video. If you want a text-first post, [Threads](/platforms/threads) is where it goes; the same content with `account.platform: "threads"` will publish text-only.
+
+## Related
+
+- [`instagram.media.mime_allowed`](/preflight/instagram-media-mime_allowed) — JPEG-only on the photo path.
+- [`threads.text.required`](/preflight/threads-text-required) — Threads's mirror constraint.

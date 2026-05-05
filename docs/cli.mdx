@@ -1,0 +1,33 @@
+---
+title: CLI
+description: A command-line client for letmepost.dev. Coming soon.
+icon: terminal
+---
+
+<Note>
+The CLI is a post-launch deliverable. Until then, the [TypeScript SDK](/sdks/typescript) and raw `curl` cover every operation.
+</Note>
+
+## Planned shape
+
+```bash planned.sh
+# auth
+lmp login
+lmp keys create my-key
+
+# accounts
+lmp accounts connect bluesky
+lmp accounts list
+
+# posts
+lmp post --to bluesky --text "Hello from the CLI"
+lmp post --schedule "2026-05-08T12:00:00Z" --to bluesky --text "..."
+lmp posts list --status rejected --since 24h
+
+# media
+lmp media upload ./hero.jpg
+```
+
+The CLI thin-wraps the same HTTP API documented elsewhere on this site, so anything you can do here you can already do today with `curl`.
+
+Watch the [GitHub releases](https://github.com/rosekamallove/letmepost.dev/releases) for the announcement.

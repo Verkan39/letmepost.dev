@@ -1,0 +1,32 @@
+---
+title: unauthorized
+description: The API key is authentic but not allowed to perform this action.
+---
+
+Your key is valid; it just can't do this. The two most common causes are role mismatch (e.g., a member key trying to manage org settings) and write attempts on a read-only endpoint shape.
+
+For most cross-organization or cross-profile attempts you'll see [`not_found`](/errors/not_found) instead — we 404 to avoid leaking resource existence to a key that shouldn't see it.
+
+## What triggers it
+
+- An owner-only action (e.g., deleting an organization, rotating an org-wide secret) attempted by a member key.
+- A read-only key on a write endpoint.
+- A profile-scoped key trying to modify org-wide settings.
+
+## Response shape
+
+```json unauthorized.json
+{
+  "error": {
+    "code": "unauthorized",
+    "message": "This action requires an owner-scoped key.",
+    "remediation": "Mint an owner-scoped key from the dashboard, or have an owner perform the action.",
+    "requestId": "req_..."
+  }
+}
+```
+
+## Related
+
+- [Authentication](/authentication) — scoping rules and key shape.
+- [`not_found`](/errors/not_found) — what you get for cross-org/cross-profile attempts.

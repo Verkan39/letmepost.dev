@@ -1,0 +1,15 @@
+---
+title: facebook.media.mime_allowed
+description: Facebook Pages accept jpeg/png images and mp4/mov video.
+---
+
+## What it checks
+
+For images: `mimeType ∈ { image/jpeg, image/png }`.
+For videos: `mimeType ∈ { video/mp4, video/quicktime }`.
+
+WebP, HEIC, GIF on the photo path will fail upstream with opaque `code 100`.
+
+## Remediation
+
+Re-encode to JPEG or PNG for images; mp4 (H.264 + AAC) for video.

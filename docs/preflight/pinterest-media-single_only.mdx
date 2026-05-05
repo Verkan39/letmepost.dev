@@ -1,0 +1,16 @@
+---
+title: pinterest.media.single_only
+description: v1 Pinterest support is single-image only. Multi-image pins are deferred.
+---
+
+## What it checks
+
+`media.length <= 1`.
+
+## Why
+
+Pinterest's API supports multi-image pins (carousel pins), but the v1 publisher targets the single-image surface. Carousel and video pins ship in a follow-up slice.
+
+## Remediation
+
+Attach exactly one image, or split into multiple pins.

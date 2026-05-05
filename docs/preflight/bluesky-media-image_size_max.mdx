@@ -1,0 +1,43 @@
+---
+title: bluesky.media.image_size_max
+description: Each image must be ≤ 976 KB (1,000,000 bytes). Bluesky's blob limit.
+---
+
+## What it checks
+
+`byteLength <= 1_000_000` per image item.
+
+## Why
+
+Bluesky's PDS blob upload caps at ~976 KB (1,000,000 bytes — Bluesky uses base-10, not base-2). Larger blobs are rejected with `BlobTooLarge`. The 976 KB number is the "post" you want; the constant is the byte limit you should compare to.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "bluesky.media.image_size_max",
+    "platform": "bluesky",
+    "message": "Image is 1450000 bytes; Bluesky allows at most 1000000.",
+    "remediation": "Re-encode the image under 1000000 bytes (Bluesky's blob limit is ~976 KB)."
+  }
+}
+```
+
+## Remediation
+
+Re-encode at lower quality or smaller dimensions. For JPEGs, quality 80–85 + max-dimension 2048 px is usually enough.
+
+```sh
+# ImageMagick
+magick input.jpg -quality 82 -resize 2048x2048\> output.jpg
+
+# sharp (Node)
+await sharp(input).resize({ width: 2048, withoutEnlargement: true }).jpeg({ quality: 82 }).toFile("output.jpg");
+```
+
+## Related
+
+- [`bluesky.media.video_size_max`](/preflight/bluesky-media-video_size_max)
+- [`bluesky.media.mime_allowed`](/preflight/bluesky-media-mime_allowed)

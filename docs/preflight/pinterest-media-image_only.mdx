@@ -1,0 +1,12 @@
+---
+title: pinterest.media.image_only
+description: v1 supports image pins only. Video pins are deferred.
+---
+
+## What it checks
+
+`media[0].kind === "image"`.
+
+## Remediation
+
+Attach an image. Video pins (Idea Pins) require a different create endpoint and ship in a follow-up slice.

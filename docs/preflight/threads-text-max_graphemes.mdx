@@ -1,0 +1,34 @@
+---
+title: threads.text.max_graphemes
+description: Threads caps post text at 500 graphemes, including image captions.
+---
+
+## What it checks
+
+`countGraphemes(text) <= 500` regardless of post shape (text-only, image, video, carousel).
+
+## Why 500
+
+Meta's published Threads API documents the 500-character cap. We use grapheme-aware counting so a single emoji counts as 1, matching Meta's own behavior on `/threads` create-container calls.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "threads.text.max_graphemes",
+    "platform": "threads",
+    "message": "Post text is 612 graphemes; Threads allows at most 500."
+  }
+}
+```
+
+## Remediation
+
+Trim the post. Use the same grapheme-aware approach as for Bluesky — see [`bluesky.text.max_graphemes`](/preflight/bluesky-text-max_graphemes) for code.
+
+## Related
+
+- [`threads.text.required`](/preflight/threads-text-required)
+- [Platforms / Threads](/platforms/threads)

@@ -1,0 +1,76 @@
+---
+title: Platforms overview
+description: Seven networks, one API. Status, features, and connect flow per platform.
+icon: network-wired
+---
+
+Every platform letmepost.dev supports goes through the same API surface — `POST /v1/posts` with the right `account` reference. Per-platform quirks (caps, mime types, OAuth shapes) live in [preflight rules](/preflight) so failures surface locally with a rule id instead of an opaque upstream error.
+
+## Status
+
+Bluesky is live for everyone today. The rest are review-gated and ship as approvals clear. Live status updates appear here and in `GET /v1/platform-versions`.
+
+<CardGroup cols={2}>
+  <Card title="Bluesky" icon="bluesky" iconType="brands" href="/platforms/bluesky">
+    **Live** · AT Proto · App-password connect (no OAuth) · Text + media + first comment.
+  </Card>
+  <Card title="Pinterest" icon="pinterest" iconType="brands" href="/platforms/pinterest">
+    **Under review** · v5 API · Single-image pins · Cheapest integration of the seven.
+  </Card>
+  <Card title="Twitter / X" icon="x-twitter" iconType="brands" href="/platforms/twitter">
+    **Under review** · v2 API · OAuth 2.0 PKCE · Single-media in v1, 4-up in a follow-up.
+  </Card>
+  <Card title="LinkedIn" icon="linkedin" iconType="brands" href="/platforms/linkedin">
+    **Under review** · Versioned REST · Personal posting in v1; org posting needs MDP.
+  </Card>
+  <Card title="Threads" icon="threads" iconType="brands" href="/platforms/threads">
+    **Under review** · Threads Graph API · Standalone OAuth at threads.net · 2–20 carousel.
+  </Card>
+  <Card title="Instagram" icon="instagram" iconType="brands" href="/platforms/instagram">
+    **Under review** · Meta Graph · Connected via Facebook OAuth (one consent, two platforms).
+  </Card>
+  <Card title="Facebook Pages" icon="facebook" iconType="brands" href="/platforms/facebook">
+    **Under review** · Meta Graph · Single OAuth grants both Pages + linked IG Business.
+  </Card>
+</CardGroup>
+
+## What's the same everywhere
+
+- **One request shape.** `POST /v1/posts` with `{ account, text, media?, scheduledAt?, ... }`.
+- **One error envelope.** `code` + `rule` + `platformResponse` + `remediation` — no per-platform `body: {}` surprises.
+- **Idempotency keys.** Every write accepts `Idempotency-Key`; replays return the original response.
+- **Preflight, not postflight.** Documented platform rules run locally before the upstream call.
+
+## What's different per platform
+
+| concern | varies by |
+|---|---|
+| Connect flow | OAuth shape (Meta Login for Business, OAuth 2.0 PKCE, etc.); Bluesky uses app passwords |
+| Token lifetime | Bluesky: minutes · X: ~2h · Threads/IG/FB: ~60d · LinkedIn: 60d (no refresh) · Pinterest: 30d |
+| Media constraints | mime allowlist, size cap, count cap, mixed image+video acceptance |
+| Text caps | Twitter 280 · Bluesky 300 · Threads 500 · Instagram 2200 · LinkedIn 3000 · Facebook 63206 |
+| Required body shape | Instagram requires media; Facebook accepts text-only; Pinterest needs board id |
+| Scope set | minimum scope to publish + optional extended scopes for read access |
+
+The per-platform pages above link to the exact constraints and the OAuth scope set.
+
+## Out of v1
+
+Deliberately cut:
+
+- **TikTok** — audit complexity. Two separate review tracks with frequent rejections. Reserved as a v2 add.
+- **Reddit, Telegram, Discord, Snapchat, Google Business, WhatsApp** — long-tail platforms with fewer than 1k accounts each in the dataset that drove platform priority decisions.
+
+The DB enum keeps a slot reserved for TikTok so a future re-add is purely additive — no breaking schema change.
+
+## Build order
+
+Platform priority was decided from the 90-day post-volume / failure-rate corpus (see [PRODUCT.md](https://github.com/rosekamallove/letmepost.dev/blob/main/PRODUCT.md) for the data):
+
+1. **Bluesky** — first to ship. Simple AT Proto, no app review, minutes-long JWT lifecycle is a good forcing function for the token-refresh architecture.
+2. **LinkedIn** — the wedge platform. #1 complaint volume in the 150-citation research corpus, cleanest API of the major networks, no brutal approval gauntlet.
+3. **Twitter / X** — table-stakes for the automation-builder ICP.
+4. **Instagram + Facebook + Threads** — Meta Graph trio, built together because they share auth (well, Threads is its own).
+5. **Pinterest** — cheapest integration, fastest-growing network in the dataset (+1369% over 90 days).
+
+Watch the [changelog](/changelog) for live status flips.

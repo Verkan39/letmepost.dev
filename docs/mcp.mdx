@@ -1,0 +1,45 @@
+---
+title: MCP server
+description: Use letmepost.dev from Claude, Cursor, or any MCP-compatible client.
+icon: plug
+---
+
+The letmepost.dev MCP server lets AI agents — Claude Desktop, Cursor, Claude Code, any MCP-compatible client — publish to social platforms, list connected accounts, and inspect post status without re-implementing our REST API.
+
+<Note>
+The MCP server is in flight as a post-launch deliverable. The full surface ships once the REST API has cleared platform reviews. This page documents the planned shape so integrators can plan around it.
+</Note>
+
+## Planned tools
+
+| tool | what |
+|------|------|
+| `lmp_post` | Publish to one or more connected accounts. Same shape as `POST /v1/posts`. |
+| `lmp_validate` | Run preflight without publishing. Returns the rule that would fail, if any. |
+| `lmp_list_accounts` | List connected platform accounts in the caller's organization. |
+| `lmp_get_post` | Fetch a single post with attempt history. |
+| `lmp_list_posts` | List posts with the same filters as `GET /v1/posts`. |
+
+## Planned setup (Claude Code)
+
+```bash planned-claude-code.sh
+claude mcp add --transport http letmepost https://api.letmepost.dev/mcp
+```
+
+The first tool call triggers OAuth. The token is scoped per-organization and obeys the same profile-scoping rules as API keys — see [authentication](/authentication).
+
+## Planned setup (Claude Desktop)
+
+```json planned-claude-desktop.json
+{
+  "mcpServers": {
+    "letmepost": {
+      "url": "https://api.letmepost.dev/mcp"
+    }
+  }
+}
+```
+
+## When it ships
+
+After Bluesky stabilizes in production and at least one of the Meta-trio platforms is approved. The MCP layer is a thin wrapper over the existing REST API, so the gating factor is breadth, not the wrapper itself.

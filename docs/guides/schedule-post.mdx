@@ -1,0 +1,68 @@
+---
+title: Scheduled posts
+description: Pass scheduledAt to queue a post for the future. 202 instead of 201, queued status, post.queued webhook.
+---
+
+Add `scheduledAt` to a `POST /v1/posts` body and the request is persisted with `status: "queued"`. A delayed job runs on the publish queue at the requested time.
+
+## Request
+
+```json scheduled.json
+{
+  "account": { "platform": "bluesky", "id": "..." },
+  "text": "Friday at noon UTC",
+  "scheduledAt": "2026-05-08T12:00:00Z"
+}
+```
+
+## Response
+
+You get `202 Accepted` instead of `201 Created`:
+
+```json 202.json
+{
+  "id": "post_01HY6X4AWBJM2K9F2PTQMRD9JQ",
+  "platform": "bluesky",
+  "status": "queued",
+  "scheduledAt": "2026-05-08T12:00:00.000Z",
+  "createdAt": "2026-05-04T15:30:00.000Z"
+}
+```
+
+Save the `id`. To check what happened later, fetch [`GET /v1/posts/:id`](/api-reference/#get-/v1/posts/:id) — it returns the full attempt history once the job has run.
+
+## Constraints
+
+- `scheduledAt` must be at least 1 second in the future. Closer than that and you get [`validation_failed`](/errors/validation_failed) with `rule: "scheduledAt.future"`. The 1-second floor is a guardrail against races where the worker fires before the persisting transaction commits.
+- **v1 scheduled posts accept text only.** Media and `firstComment` on scheduled posts surface `validation_failed` with `rule: "scheduledAt.text_only"`. The remediation is to publish synchronously — the scheduled-media path needs persistent media storage and ships in a follow-up slice.
+
+## Lifecycle
+
+A scheduled post moves through these statuses:
+
+```
+queued    →   publishing   →   published
+                          ↘   rejected
+                          ↘   failed
+```
+
+Subscribe to webhooks for each transition:
+
+- [`post.queued`](/webhooks/post-queued) — fired immediately on accept.
+- [`post.published`](/webhooks/post-published) — successful publish.
+- [`post.rejected`](/webhooks/post-rejected) — preflight or platform rejected; not retried.
+- [`post.failed`](/webhooks/post-failed) — transient failure; the worker may retry per the queue policy.
+
+## Idempotency on scheduled posts
+
+`Idempotency-Key` works the same way as on immediate posts — the replay cache returns the original `202` response if you retry within 24 h with the same body. The queued job is enqueued exactly once.
+
+## Time zones
+
+`scheduledAt` is ISO-8601 with a timezone offset. Always include the `Z` (or an explicit `+HH:MM`); naive datetimes are rejected. We do not interpret a "local" timezone for you.
+
+## See also
+
+- [`POST /v1/posts` reference](/api-reference/#post-/v1/posts)
+- [Idempotency](/idempotency)
+- [`post.queued` webhook](/webhooks/post-queued)

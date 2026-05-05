@@ -1,0 +1,103 @@
+---
+title: Instagram Business
+description: Instagram Business via the Meta Graph API. Connected together with Facebook Pages — one OAuth, two platforms.
+icon: instagram
+iconType: brands
+---
+
+Instagram Business is published via Meta's Graph API, **not** the consumer Instagram API. Connecting Instagram is a side effect of connecting Facebook — there is no separate `connect/instagram` endpoint. One Meta OAuth produces two letmepost rows: one `facebook`, one `instagram` (when an IG Business is linked to a Page the user manages).
+
+## Connect
+
+Start at `POST /v1/accounts/connect/facebook` (not `instagram`). The Facebook OAuth grants the scopes needed for both Pages and IG Business. After complete:
+
+- We call `GET /me/accounts` to discover Pages.
+- For each Page, we read `instagram_business_account` to find the linked IG.
+- One row per discovered Page, plus one IG row per Page that has an IG Business linked.
+
+If the user manages no Pages: [`facebook.pages.none`](/preflight/facebook-pages-none).
+If a Page has no IG Business linked: only the Facebook row is created.
+
+## Scopes
+
+The Facebook connect requests these scopes (all of them; IG Business only works with `pages_show_list` + the `instagram_*` scopes):
+
+```
+pages_show_list             — list Pages the user manages
+pages_manage_posts          — create posts on Pages
+pages_read_engagement       — pre-req for posts on some apps
+business_management         — needed for Pages connected via Business
+instagram_basic             — read IG Business account info per Page
+instagram_content_publish   — two-step container publish on IG
+```
+
+`extended` scopes (off by default): `pages_read_user_content`, `pages_manage_engagement`, `instagram_manage_comments`, `instagram_manage_insights`.
+
+## Token lifecycle
+
+We exchange the short-lived token for a long-lived (~60-day) token at connect time, then refresh on schedule. `token.expiring` fires before expiry.
+
+## Posting
+
+Instagram has **no text-only post shape** — every post needs at least one media item ([`instagram.media.required`](/preflight/instagram-media-required)).
+
+```json single-image.json
+{
+  "account": { "platform": "instagram", "id": "..." },
+  "text": "shipped",
+  "media": [
+    { "kind": "image", "mediaId": "med_…", "altText": "..." }
+  ]
+}
+```
+
+```json reels.json
+{
+  "account": { "platform": "instagram", "id": "..." },
+  "text": "Reels caption",
+  "media": [
+    { "kind": "video", "mediaId": "med_…" }
+  ]
+}
+```
+
+```json carousel.json
+{
+  "account": { "platform": "instagram", "id": "..." },
+  "text": "carousel of three",
+  "media": [
+    { "kind": "image", "mediaId": "med_…" },
+    { "kind": "image", "mediaId": "med_…" },
+    { "kind": "image", "mediaId": "med_…" }
+  ]
+}
+```
+
+## Constraints
+
+- Caption: 2200 graphemes max ([`instagram.text.max_graphemes`](/preflight/instagram-text-max_graphemes))
+- Media required ([`instagram.media.required`](/preflight/instagram-media-required))
+- Carousel: 2–10 items, mixed allowed ([`instagram.media.count_max`](/preflight/instagram-media-count_max))
+- **Image mime: JPEG only** ([`instagram.media.mime_allowed`](/preflight/instagram-media-mime_allowed))
+- Video mimes: mp4, mov
+- Image size: 8 MB max
+- Video size: 1 GB max; Reels duration ≤ 90 s (enforced platform-side)
+- Aspect ratio: 0.8..1.91 for feed, 9:16 for Reels — caught at container-finalize as [`instagram.media.aspect_ratio`](/preflight/instagram-media-aspect_ratio)
+- **Media URLs must be publicly reachable** — the canonical [`instagram.media.reachable`](/preflight/instagram-media-reachable) (Meta's notorious `OAuthException 2207052`)
+
+## Preflight rules
+
+- [`instagram.media.required`](/preflight/instagram-media-required)
+- [`instagram.text.max_graphemes`](/preflight/instagram-text-max_graphemes)
+- [`instagram.media.count_max`](/preflight/instagram-media-count_max)
+- [`instagram.media.alt_text_max_graphemes`](/preflight/instagram-media-alt_text_max_graphemes)
+- [`instagram.media.mime_allowed`](/preflight/instagram-media-mime_allowed)
+- [`instagram.media.image_size_max`](/preflight/instagram-media-image_size_max)
+- [`instagram.media.video_size_max`](/preflight/instagram-media-video_size_max)
+- [`instagram.media.reachable`](/preflight/instagram-media-reachable)
+- [`instagram.media.aspect_ratio`](/preflight/instagram-media-aspect_ratio)
+
+## Notes
+
+- Use [`POST /v1/media`](/guides/upload-media) to upload. URLs from your own host work but introduce the reachability failure mode — Meta's CDN must be able to fetch them anonymously.
+- Reels and feed video are unified on the modern API; we route single-video posts through the Reels container and feed-video posts have been retired.

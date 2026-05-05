@@ -1,0 +1,12 @@
+---
+title: linkedin.visibility.enum
+description: visibility must be PUBLIC or CONNECTIONS. Other values are rejected.
+---
+
+## What it checks
+
+When the request body sets a LinkedIn-specific `visibility`, it must be one of `PUBLIC` or `CONNECTIONS`. Other values (LOGGED_IN, CONTAINER, etc.) require LinkedIn's MDP and aren't supported in v1.
+
+## Remediation
+
+Use `PUBLIC` (the default) or `CONNECTIONS`. The other visibility modes ship with org-posting in a follow-up slice.

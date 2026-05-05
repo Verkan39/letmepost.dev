@@ -1,0 +1,35 @@
+---
+title: post.queued
+description: A scheduled post was accepted and a delayed publish job was enqueued.
+---
+
+Fires the moment we accept a scheduled `POST /v1/posts` and enqueue the delayed job. Immediate posts (no `scheduledAt`) **do not** fire this event — they go straight to `post.published` or a failure event.
+
+## Payload
+
+```json post.queued.json
+{
+  "id": "evt_...",
+  "type": "post.queued",
+  "createdAt": "2026-05-04T15:30:00Z",
+  "organizationId": "org_...",
+  "data": {
+    "id": "post_...",
+    "platform": "bluesky",
+    "accountId": "...",
+    "profileId": "...",
+    "scheduledAt": "2026-05-08T12:00:00Z",
+    "queuedAt": "2026-05-04T15:30:00Z"
+  }
+}
+```
+
+## Use it for
+
+- Surface "scheduled" state in your UI as soon as the API accepts the post.
+- Log the queueing for audit trails — `queuedAt` is the API-side timestamp, not your wall clock.
+
+## Related
+
+- [`post.published`](/webhooks/post-published) — fires when the queued post actually publishes.
+- [Scheduled posts](/guides/schedule-post) — full scheduling guide.

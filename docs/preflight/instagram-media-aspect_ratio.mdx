@@ -1,0 +1,43 @@
+---
+title: instagram.media.aspect_ratio
+description: Instagram rejects media that's outside its supported aspect-ratio range. Caught at container-finalize time.
+---
+
+## What it checks
+
+The IG container reports an aspect-ratio rejection when the media's width/height ratio is outside `0.8..1.91` for feed posts, or not `9:16` for Reels. Detection happens at the container status-poll step — preflight surfaces the rule when Meta reports it.
+
+## Why we don't check it statically
+
+Verifying the aspect ratio requires reading image dimensions or ffprobe-style video introspection. We don't do that in the API hot path; instead we let Meta run its own check and translate the response into this rule.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "instagram.media.aspect_ratio",
+    "platform": "instagram",
+    "message": "Instagram rejected the container — media aspect ratio is outside the accepted range.",
+    "remediation": "Crop or pad to a 4:5..1.91:1 ratio for feed posts, or 9:16 for Reels."
+  }
+}
+```
+
+## Remediation
+
+For a feed image, the safest target is **1:1** (1080×1080). Reels: **9:16** (1080×1920).
+
+```sh
+# Pad a wide image to 1:1
+magick input.jpg -gravity center -background white -extent 1080x1080 output.jpg
+
+# Crop a 16:9 video to 9:16
+ffmpeg -i input.mp4 -vf "crop=ih*9/16:ih,scale=1080:1920" -c:a copy output.mp4
+```
+
+## Related
+
+- [`instagram.media.mime_allowed`](/preflight/instagram-media-mime_allowed)
+- [`instagram.media.reachable`](/preflight/instagram-media-reachable) — the 2207052 sibling.

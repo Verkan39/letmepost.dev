@@ -1,0 +1,29 @@
+---
+title: facebook.text.max_graphemes
+description: Facebook Page posts cap at 63,206 graphemes. Hard server-side limit.
+---
+
+## What it checks
+
+`countGraphemes(text) <= 63_206`.
+
+## Why 63,206
+
+Facebook's hard server-side cap on a Page post is 63,206 characters — an oddly specific value chosen by Meta. Above it, Graph API rejects with `code 100`. We pre-check against graphemes; since Facebook counts UTF-16 codeunits but graphemes ≤ codeunits, we never over-permit a payload that would 100 upstream.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "facebook.text.max_graphemes",
+    "platform": "facebook",
+    "message": "Post text exceeds Facebook's 63206-character cap."
+  }
+}
+```
+
+## Remediation
+
+If you're hitting this, the post is probably better as a Note or a link to a longer-form surface. Trim to under 63,206 characters.

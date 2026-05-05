@@ -1,0 +1,47 @@
+---
+title: threads.media.mime_allowed
+description: Threads accepts jpeg/png/webp images and mp4/mov video.
+---
+
+## What it checks
+
+For images: `mimeType ∈ { image/jpeg, image/png, image/webp }`.
+For videos: `mimeType ∈ { video/mp4, video/quicktime }`.
+
+The mime is sniffed from the resolved bytes, not trusted from the file extension.
+
+## Why
+
+Meta's Threads create-container endpoint rejects HEIC, BMP, AVI, etc. with opaque `code 100` errors. Catching the mime mismatch locally surfaces a useful rule + remediation.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "threads.media.mime_allowed",
+    "platform": "threads",
+    "message": "Image mime type 'image/heic' is not allowed on Threads.",
+    "remediation": "Use one of: image/jpeg, image/png, image/webp."
+  }
+}
+```
+
+## Remediation
+
+Re-encode the asset:
+
+```sh
+# HEIC → JPEG
+magick input.heic output.jpg
+
+# AVI → MP4
+ffmpeg -i input.avi -c:v libx264 -c:a aac output.mp4
+```
+
+## Related
+
+- [`threads.media.image_size_max`](/preflight/threads-media-image_size_max)
+- [`threads.media.video_size_max`](/preflight/threads-media-video_size_max)
+- [`instagram.media.mime_allowed`](/preflight/instagram-media-mime_allowed) — IG is stricter (JPEG-only).

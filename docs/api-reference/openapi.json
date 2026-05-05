@@ -1,0 +1,1414 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "letmepost.dev API",
+    "version": "v1",
+    "description": "Open-source social media publishing API. Preflight validation, transparent errors, idempotency, stable platform versions.\n\nThe full developer documentation lives at [letmepost.dev/docs/](https://letmepost.dev/docs/). This reference is auto-generated from the canonical Zod schemas at `packages/schemas/`.\n\n**Auth:** Bearer key in the `Authorization` header. See [Authentication](https://letmepost.dev/docs/authentication/).\n**Idempotency:** every write accepts `Idempotency-Key`. See [Idempotency](https://letmepost.dev/docs/idempotency/).\n**Errors:** stable envelope with `code`, `rule`, `platformResponse`, `remediation`. See [Errors](https://letmepost.dev/docs/errors/).",
+    "contact": {
+      "name": "letmepost.dev",
+      "url": "https://github.com/rosekamallove/letmepost.dev"
+    },
+    "license": {
+      "name": "Apache-2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.letmepost.dev",
+      "description": "Production"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Posts",
+      "description": "Publish and read posts."
+    },
+    {
+      "name": "Media",
+      "description": "Upload and reference media."
+    },
+    {
+      "name": "Accounts",
+      "description": "Connect and manage platform accounts."
+    },
+    {
+      "name": "API keys",
+      "description": "Mint and revoke keys."
+    },
+    {
+      "name": "Webhooks",
+      "description": "Register webhook endpoints."
+    },
+    {
+      "name": "Profiles",
+      "description": "Profile-scoped key management."
+    },
+    {
+      "name": "Platform versions",
+      "description": "Public version tracker."
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "lmp_live_… or lmp_test_…",
+        "description": "Mint an API key in the dashboard. See https://letmepost.dev/docs/authentication/."
+      }
+    },
+    "schemas": {
+      "PostStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "validated",
+          "publishing",
+          "published",
+          "failed",
+          "rejected"
+        ]
+      },
+      "CreatePostResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "post_01HY6X4AWBJM2K9F2PTQMRD9JQ"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PostStatus"
+          },
+          "uri": {
+            "type": "string",
+            "description": "Platform-native URI (e.g., AT Proto for Bluesky, post URN for LinkedIn)."
+          },
+          "cid": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "scheduledAt": {
+            "type": "string"
+          },
+          "firstCommentUri": {
+            "type": "string"
+          },
+          "firstCommentCid": {
+            "type": "string"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "message"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "platform",
+          "createdAt"
+        ]
+      },
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "validation_failed",
+          "preflight_failed",
+          "platform_auth_failed",
+          "platform_rejected",
+          "platform_unavailable",
+          "internal_error",
+          "unauthenticated",
+          "unauthorized",
+          "not_found",
+          "idempotency_conflict",
+          "rate_limited"
+        ],
+        "description": "The eleven canonical error codes. See https://letmepost.dev/docs/errors/ for per-code documentation."
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "$ref": "#/components/schemas/ErrorCode"
+              },
+              "message": {
+                "type": "string"
+              },
+              "rule": {
+                "type": "string",
+                "description": "The preflight rule id or validation field path that failed. See https://letmepost.dev/docs/preflight/ for the rule catalog."
+              },
+              "platform": {
+                "type": "string"
+              },
+              "platformVersion": {
+                "type": "string",
+                "description": "Pinned upstream API version."
+              },
+              "platformResponse": {
+                "description": "Raw upstream response, when available."
+              },
+              "remediation": {
+                "type": "string"
+              },
+              "requestId": {
+                "type": "string"
+              },
+              "traceId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Platform": {
+        "type": "string",
+        "enum": [
+          "bluesky",
+          "facebook",
+          "instagram",
+          "linkedin",
+          "pinterest",
+          "threads",
+          "twitter"
+        ],
+        "description": "Supported platforms in v1."
+      },
+      "AccountRef": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "$ref": "#/components/schemas/Platform"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The letmepost platform_account id you got from connect.",
+            "example": "00000000-0000-0000-0000-000000000000"
+          }
+        },
+        "required": [
+          "platform",
+          "id"
+        ]
+      },
+      "MediaItem": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video"
+            ]
+          },
+          "altText": {
+            "type": "string"
+          },
+          "mediaId": {
+            "type": "string",
+            "pattern": "^med_[0-9A-Za-z]{22}$",
+            "description": "References a previous POST /v1/media upload. Preferred for production."
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Public URL we fetch from your CDN. Must respond 200 to anonymous GET."
+          },
+          "bytesBase64": {
+            "type": "string",
+            "description": "Inline base64. Convenient for tests; use POST /v1/media for production."
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "description": "Exactly one of mediaId / url / bytesBase64 must be set per item."
+      },
+      "FirstComment": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "description": "Bluesky-only today. Auto-replies to the parent post with this text after publish."
+      },
+      "PinterestPostOverrides": {
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destinationUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "ThreadsPostOverrides": {
+        "type": "object",
+        "properties": {
+          "replyToId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Threads thread id to reply under (Threads's reply_to_id parameter)."
+          }
+        }
+      },
+      "CreatePostRequest": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/AccountRef"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "example": "Hello from letmepost.dev"
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaItem"
+            }
+          },
+          "firstComment": {
+            "$ref": "#/components/schemas/FirstComment"
+          },
+          "scheduledAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO-8601 timestamp at least 1 second in the future. When set, the post is queued and the response is 202.",
+            "example": "2026-05-08T12:00:00.000Z"
+          },
+          "pinterest": {
+            "$ref": "#/components/schemas/PinterestPostOverrides"
+          },
+          "threads": {
+            "$ref": "#/components/schemas/ThreadsPostOverrides"
+          }
+        },
+        "required": [
+          "account",
+          "text"
+        ]
+      },
+      "Post": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "profileId": {
+            "type": "string"
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "account": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "platform": {
+                "$ref": "#/components/schemas/Platform"
+              },
+              "platformAccountId": {
+                "type": "string"
+              },
+              "displayName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "platform",
+              "platformAccountId",
+              "displayName"
+            ]
+          },
+          "platform": {
+            "$ref": "#/components/schemas/Platform"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PostStatus"
+          },
+          "text": {
+            "type": "string"
+          },
+          "mediaRefs": {
+            "type": "array",
+            "items": {}
+          },
+          "scheduledAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platformUri": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platformCid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error": {},
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "profileId",
+          "accountId",
+          "account",
+          "platform",
+          "status",
+          "text",
+          "mediaRefs",
+          "scheduledAt",
+          "publishedAt",
+          "platformUri",
+          "platformCid",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PostListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Post"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "data",
+          "nextCursor"
+        ]
+      },
+      "CreateMediaResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^med_[0-9A-Za-z]{22}$"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "contentType",
+          "sizeBytes",
+          "sha256",
+          "createdAt"
+        ]
+      },
+      "Empty": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/v1/posts": {
+      "post": {
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Publish or schedule a post",
+        "description": "Publish to a connected account, or schedule for a future time when `scheduledAt` is set.\n\n- **Idempotent:** include an `Idempotency-Key` header. Replays within 24 hours return the original response.\n- **Preflight:** every documented platform constraint runs locally before the upstream call. See [/docs/preflight/](https://letmepost.dev/docs/preflight/).\n- **Errors:** failures use the [stable error envelope](https://letmepost.dev/docs/errors/) — `code`, `rule`, `platformResponse`, `remediation`.\n\nFor per-platform payload differences, see the [platforms guides](https://letmepost.dev/docs/platforms/bluesky/).",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Recommended on every write. See [Idempotency](https://letmepost.dev/docs/idempotency/)."
+            },
+            "required": false,
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Immediate publish succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatePostResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Scheduled post accepted; published when scheduledAt fires.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatePostResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "validation_failed or preflight_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated or platform_auth_failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "idempotency_conflict.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Posts"
+        ],
+        "summary": "List posts",
+        "description": "Cursor-paginated. Filter by `profileId`, `platform`, `status`, `errorCode`, `after`, `before`. Cursor pagination via `nextCursor` on responses.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "profileId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/Platform"
+              }
+            },
+            "required": false,
+            "name": "platform",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/PostStatus"
+              }
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "required": false,
+            "name": "errorCode",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "required": false,
+            "name": "after",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "required": false,
+            "name": "before",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of posts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/posts/{id}": {
+      "get": {
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Fetch a single post with attempts",
+        "description": "Returns the full post record including every publish attempt (timing, upstream response, error code).",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Post detail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Post"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/media": {
+      "post": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Upload media (multipart)",
+        "description": "Upload a single file part named `file`. Returns a `med_…` id you reference from post bodies.\n\nThe 200 MB ceiling is conservative; larger uploads land in a follow-up slice. See [/docs/media/](https://letmepost.dev/docs/media/).",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The file part."
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Upload succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateMediaResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "validation_failed (missing file, wrong content type).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload too large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "List media uploads",
+        "description": "TODO: full schema. See https://letmepost.dev/docs/ for the surrounding context.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts/connect/{platform}": {
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Start a connect flow",
+        "description": "TODO: full schema. See https://letmepost.dev/docs/ for the surrounding context.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "platform",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts/connect/{platform}/complete": {
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Complete a connect flow",
+        "description": "TODO: full schema. See https://letmepost.dev/docs/ for the surrounding context.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "platform",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "List connected accounts",
+        "description": "TODO: full schema. See https://letmepost.dev/docs/ for the surrounding context.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/accounts/{id}": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Fetch a connected account",
+        "description": "TODO: full schema. See https://letmepost.dev/docs/ for the surrounding context.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Disconnect",
+        "description": "TODO: full schema. See https://letmepost.dev/docs/ for the surrounding context.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/api-keys": {
+      "post": {
+        "tags": [
+          "API keys"
+        ],
+        "summary": "Mint an API key",
+        "description": "TODO: full schema. See https://letmepost.dev/docs/ for the surrounding context.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "API keys"
+        ],
+        "summary": "List API keys",
+        "description": "TODO: full schema. See https://letmepost.dev/docs/ for the surrounding context.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/api-keys/{id}": {
+      "delete": {
+        "tags": [
+          "API keys"
+        ],
+        "summary": "Revoke an API key",
+        "description": "TODO: full schema. See https://letmepost.dev/docs/ for the surrounding context.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhook-endpoints": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Register a webhook URL",
+        "description": "TODO: full schema. See https://letmepost.dev/docs/ for the surrounding context.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "List webhook endpoints",
+        "description": "TODO: full schema. See https://letmepost.dev/docs/ for the surrounding context.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhook-endpoints/{id}": {
+      "delete": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Delete a webhook endpoint",
+        "description": "TODO: full schema. See https://letmepost.dev/docs/ for the surrounding context.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/profiles": {
+      "get": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "List profiles",
+        "description": "TODO: full schema. See https://letmepost.dev/docs/ for the surrounding context.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Create a profile",
+        "description": "TODO: full schema. See https://letmepost.dev/docs/ for the surrounding context.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/platform-versions": {
+      "get": {
+        "tags": [
+          "Platform versions"
+        ],
+        "summary": "Public version tracker",
+        "description": "TODO: full schema. See https://letmepost.dev/docs/ for the surrounding context.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

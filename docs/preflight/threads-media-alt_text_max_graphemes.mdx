@@ -1,0 +1,36 @@
+---
+title: threads.media.alt_text_max_graphemes
+description: Threads alt text caps at 1000 graphemes per media item.
+---
+
+## What it checks
+
+`countGraphemes(item.altText) <= 1000`.
+
+## Why 1000
+
+Meta's Threads API docs don't publish an explicit alt-text cap, so we use the nearest analogue we trust — half of Instagram's 2200-cap, sized down because Threads alt text is rendered in narrower contexts. The 1000 number is conservative: anything below it has been accepted upstream in our testing.
+
+If Meta publishes an explicit cap that differs, this rule will follow.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "threads.media.alt_text_max_graphemes",
+    "platform": "threads",
+    "message": "Alt text is 1240 graphemes; Threads allows at most 1000."
+  }
+}
+```
+
+## Remediation
+
+Tighten the description. Alt text should describe the image's content; if you have more to say, it belongs in the post body.
+
+## Related
+
+- [`bluesky.media.alt_text_max_graphemes`](/preflight/bluesky-media-alt_text_max_graphemes) — Bluesky caps at 2000.
+- [`instagram.media.alt_text_max_graphemes`](/preflight/instagram-media-alt_text_max_graphemes) — IG caps at 2200.

@@ -1,0 +1,62 @@
+---
+title: Authentication
+description: API keys, scoping, and rotation. Bearer tokens, prefixed by environment.
+---
+
+Every request to the API requires a Bearer token in the `Authorization` header. Keys are prefixed by environment so a `lmp_test_…` key cannot accidentally write to production data.
+
+## Headers
+
+```
+Authorization: Bearer lmp_live_a1b2c3d4...
+Idempotency-Key: 01HY6X4AWBJM2K9F2PTQMRD9JQ   (optional, recommended on writes)
+```
+
+The dashboard's **API keys** page mints, lists, and revokes keys. The secret is shown exactly once — at create time. After that, rotate to replace it.
+
+## Key shape
+
+| Prefix       | Environment | Use                                         |
+|--------------|-------------|---------------------------------------------|
+| `lmp_live_…` | production  | hits `api.letmepost.dev`                    |
+| `lmp_test_…` | sandbox     | hits sandbox accounts; rejects live writes  |
+
+The hash, not the secret, is stored at rest. Your secret is unrecoverable after creation.
+
+## Scoping
+
+A key carries two scopes:
+
+- **Organization** — every key is bound to a single organization. There is no cross-org key.
+- **Profile** *(optional)* — a key may be pinned to a single profile within the org. Cross-profile access by a profile-scoped key returns `404 not_found`, never `403`, so the key cannot probe for the existence of other profiles.
+
+Set the profile scope at creation time. To widen scope, mint a new key — keys are immutable.
+
+## Read vs write
+
+Read endpoints (`GET /v1/posts`, `GET /v1/posts/:id`, `GET /v1/media`, `GET /v1/accounts`) accept either a Bearer key or a dashboard session cookie. Writes accept Bearer keys only.
+
+## Rotation
+
+There is no automatic key rotation. To rotate:
+
+1. Mint a new key in the dashboard.
+2. Switch your application secret to the new key.
+3. Revoke the old key.
+
+Revocation is immediate; in-flight requests on the old key fail with `unauthenticated`.
+
+## OAuth tokens are different
+
+The `Authorization: Bearer …` header authenticates *you* to letmepost. The OAuth tokens we hold for upstream platforms (Bluesky session, LinkedIn access token, etc.) are managed entirely server-side, AES-256-GCM encrypted at rest, and refreshed on the platform's schedule. You never see them.
+
+See [accounts](/guides/connect-account) for the connection lifecycle.
+
+## Errors
+
+| code | when |
+|------|------|
+| [`unauthenticated`](/errors/unauthenticated) | Header missing, malformed, key revoked, or key prefix doesn't match the environment. |
+| [`unauthorized`](/errors/unauthorized) | Authenticated, but the key isn't allowed to perform this action. |
+| [`not_found`](/errors/not_found) | Often a profile-scope mismatch — see scoping above. |
+| [`rate_limited`](/errors/rate_limited) | Per-key rate limit exhausted. |

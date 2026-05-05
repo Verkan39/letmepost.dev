@@ -1,0 +1,82 @@
+---
+title: letmepost.dev
+description: Open-source social media publishing API. Preflight validation, transparent errors, idempotency, stable platform versions.
+mode: wide
+---
+
+A single HTTP API for publishing to Bluesky, Facebook Pages, Instagram Business, LinkedIn, Pinterest, Threads, and Twitter / X. Every post runs through a preflight validator before the upstream call, every error response carries the rule that fired, and every write accepts an idempotency key.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Publish your first Bluesky post via curl in 90 seconds.
+  </Card>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Bearer keys, scoping, rotation.
+  </Card>
+  <Card title="Errors" icon="circle-exclamation" href="/errors">
+    The eleven error codes and what each one means.
+  </Card>
+  <Card title="Preflight" icon="list-check" href="/preflight">
+    Every documented platform constraint, checked before the upstream call.
+  </Card>
+</CardGroup>
+
+## What you can do
+
+Small, opinionated API surface — one primitive done well.
+
+```
+POST   /v1/posts                          publish or schedule a post
+GET    /v1/posts                          list posts (filterable, cursor-paginated)
+GET    /v1/posts/:id                      full post record + every attempt
+
+POST   /v1/media                          multipart upload, returns med_… id
+GET    /v1/media                          list uploaded media
+
+POST   /v1/accounts/connect/:platform     start an OAuth handshake
+POST   /v1/accounts/connect/:platform/complete   finish it
+GET    /v1/accounts                       list connected accounts
+DELETE /v1/accounts/:id                   disconnect
+
+POST   /v1/webhook-endpoints              register a webhook URL
+POST   /v1/api-keys                       mint a scoped API key
+```
+
+The full request and response shapes live in the [API reference](/api-reference).
+
+## Built for
+
+<CardGroup cols={3}>
+  <Card title="AI agents" icon="robot">
+    n8n, LangGraph, CrewAI, Make. Idempotent, MCP-compatible, no per-profile pricing.
+  </Card>
+  <Card title="Indie cross-posting tools" icon="hammer">
+    The wedge for anyone hand-rolling integrations because every existing scheduler is per-channel-priced.
+  </Card>
+  <Card title="Agencies on n8n / Postiz" icon="users">
+    Migrate off Hootsuite / Sprout / Later to a flat-priced primitive that fails loudly.
+  </Card>
+</CardGroup>
+
+## Principles
+
+These are non-negotiable. If a feature breaks one of them, the feature loses.
+
+<AccordionGroup>
+  <Accordion title="Preflight, not postflight" icon="filter">
+    Every documented platform constraint is checked before we touch the upstream API. A 312-grapheme Bluesky post fails locally with a rule id, not asynchronously with `body: {}`.
+  </Accordion>
+  <Accordion title="Transparent errors" icon="eye">
+    No empty bodies. Every failure includes a stable code, the rule that fired, the upstream response, and a remediation hint. See [errors](/errors).
+  </Accordion>
+  <Accordion title="Idempotency by default" icon="repeat">
+    Every write accepts `Idempotency-Key`. Retries are safe. See [idempotency](/idempotency).
+  </Accordion>
+  <Accordion title="Stable platform versions" icon="lock">
+    When LinkedIn sunsets an API version, we upgrade internally and publish a changelog. Your workflow doesn't break at 2 a.m.
+  </Accordion>
+</AccordionGroup>
+
+## Status
+
+Bluesky publishes end-to-end today. Pinterest and Twitter/X are built and waiting on platform review. LinkedIn, Facebook, Instagram, and Threads are review-gated; we ship them as approval clears. Watch the [changelog](/changelog) and the public version tracker at `GET /v1/platform-versions`.

@@ -1,0 +1,12 @@
+---
+title: twitter.media.video_size_max
+description: Videos cap at 512 MB on Twitter / X.
+---
+
+## What it checks
+
+`byteLength <= 512_000_000` for `video/mp4` media.
+
+## Remediation
+
+Re-encode at lower bitrate. For 1080p, 5 Mbps is plenty for any reasonable Twitter video.

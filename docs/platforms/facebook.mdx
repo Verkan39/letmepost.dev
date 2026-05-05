@@ -1,0 +1,72 @@
+---
+title: Facebook Pages
+description: Facebook Pages via the Meta Graph API. One OAuth connects Pages and any linked Instagram Business accounts.
+icon: facebook
+iconType: brands
+---
+
+Facebook Pages publishing via the Meta Graph API. Connecting Facebook is the entry point for both `facebook` and `instagram` platforms in letmepost — see the [Instagram page](/platforms/instagram) for the fan-out.
+
+## Connect
+
+`POST /v1/accounts/connect/facebook`. Standard Facebook Login for Business OAuth. After complete, we discover Pages via `GET /me/accounts` and create one `platform_accounts` row per Page (plus one IG row per Page that has an IG Business linked).
+
+## Scopes
+
+```
+pages_show_list             — list Pages the user manages
+pages_manage_posts          — create posts on Pages
+pages_read_engagement       — pre-req for posts on some apps
+business_management         — Pages connected via Business
+instagram_basic             — read IG Business per Page
+instagram_content_publish   — IG container publish
+```
+
+The IG scopes are requested even on the Facebook connect because the same OAuth grant covers both. `extended` adds insights / engagement scopes.
+
+## Token lifecycle
+
+Long-lived (~60-day) tokens, refreshed on schedule.
+
+## Posting
+
+```json text.json
+{
+  "account": { "platform": "facebook", "id": "..." },
+  "text": "Page update"
+}
+```
+
+```json photo.json
+{
+  "account": { "platform": "facebook", "id": "..." },
+  "text": "with a photo",
+  "media": [{ "kind": "image", "mediaId": "med_…" }]
+}
+```
+
+## Constraints
+
+- Text: 63,206 graphemes ([`facebook.text.max_graphemes`](/preflight/facebook-text-max_graphemes))
+- Image mimes: jpeg, png ([`facebook.media.mime_allowed`](/preflight/facebook-media-mime_allowed))
+- Video mimes: mp4, mov
+- Image size: 4 MB max ([`facebook.media.image_size_max`](/preflight/facebook-media-image_size_max))
+- Video size: 4 GB max ([`facebook.media.video_size_max`](/preflight/facebook-media-video_size_max))
+- Mixed image + video: rejected ([`facebook.media.image_video_exclusive`](/preflight/facebook-media-image_video_exclusive))
+- Up to 10 images per post ([`facebook.media.count_max`](/preflight/facebook-media-count_max))
+
+## Preflight rules
+
+- [`facebook.text.required`](/preflight/facebook-text-required)
+- [`facebook.text.max_graphemes`](/preflight/facebook-text-max_graphemes)
+- [`facebook.media.image_video_exclusive`](/preflight/facebook-media-image_video_exclusive)
+- [`facebook.media.count_max`](/preflight/facebook-media-count_max)
+- [`facebook.media.mime_allowed`](/preflight/facebook-media-mime_allowed)
+- [`facebook.media.image_size_max`](/preflight/facebook-media-image_size_max)
+- [`facebook.media.video_size_max`](/preflight/facebook-media-video_size_max)
+- [`facebook.pages.none`](/preflight/facebook-pages-none) — connect-time, not publish-time.
+
+## See also
+
+- [Instagram](/platforms/instagram) — same OAuth, sibling rows.
+- [Accounts](/guides/connect-account) — fan-out semantics.

@@ -1,0 +1,12 @@
+---
+title: twitter.media.gif_size_max
+description: Animated GIFs cap at 15 MB on Twitter / X.
+---
+
+## What it checks
+
+`byteLength <= 15_000_000` for `image/gif` media.
+
+## Remediation
+
+Re-encode at fewer frames or lower quality. For long animations, an mp4 video is usually a better fit anyway — it'll render with native video controls.

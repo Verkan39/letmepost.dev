@@ -1,0 +1,14 @@
+---
+title: pinterest.image_url.reachable
+description: Pinterest fetches the pin image from the URL you provide. It must respond 200 anonymously.
+---
+
+## What it checks
+
+Active probe — we HEAD the image URL during preflight. If the response isn't a 2xx that resolves to image bytes, the rule fires.
+
+Same failure modes as [`instagram.media.reachable`](/preflight/instagram-media-reachable): Drive share links, Dropbox previews, S3 with restricted ACLs.
+
+## Remediation
+
+Use [`POST /v1/media`](/guides/upload-media) and reference the returned `mediaId`. The result URL is on our public CDN and Pinterest fetches it cleanly.

@@ -1,0 +1,41 @@
+---
+title: bluesky.text.max_graphemes
+description: Bluesky caps post text at 300 graphemes. Emoji and ZWJ sequences count as 1.
+---
+
+## What it checks
+
+`countGraphemes(text) <= 300`. The grapheme counter uses Unicode segmentation, so `👨‍👩‍👧‍👦` is one grapheme, not seven codepoints.
+
+## Why 300
+
+The cap matches Bluesky's `app.bsky.feed.post` schema constant, which is itself defined in graphemes — not bytes, not codepoints, not UTF-16 codeunits. We use the same counter the platform uses, so what passes preflight passes upstream.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "bluesky.text.max_graphemes",
+    "platform": "bluesky",
+    "message": "Post text is 312 graphemes; Bluesky allows at most 300.",
+    "remediation": "Shorten the post to 300 graphemes or fewer."
+  }
+}
+```
+
+## Remediation
+
+Trim the post. If you're truncating programmatically, **use a grapheme-aware splitter**. JavaScript's `string.length` counts UTF-16 codeunits and will under-count emoji; use `Intl.Segmenter` or `graphemer`.
+
+```ts
+import Graphemer from "graphemer";
+const g = new Graphemer();
+const truncated = g.splitGraphemes(text).slice(0, 300).join("");
+```
+
+## Related
+
+- [`bluesky.text.non_empty`](/preflight/bluesky-text-non_empty)
+- [Platforms / Bluesky](/platforms/bluesky)

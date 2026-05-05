@@ -1,0 +1,28 @@
+---
+title: Changelog
+description: Reverse-chronological release notes. API surface, schema, breaking changes.
+---
+
+The canonical record lives in the git history; this page summarizes notable additions, breakings, and platform-version pin upgrades.
+
+## 2026-05 — alpha
+
+- Bluesky publisher live end-to-end.
+- Threads, Facebook, and Instagram publishers built; Meta app review in flight.
+- Pinterest and Twitter/X publishers built; awaiting platform approval.
+- LinkedIn publisher behind product-tier review.
+- Webhook events: `post.queued`, `post.published`, `post.rejected`, `post.failed`, `token.expiring`, `token.revoked`, `version.deprecated`.
+
+## How we communicate breaking changes
+
+- Stable error code rename → bumps the API version (none have happened yet).
+- New required field on a request → bumps the API version.
+- New optional field on a request, or a new field on a response → non-breaking.
+- New error code → non-breaking; consumers must default-case unknown codes.
+- Removing a webhook event type → bumps the API version.
+
+The current path is `/v1/`. When `/v2/` ships we'll keep `/v1/` available for at least 12 months.
+
+## Upstream platform versions
+
+We pin upstream versions and upgrade internally when a platform announces a sunset. The current pins are exposed via `GET /v1/platform-versions`. When we change one, we publish a `version.deprecated` webhook for any account on the outgoing version and run the migration internally — your code keeps working.

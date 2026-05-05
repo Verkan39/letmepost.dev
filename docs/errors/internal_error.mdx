@@ -1,0 +1,42 @@
+---
+title: internal_error
+description: Unexpected server-side issue. Includes a requestId you can file with us.
+---
+
+Something broke on our side that we didn't anticipate. Every `internal_error` is a bug. The `requestId` field is the link between you and our logs.
+
+## What triggers it
+
+- Unhandled exceptions on a code path we haven't covered.
+- Database / Redis connectivity loss.
+- Storage layer (S3) refused the call for a reason we can't classify.
+- A feature flag is in an inconsistent state.
+
+If a third-party platform is down, you'll see [`platform_unavailable`](/errors/platform_unavailable) instead — `internal_error` is exclusively about us.
+
+## Response shape
+
+```json internal_error.json
+{
+  "error": {
+    "code": "internal_error",
+    "message": "An unexpected error occurred.",
+    "remediation": "Retry with the same Idempotency-Key. If the issue persists, share the requestId with support.",
+    "requestId": "req_01HY6X4AWBJM2K9F2PTQMRD9JQ",
+    "traceId": "abc123..."
+  }
+}
+```
+
+The `message` field is intentionally generic — internal errors don't leak server-side details. The `requestId` is the way to reference this specific failure.
+
+## How to handle
+
+1. Retry once with the same `Idempotency-Key`.
+2. If it fails again, file an issue or open a support thread with the `requestId`.
+3. We do not return server stack traces; please don't try to parse `message` for diagnosis.
+
+## Related
+
+- [Idempotency](/idempotency) — every retry is safe with a key.
+- [`platform_unavailable`](/errors/platform_unavailable) — third-party outage, not ours.

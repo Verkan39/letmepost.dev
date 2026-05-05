@@ -1,0 +1,12 @@
+---
+title: pinterest.image.mime_allowed
+description: Pinterest accepts jpeg/png images.
+---
+
+## What it checks
+
+`mimeType ∈ { image/jpeg, image/png }`. WebP, HEIC, GIF are rejected.
+
+## Remediation
+
+Re-encode to JPEG or PNG.

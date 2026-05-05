@@ -1,0 +1,33 @@
+---
+title: threads.media.count_max
+description: Threads carousels accept 2–20 mixed media items. Beyond 20 is rejected.
+---
+
+## What it checks
+
+`media.length <= 20`.
+
+Threads is the most permissive carousel of the platforms supported here — 20 children, mixed images and videos. The minimum carousel size is 2; below that, single-image or single-video shapes apply (see [`threads.text.required`](/preflight/threads-text-required) for the post-shape decision tree).
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "threads.media.count_max",
+    "platform": "threads",
+    "message": "Attached 25 media items; Threads allows at most 20 per carousel.",
+    "remediation": "Reduce to 20 items or fewer, or split into multiple posts."
+  }
+}
+```
+
+## Remediation
+
+Cap at 20. For longer galleries, split into a thread — Threads's reply UX is solid, and each reply can hold 20 more.
+
+## Related
+
+- [`threads.media.alt_text_max_graphemes`](/preflight/threads-media-alt_text_max_graphemes)
+- [`instagram.media.count_max`](/preflight/instagram-media-count_max) — IG caps the same shape at 10.

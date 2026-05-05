@@ -1,0 +1,38 @@
+---
+title: idempotency_conflict
+description: Same Idempotency-Key reused with a different request body. We surface this rather than silently publish twice.
+---
+
+You sent a second request with an `Idempotency-Key` we've already seen — but the body hash is different from the first request. We refuse to publish, because that's almost always a bug.
+
+## What triggers it
+
+- A retry path that mutates the body before retrying. Common when the body is built from a "current state" object that changes between attempts.
+- Re-using a cached UUID for a logically distinct call.
+- A worker that retries the same job after the post was edited.
+
+## Response shape
+
+```json idempotency_conflict.json
+{
+  "error": {
+    "code": "idempotency_conflict",
+    "message": "An Idempotency-Key was reused with a different request body.",
+    "remediation": "Generate a new Idempotency-Key for this distinct request, or reuse the original body byte-for-byte.",
+    "requestId": "req_..."
+  }
+}
+```
+
+## Pick one
+
+1. **The bodies should be identical.** Whatever made them differ is the bug. Find it (often a timestamp or a randomized field) and either freeze it or strip it.
+2. **The bodies are intentionally different.** Generate a new key. Two distinct requests should never share a key.
+
+## Replay window
+
+The replay cache keeps the original response for 24 hours, then evicts it. Beyond 24 h the same key is treated as fresh — so you won't get this error from a stale key after a day. Don't lean on the 24 h window for application-level dedup; that's what your own logic is for.
+
+## Related
+
+- [Idempotency](/idempotency) — the full contract.

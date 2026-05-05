@@ -1,0 +1,37 @@
+---
+title: token.revoked
+description: A connected platform token was rejected by the upstream — the user revoked, expired, or rotated it.
+---
+
+Fires when we detect that a connected account's token is no longer accepted by the upstream platform. Either:
+
+- The user revoked the app's access from the platform's settings page.
+- A refresh attempt failed because the refresh token is expired or invalid.
+- A Bluesky app password was deleted from `bsky.app/settings/app-passwords`.
+
+## Payload
+
+```json
+{
+  "type": "token.revoked",
+  "data": {
+    "accountId": "...",
+    "profileId": "...",
+    "platform": "facebook",
+    "platformAccountId": "...",
+    "displayName": "...",
+    "revokedAt": "2026-05-04T15:30:00Z",
+    "reason": "refresh_failed"
+  }
+}
+```
+
+## Use it for
+
+- Mark the connected account as needing re-auth in your UI.
+- Stop scheduling new posts against the account until reconnected.
+
+## Related
+
+- [`token.expiring`](/webhooks/token-expiring) — the heads-up event.
+- [`platform_auth_failed`](/errors/platform_auth_failed)

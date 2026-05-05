@@ -1,0 +1,19 @@
+---
+title: meta.container.expired
+description: Instagram or Threads media container exceeded its 24-hour TTL. Re-create.
+---
+
+## What it checks
+
+Meta's two-step flow (create container → publish) holds the container for 24 hours. If our polling sees the container in `EXPIRED` state at publish time, this rule fires.
+
+In practice this only matters for long-deferred publishes — synchronous `POST /v1/posts` runs end-to-end in seconds.
+
+## Remediation
+
+Retry the publish with the same `Idempotency-Key`. The dispatcher creates a fresh container on each attempt.
+
+## Related
+
+- [`threads.container.expired`](/preflight/threads-container-expired) — Threads-specific shape.
+- [`threads.container.error`](/preflight/threads-container-error) — non-expiry container failures.

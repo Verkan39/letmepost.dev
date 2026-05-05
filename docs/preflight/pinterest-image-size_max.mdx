@@ -1,0 +1,12 @@
+---
+title: pinterest.image.size_max
+description: Pinterest images cap at 20 MB.
+---
+
+## What it checks
+
+`byteLength <= 20_000_000`. The most permissive image cap among the v1 platforms.
+
+## Remediation
+
+Re-encode if you're over 20 MB. That's a lot of pixels — most pins should be well under.

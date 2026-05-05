@@ -1,0 +1,35 @@
+---
+title: post.failed
+description: Transient failure — internal error or upstream 5xx. The worker may retry.
+---
+
+Fires for transient failures: `internal_error` or `platform_unavailable`. For scheduled posts, the worker may retry per the queue policy before this event becomes terminal.
+
+## Payload
+
+```json
+{
+  "type": "post.failed",
+  "data": {
+    "id": "post_...",
+    "platform": "bluesky",
+    "accountId": "...",
+    "profileId": "...",
+    "error": {
+      "code": "platform_unavailable",
+      "message": "Bluesky API returned 503 Service Unavailable."
+    },
+    "rejectedAt": "2026-05-04T15:30:00Z"
+  }
+}
+```
+
+## Use it for
+
+- Surface "publish issue, will retry" state — distinct from `post.rejected` ("publish failed, won't retry").
+- Capture metrics on platform-side reliability.
+
+## Related
+
+- [`post.rejected`](/webhooks/post-rejected) — terminal failure.
+- [`platform_unavailable`](/errors/platform_unavailable)

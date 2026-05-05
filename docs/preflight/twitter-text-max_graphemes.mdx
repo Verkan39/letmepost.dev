@@ -1,0 +1,16 @@
+---
+title: twitter.text.max_graphemes
+description: Tweets cap at 280 graphemes — with t.co URL wrapping accounted for.
+---
+
+## What it checks
+
+`countGraphemes(text) <= 280`, with URLs counted as 23 characters regardless of their real length (t.co wraps every URL).
+
+## Why 280 + 23
+
+Twitter's `tweet.create` enforces 280 graphemes. URLs are wrapped by t.co to a fixed 23-character length, so a 100-character URL still counts as 23. We subtract the real URL length and add 23 for each URL.
+
+## Remediation
+
+Trim the tweet, or break it into a thread.

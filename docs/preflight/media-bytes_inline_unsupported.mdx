@@ -1,0 +1,14 @@
+---
+title: media.bytes_inline_unsupported
+description: Inline base64 isn't accepted on this platform's URL-only ingest path. Upload via POST /v1/media first.
+---
+
+## What it checks
+
+The platform's publish path requires a URL — Meta's create-container flow, Pinterest's pin creation — and the request supplied `bytesBase64` instead.
+
+We could buffer + upload to a temp URL on the fly, but that path has had enough surprise failures (timeouts, signed URL expiry) that we make the caller do it explicitly.
+
+## Remediation
+
+Upload via [`POST /v1/media`](/guides/upload-media) and use the returned `mediaId`. Inline bytes work fine for Bluesky and Twitter; the URL-only platforms route through media first.

@@ -1,0 +1,58 @@
+---
+title: Twitter / X
+description: Twitter / X v2 API. OAuth 2.0 with PKCE. Single-media tweets in v1.
+icon: x-twitter
+iconType: brands
+---
+
+X (Twitter) v2 API via OAuth 2.0 with PKCE. v1 of the publisher targets single-image and single-video tweets; the 4-up surface ships in a follow-up slice.
+
+## Connect
+
+`POST /v1/accounts/connect/twitter`. OAuth 2.0 PKCE. After complete we call `GET /2/users/me` to pin the user id.
+
+## Scopes
+
+```
+tweet.write    — create tweets
+tweet.read     — required to mint the token
+users.read     — required to mint the token
+offline.access — required for refresh tokens
+```
+
+Extended: `like.read`, `follows.read` — off by default; not needed for publishing.
+
+## Token lifecycle
+
+X access tokens are short-lived (~2 hours) but `offline.access` issues a refresh token that lets us refresh on schedule.
+
+## Posting
+
+```json tweet.json
+{
+  "account": { "platform": "twitter", "id": "..." },
+  "text": "shipped",
+  "media": [{ "kind": "image", "mediaId": "med_…", "altText": "..." }]
+}
+```
+
+## Constraints
+
+- Text: 280 graphemes ([`twitter.text.max_graphemes`](/preflight/twitter-text-max_graphemes))
+- Single media only in v1 ([`twitter.media.single_only`](/preflight/twitter-media-single_only))
+- Image mimes: jpeg, png, webp, gif
+- Video mime: mp4
+- Image size: 5 MB max ([`twitter.media.image_size_max`](/preflight/twitter-media-image_size_max))
+- GIF size: 15 MB max ([`twitter.media.gif_size_max`](/preflight/twitter-media-gif_size_max))
+- Video size: 512 MB max ([`twitter.media.video_size_max`](/preflight/twitter-media-video_size_max))
+- URLs in tweet text count as 23 characters regardless of real length (t.co wrapping)
+
+## Preflight rules
+
+- [`twitter.text.non_empty`](/preflight/twitter-text-non_empty)
+- [`twitter.text.max_graphemes`](/preflight/twitter-text-max_graphemes)
+- [`twitter.media.single_only`](/preflight/twitter-media-single_only)
+- [`twitter.media.mime_allowed`](/preflight/twitter-media-mime_allowed)
+- [`twitter.media.image_size_max`](/preflight/twitter-media-image_size_max)
+- [`twitter.media.gif_size_max`](/preflight/twitter-media-gif_size_max)
+- [`twitter.media.video_size_max`](/preflight/twitter-media-video_size_max)

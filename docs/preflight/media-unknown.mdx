@@ -1,0 +1,19 @@
+---
+title: media.unknown
+description: A mediaId on the request body doesn't resolve to a media record we can see.
+---
+
+## What it checks
+
+The `mediaId` referenced from `media: [{ mediaId: "med_..." }]` doesn't match a media row in your organization's profile scope.
+
+Causes:
+
+- Typo in the id.
+- The media row was deleted.
+- A profile-scoped key referencing media uploaded under a different profile.
+- The `med_…` id format is correct (`/^med_[0-9A-Za-z]{22}$/`) but no row matches.
+
+## Remediation
+
+Re-upload via [`POST /v1/media`](/guides/upload-media) and use the new id, or verify the id exists with `GET /v1/media`.

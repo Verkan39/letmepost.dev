@@ -1,0 +1,12 @@
+---
+title: facebook.media.video_size_max
+description: Each Facebook Page video must be ≤ 4 GB.
+---
+
+## What it checks
+
+`byteLength <= 4_000_000_000` per video, on the Pages `/videos` endpoint.
+
+## Remediation
+
+Re-encode at a lower bitrate. Most Page videos are well under 4 GB; if you're hitting this you're probably uploading uncompressed.

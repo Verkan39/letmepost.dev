@@ -1,0 +1,37 @@
+---
+title: instagram.media.image_size_max
+description: Each Instagram image must be ≤ 8 MB.
+---
+
+## What it checks
+
+`byteLength <= 8_000_000` per image item.
+
+## Why
+
+Meta's Instagram container endpoint caps photo containers at 8 MB. Larger payloads are rejected at container creation.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "instagram.media.image_size_max",
+    "platform": "instagram",
+    "message": "Image is 9500000 bytes; Instagram allows at most 8000000."
+  }
+}
+```
+
+## Remediation
+
+Re-encode at lower quality or smaller dimensions:
+
+```sh
+magick input.jpg -quality 85 -resize 2048x2048\> output.jpg
+```
+
+## Related
+
+- [`instagram.media.mime_allowed`](/preflight/instagram-media-mime_allowed) — JPEG-only.

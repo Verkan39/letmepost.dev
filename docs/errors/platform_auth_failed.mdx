@@ -1,0 +1,44 @@
+---
+title: platform_auth_failed
+description: The connected account's platform token is missing, expired, or revoked. The user must reconnect.
+---
+
+The credentials we hold for the connected upstream account are no longer accepted by the platform. This is distinct from [`unauthenticated`](/errors/unauthenticated), which is about your letmepost API key — `platform_auth_failed` is about the OAuth token (or app password) for the *connected platform account*.
+
+## What triggers it
+
+- The user revoked your app's access from the platform's settings page.
+- A LinkedIn token aged past its 60-day lifetime and the user hasn't re-authenticated.
+- A Bluesky app password was deleted from `bsky.app/settings/app-passwords`.
+- A Threads token was rotated faster than our refresh schedule (rare, but the upstream allows it).
+- Facebook user removed your business asset from their account.
+
+## Response shape
+
+```json platform_auth_failed.json
+{
+  "error": {
+    "code": "platform_auth_failed",
+    "message": "Bluesky rejected the session token.",
+    "platform": "bluesky",
+    "platformVersion": "atproto-2026-04",
+    "platformResponse": { "error": "AuthMissing", "message": "..." },
+    "remediation": "Reconnect the Bluesky account.",
+    "requestId": "req_..."
+  }
+}
+```
+
+## How to handle
+
+1. Mark the connected account as needing re-auth in your UI.
+2. Send the user through the connect flow again — see [accounts](/guides/connect-account).
+3. Subscribe to [`token.expiring`](/webhooks/token-expiring) and [`token.revoked`](/webhooks/token-revoked) so this doesn't surprise you mid-publish.
+
+The connected `platform_account` row stays in place; reconnecting upserts new tokens onto the same row, so post history and idempotency keys are preserved.
+
+## Related
+
+- [`token.expiring`](/webhooks/token-expiring) — fires before this happens.
+- [`token.revoked`](/webhooks/token-revoked) — fires when we detect the token is dead.
+- [`unauthenticated`](/errors/unauthenticated) — your API key is the problem, not the platform token.

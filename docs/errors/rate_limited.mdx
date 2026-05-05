@@ -1,0 +1,52 @@
+---
+title: rate_limited
+description: Per-key rate limit exhausted. Honor the Retry-After header.
+---
+
+You've sent more requests than the rate limit allows for this API key. Slow down and retry after the `Retry-After` header's value.
+
+## What triggers it
+
+- Burst exceeded the per-key write limit on `POST /v1/posts`.
+- Burst exceeded the per-key media-upload limit on `POST /v1/media`.
+- Suspicious patterns flagged by the rate limiter.
+
+The exact limits aren't published as a contract — they're tuned by environment and may move. Honor `Retry-After` and you'll never need the number.
+
+## Response shape
+
+```json rate_limited.json
+{
+  "error": {
+    "code": "rate_limited",
+    "message": "Rate limit exceeded.",
+    "remediation": "Wait the number of seconds in the Retry-After header before retrying.",
+    "requestId": "req_..."
+  }
+}
+```
+
+`Retry-After` is set on the response in seconds.
+
+## How to handle
+
+```ts handle.ts
+async function postWithBackoff(body: object) {
+  for (let i = 0; i < 5; i++) {
+    const res = await fetch("https://api.letmepost.dev/v1/posts", { /* ... */ });
+    if (res.status !== 429) return res;
+    const retry = Number(res.headers.get("retry-after") ?? 1);
+    await sleep(retry * 1000);
+  }
+  throw new Error("rate limited five times in a row");
+}
+```
+
+## Distinct from upstream rate limits
+
+This error is letmepost's own per-key limit. When the *upstream* platform rate-limits us you'll see [`platform_rejected`](/errors/platform_rejected) or [`platform_unavailable`](/errors/platform_unavailable) with the upstream's headers attached.
+
+## Related
+
+- [Authentication](/authentication) — keys are the unit of rate limiting.
+- [`platform_unavailable`](/errors/platform_unavailable) — upstream is the limiter, not us.

@@ -1,0 +1,25 @@
+---
+title: facebook.text.required
+description: Facebook posts without media require non-empty text.
+---
+
+## What it checks
+
+If `media` is empty or absent, `text.trim().length > 0`. Facebook supports text-only Page posts but not empty ones.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "facebook.text.required",
+    "platform": "facebook",
+    "message": "Facebook posts without media require non-empty text."
+  }
+}
+```
+
+## Remediation
+
+Provide non-whitespace `text` or attach media.

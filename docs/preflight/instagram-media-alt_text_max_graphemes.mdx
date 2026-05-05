@@ -1,0 +1,33 @@
+---
+title: instagram.media.alt_text_max_graphemes
+description: Instagram alt text caps at 2200 graphemes — same as the caption.
+---
+
+## What it checks
+
+`countGraphemes(item.altText) <= 2200`.
+
+## Why 2200
+
+Instagram doesn't publish a distinct alt-text cap in the Graph API; in practice the field accepts up to the same 2200-grapheme limit as the caption. We use the same number rather than guessing tighter.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "instagram.media.alt_text_max_graphemes",
+    "platform": "instagram",
+    "message": "Instagram alt text is capped at 2200 characters."
+  }
+}
+```
+
+## Remediation
+
+Tighten the description.
+
+## Related
+
+- [`instagram.text.max_graphemes`](/preflight/instagram-text-max_graphemes)

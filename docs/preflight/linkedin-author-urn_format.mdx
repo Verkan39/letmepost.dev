@@ -1,0 +1,16 @@
+---
+title: linkedin.author.urn_format
+description: The author URN must match urn:li:person:{id}. We surface the format check before LinkedIn's opaque 422.
+---
+
+## What it checks
+
+The platform-account row's stored URN must match `^urn:li:person:[A-Za-z0-9_-]+$`. If we couldn't mint a valid URN at connect time (or the row was edited), this rule fires before the upstream call.
+
+## Why this is a separate check
+
+LinkedIn's `/rest/posts` returns a generic 422 with no field path when the URN format is wrong. Catching it locally surfaces the actual issue.
+
+## Remediation
+
+Disconnect and reconnect the account. The connect flow re-runs `/userinfo` to mint a fresh URN. If the issue persists, it's a sign of an upstream LinkedIn bug — open a support thread with the request id.

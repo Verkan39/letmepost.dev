@@ -1,0 +1,55 @@
+---
+title: LinkedIn
+description: Personal posting via LinkedIn's Versioned REST API. Org/Company posting ships with MDP approval.
+icon: linkedin
+iconType: brands
+---
+
+LinkedIn's Versioned REST API. v1 covers personal posting only; org/Company posting requires the Marketing Developer Platform (MDP) and ships in a follow-up slice.
+
+## Connect
+
+`POST /v1/accounts/connect/linkedin`. OAuth 2.0, three-legged. After complete, we call `/userinfo` to mint a stable `urn:li:person:*` author URN and store it on the `platform_accounts` row.
+
+## Scopes
+
+| scope                  | requested |
+|------------------------|-----------|
+| `w_member_social`      | always — required to post on a personal account. |
+| `openid`, `profile`    | always — needed to mint the URN. |
+| `email`                | extended only. |
+| `r_organization_social`, `w_organization_social` | extended only — gated behind MDP. |
+
+Org posting requires both MDP approval and the `w_organization_social` scope. Until MDP clears, `extended` org scopes are off and [`linkedin.author.org_not_supported`](/preflight/linkedin-author-org_not_supported) fires if you try.
+
+## Version pinning
+
+LinkedIn sunset five API versions in six months from 2024–2025. We pin a single version for our `Linkedin-Version` header and upgrade internally; the public version tracker (`GET /v1/platform-versions`) shows the current pin and any in-flight migration. When LinkedIn announces a sunset, you'll see [`version.deprecated`](/webhooks/version-deprecated) on accounts that need attention.
+
+## Token lifecycle
+
+LinkedIn tokens are 60 days, **no refresh**. Re-auth is mandatory at expiry. We fire [`token.expiring`](/webhooks/token-expiring) seven days ahead so you can prompt your user.
+
+## Posting
+
+```json text.json
+{
+  "account": { "platform": "linkedin", "id": "..." },
+  "text": "Personal LinkedIn post"
+}
+```
+
+## Constraints
+
+- Text: 3000 graphemes max, emoji-aware ([`linkedin.text.max_graphemes`](/preflight/linkedin-text-max_graphemes))
+- Author URN must be `urn:li:person:*` ([`linkedin.author.urn_format`](/preflight/linkedin-author-urn_format))
+- Org URNs rejected in v1 ([`linkedin.author.org_not_supported`](/preflight/linkedin-author-org_not_supported))
+
+## Preflight rules
+
+- [`linkedin.text.non_empty`](/preflight/linkedin-text-non_empty)
+- [`linkedin.text.max_graphemes`](/preflight/linkedin-text-max_graphemes)
+- [`linkedin.author.urn_format`](/preflight/linkedin-author-urn_format)
+- [`linkedin.author.org_not_supported`](/preflight/linkedin-author-org_not_supported)
+- [`linkedin.author.unresolved`](/preflight/linkedin-author-unresolved)
+- [`linkedin.visibility.enum`](/preflight/linkedin-visibility-enum)

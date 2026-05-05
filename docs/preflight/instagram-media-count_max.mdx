@@ -1,0 +1,34 @@
+---
+title: instagram.media.count_max
+description: Instagram carousels cap at 10 mixed media items.
+---
+
+## What it checks
+
+`media.length <= 10`. Carousels can mix images and videos (since IG Graph API v15).
+
+## Why 10
+
+Meta's Instagram Content Publishing API documents `CAROUSEL` containers at 2–10 children. Above that the create-container call returns an opaque `code 100`.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "instagram.media.count_max",
+    "platform": "instagram",
+    "message": "Attached 12 media items; Instagram allows at most 10 per carousel.",
+    "remediation": "Reduce to 10 items or fewer."
+  }
+}
+```
+
+## Remediation
+
+Trim to 10. If you have more, post the rest as a follow-up — IG doesn't support carousel-of-carousels.
+
+## Related
+
+- [`threads.media.count_max`](/preflight/threads-media-count_max) — Threads caps higher (20).

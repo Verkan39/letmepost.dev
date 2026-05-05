@@ -1,0 +1,38 @@
+---
+title: unauthenticated
+description: The Authorization header is missing, malformed, or the API key is revoked.
+---
+
+The request didn't carry a valid letmepost API key. This is about *your* key — not the upstream platform token. For platform token issues see [`platform_auth_failed`](/errors/platform_auth_failed).
+
+## What triggers it
+
+- No `Authorization` header.
+- Header doesn't start with `Bearer `.
+- Key is unknown (typo, revoked, deleted org).
+- Key prefix doesn't match the environment (e.g., `lmp_test_…` against the production base URL).
+
+## Response shape
+
+```json unauthenticated.json
+{
+  "error": {
+    "code": "unauthenticated",
+    "message": "Missing or invalid Authorization header.",
+    "remediation": "Send 'Authorization: Bearer lmp_live_…' (or lmp_test_…) on every request.",
+    "requestId": "req_..."
+  }
+}
+```
+
+## Remediation
+
+1. Mint or rotate a key in the dashboard's **API keys** page.
+2. Confirm the prefix matches your environment.
+3. Confirm the key wasn't revoked — revocation is immediate.
+
+## Related
+
+- [Authentication](/authentication) — full key shape + scoping rules.
+- [`unauthorized`](/errors/unauthorized) — authenticated but not allowed.
+- [`platform_auth_failed`](/errors/platform_auth_failed) — upstream platform token issue.

@@ -1,0 +1,12 @@
+---
+title: pinterest.media.required
+description: Every pin needs an image. Pinterest is media-first.
+---
+
+## What it checks
+
+`media.length === 1` with `kind: "image"`.
+
+## Remediation
+
+Attach a single image. v1 Pinterest support is single-image only — see [`pinterest.media.single_only`](/preflight/pinterest-media-single_only) and [`pinterest.media.image_only`](/preflight/pinterest-media-image_only) for the cousin rules.

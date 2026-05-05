@@ -1,0 +1,12 @@
+---
+title: pinterest.destination_url.reachable
+description: The pin's click-through URL must be reachable.
+---
+
+## What it checks
+
+If you provide `pinterest.destinationUrl`, we probe it during preflight. It must respond 2xx anonymously.
+
+## Remediation
+
+Verify the URL serves a 2xx anonymously. Pinterest will follow redirects, but a 404 destination is the kind of thing that happens when you ship a pin pointing at a not-yet-deployed page.

@@ -1,0 +1,12 @@
+---
+title: linkedin.author.unresolved
+description: We don't have a usable LinkedIn author URN for this account. Re-auth needed.
+---
+
+## What it checks
+
+The connected `platform_account` row has no `platformAccountId` (LinkedIn URN) set. Connect should always populate this; if it didn't, the account row is in a broken state.
+
+## Remediation
+
+Disconnect and reconnect the LinkedIn account. The connect flow calls LinkedIn's `/userinfo` to mint a stable URN; that will repopulate the field.

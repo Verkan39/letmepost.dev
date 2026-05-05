@@ -1,0 +1,12 @@
+---
+title: twitter.media.image_size_max
+description: Static images cap at 5 MB on Twitter / X.
+---
+
+## What it checks
+
+`byteLength <= 5_000_000` for non-GIF images.
+
+## Remediation
+
+Re-encode at lower quality. JPEG q=82 + max 2048 px is usually well under 5 MB.

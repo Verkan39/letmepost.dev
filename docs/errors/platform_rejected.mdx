@@ -1,0 +1,53 @@
+---
+title: platform_rejected
+description: Preflight passed but the upstream platform still rejected the call. Carries the raw platform response.
+---
+
+The request passed every preflight rule we know about, but the upstream platform still said no. This is rare — when it happens we treat it as a gap in preflight coverage and either add a rule or sharpen an existing one.
+
+## What triggers it
+
+- A platform rule we don't yet enforce locally — e.g., a content moderation rejection, an account-state issue (rate-limited at the platform level, suspended), or a constraint introduced after our last update.
+- An async media-validation failure on Meta's container flow (the file passed our size + mime checks but failed deeper inspection).
+- A platform-specific rejection we haven't translated into a preflight rule yet.
+
+## Response shape
+
+```json platform_rejected.json
+{
+  "error": {
+    "code": "platform_rejected",
+    "message": "Threads rejected the create-container call: media URL not reachable.",
+    "rule": "threads.container.error",
+    "platform": "threads",
+    "platformVersion": "graph-2026-04",
+    "platformResponse": {
+      "error": {
+        "message": "Container creation failed",
+        "code": 100,
+        "fbtrace_id": "..."
+      }
+    },
+    "remediation": "Verify the media URL returns 200 anonymously, or upload via POST /v1/media first.",
+    "requestId": "req_..."
+  }
+}
+```
+
+`platformResponse` carries the raw upstream body, untouched. That's the most useful signal when this code surfaces — we don't summarize it away.
+
+## How to handle
+
+1. Inspect `platformResponse` for the upstream code / subcode.
+2. If it's a known opaque rejection (e.g., Instagram's `OAuthException 2207052`), check the matching preflight rule page and follow the remediation there.
+3. File an issue: every `platform_rejected` we see in production is a candidate for a new preflight rule. The dashboard's post log makes these easy to spot.
+
+## HTTP status
+
+- `4xx` (the platform's status, passed through) when the upstream said the call is invalid.
+- `502 Bad Gateway` when the upstream returned a 5xx — we map upstream 5xx to our 502 + `platform_unavailable` instead of `platform_rejected`. See [`platform_unavailable`](/errors/platform_unavailable) for that case.
+
+## Related
+
+- [`platform_unavailable`](/errors/platform_unavailable) — upstream returned 5xx; transient.
+- [`preflight_failed`](/errors/preflight_failed) — we caught it before the platform did.

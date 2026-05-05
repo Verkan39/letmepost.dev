@@ -1,0 +1,33 @@
+---
+title: threads.container.expired
+description: A media container exceeded its 24-hour TTL before publish. Re-create the container.
+---
+
+## What it checks
+
+Threads's two-step publish flow creates a media container, polls until it transitions to `FINISHED`, then publishes. Containers expire 24 hours after creation. If our polling sees status `EXPIRED`, this rule fires.
+
+In practice this only fires on long-deferred publishes (the worker fell behind for >24h). Live `POST /v1/posts` calls publish within seconds.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "threads.container.expired",
+    "platform": "threads",
+    "message": "Threads media container expired before publish (24 h ttl).",
+    "remediation": "Retry the publish — a new container is created on each attempt."
+  }
+}
+```
+
+## Remediation
+
+Retry the publish with the same `Idempotency-Key`. The dispatcher creates a fresh container each attempt; an expired one from a previous run isn't carried forward.
+
+## Related
+
+- [`meta.container.expired`](/preflight/meta-container-expired) — the cross-platform shape (IG + Threads).
+- [`threads.container.error`](/preflight/threads-container-error) — non-expiry container failures.

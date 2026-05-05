@@ -1,0 +1,27 @@
+---
+title: Python SDK
+description: Post-launch follow-up. Use requests/httpx in the meantime.
+---
+
+The Python SDK is a post-launch deliverable. Until then, the raw HTTP surface is the supported integration path:
+
+```python
+import os, uuid, requests
+
+def post_to_letmepost(body: dict) -> dict:
+    res = requests.post(
+        "https://api.letmepost.dev/v1/posts",
+        headers={
+            "Authorization": f"Bearer {os.environ['LMP_KEY']}",
+            "Idempotency-Key": str(uuid.uuid4()),
+            "Content-Type": "application/json",
+        },
+        json=body,
+        timeout=30,
+    )
+    if not res.ok:
+        raise RuntimeError(res.json()["error"])
+    return res.json()
+```
+
+Watch the [GitHub releases](https://github.com/rosekamallove/letmepost.dev/releases) for the SDK announcement.

@@ -1,0 +1,38 @@
+---
+title: threads.media.video_size_max
+description: Each video on Threads must be ≤ 1 GB.
+---
+
+## What it checks
+
+`byteLength <= 1_000_000_000` per video.
+
+## Why
+
+Meta's Threads docs cap per-video at 1 GB on the create-container endpoint. Beyond that the upstream rejects before the post becomes visible.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "threads.media.video_size_max",
+    "platform": "threads",
+    "message": "Video is 1450000000 bytes; Threads allows at most 1000000000.",
+    "remediation": "Compress the video under 1000000000 bytes (Threads's per-video limit is 1 GB)."
+  }
+}
+```
+
+## Remediation
+
+Re-encode at a lower bitrate or split the post. For 1080p, 6 Mbps is a generous ceiling:
+
+```sh
+ffmpeg -i input.mp4 -c:v libx264 -b:v 6M -c:a aac -b:a 128k -movflags +faststart output.mp4
+```
+
+## Related
+
+- [`threads.media.image_size_max`](/preflight/threads-media-image_size_max)

@@ -1,0 +1,42 @@
+---
+title: platform_unavailable
+description: Upstream is down, throttled, or returning 5xx. Transient — retry later.
+---
+
+The upstream platform is unreachable, throttled, or returning 5xx. Treat as transient. The post is **not** retried automatically by `POST /v1/posts` — that's the caller's job, with idempotency.
+
+For scheduled posts the worker retries internally per the queue policy.
+
+## What triggers it
+
+- The platform is down (e.g., Meta Graph 5xx outage).
+- The platform throttled us at the network layer (rare; per-app rate limit usually surfaces as `platform_rejected`).
+- DNS / TLS error reaching the platform.
+- The platform took longer than our request timeout to respond.
+
+## Response shape
+
+```json platform_unavailable.json
+{
+  "error": {
+    "code": "platform_unavailable",
+    "message": "Bluesky API returned 503 Service Unavailable.",
+    "platform": "bluesky",
+    "platformResponse": "<raw upstream body or null>",
+    "remediation": "Retry with the same Idempotency-Key after a short backoff.",
+    "requestId": "req_..."
+  }
+}
+```
+
+## How to handle
+
+Retry with **the same `Idempotency-Key`**. Our replay cache holds for 24 hours; sending the same request again within that window is safe — if the upstream succeeded the first time despite the 5xx, you'll get the cached `201` back.
+
+Standard exponential backoff is fine: 1s, 2s, 4s, 8s, …, up to your tolerance.
+
+## Related
+
+- [Idempotency](/idempotency) — why retries are safe.
+- [`rate_limited`](/errors/rate_limited) — letmepost's own rate limit.
+- [`platform_rejected`](/errors/platform_rejected) — upstream said no for content reasons.

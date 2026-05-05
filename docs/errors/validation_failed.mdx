@@ -1,0 +1,52 @@
+---
+title: validation_failed
+description: Request body or query string failed schema validation. The rule field carries the path of the offending field.
+---
+
+The request body, headers, or query parameters didn't match the documented schema. This is a schema-level rejection — preflight (which checks platform-specific rules) hasn't run yet.
+
+## What triggers it
+
+- Required field missing (e.g. `account.platform` absent on `POST /v1/posts`).
+- Type mismatch (e.g. `text: 42` instead of a string).
+- Out-of-range value (e.g. `limit: -1` on a list endpoint).
+- Bad pattern match (e.g. `mediaId: "foo"` — must match `^med_[0-9A-Za-z]{22}$`).
+- Constraint violation (e.g. `scheduledAt` parses but is in the past).
+
+## Response shape
+
+```json validation_failed.json
+{
+  "error": {
+    "code": "validation_failed",
+    "message": "Required",
+    "rule": "account.platform",
+    "platformResponse": [
+      { "code": "invalid_type", "expected": "string", "received": "undefined", "path": ["account", "platform"], "message": "Required" }
+    ],
+    "remediation": "Check the request body matches the documented schema.",
+    "requestId": "req_..."
+  }
+}
+```
+
+`rule` is the dot-joined Zod path that failed. `platformResponse` carries the full Zod issues array — every issue, not just the first — so a UI can render them inline next to the right field.
+
+## Reproducing it
+
+```bash reproduce.sh
+# Missing 'text' — should fail with rule: "text"
+curl -X POST https://api.letmepost.dev/v1/posts \\
+  -H "Authorization: Bearer $LMP_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "account": { "platform": "bluesky", "id": "..." } }'
+```
+
+## Remediation
+
+Read the path in `rule`, fix the field. The rule field is always the path of the **first** failure; check `platformResponse` for the full list when you're rendering form errors to a user.
+
+## Related
+
+- [`preflight_failed`](/errors/preflight_failed) — passes schema, fails platform constraints.
+- [API reference](/api-reference) — every endpoint's request schema.

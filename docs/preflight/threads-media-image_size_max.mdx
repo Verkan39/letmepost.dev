@@ -1,0 +1,39 @@
+---
+title: threads.media.image_size_max
+description: Each image on Threads must be ≤ 8 MB.
+---
+
+## What it checks
+
+`byteLength <= 8_000_000` per image.
+
+## Why
+
+Meta's Threads API documents an 8 MB per-image cap on the create-container endpoint. Larger images are rejected upstream with `code 100, error subcode 2207003` or similar.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "threads.media.image_size_max",
+    "platform": "threads",
+    "message": "Image is 9500000 bytes; Threads allows at most 8000000.",
+    "remediation": "Re-encode the image under 8000000 bytes (Threads's per-image limit is 8 MB)."
+  }
+}
+```
+
+## Remediation
+
+Re-encode at lower quality or smaller dimensions. JPEG q=85 + max 2048 px is a sensible default:
+
+```sh
+magick input.jpg -quality 85 -resize 2048x2048\> output.jpg
+```
+
+## Related
+
+- [`threads.media.video_size_max`](/preflight/threads-media-video_size_max)
+- [`threads.media.mime_allowed`](/preflight/threads-media-mime_allowed)

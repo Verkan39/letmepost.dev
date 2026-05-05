@@ -1,0 +1,84 @@
+---
+title: Publish a post
+description: From key to published — the synchronous path, the scheduled path, and what to subscribe to in between.
+icon: send
+---
+
+Publishing is one HTTP call. The same `POST /v1/posts` endpoint handles immediate and scheduled posts; the response status code and the lifecycle differ.
+
+## Immediate publish
+
+A post body without `scheduledAt` runs synchronously. Preflight runs, the upstream platform call fires, and the response is `201` with the platform-native URI:
+
+```bash immediate.sh
+curl -X POST https://api.letmepost.dev/v1/posts \
+  -H "Authorization: Bearer $LMP_KEY" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account": { "platform": "bluesky", "id": "..." },
+    "text": "shipped"
+  }'
+```
+
+Response:
+
+```json 201.json
+{
+  "id": "post_...",
+  "platform": "bluesky",
+  "status": "published",
+  "uri": "at://did:plc:abc/app.bsky.feed.post/3kr...",
+  "cid": "bafyrei...",
+  "createdAt": "2026-05-04T12:00:00Z"
+}
+```
+
+The `uri` field's shape is platform-native (AT Proto for Bluesky, Twitter snowflake id, LinkedIn URN, etc.). Save it if you need to deep-link to the post later.
+
+## Scheduled publish
+
+Add `scheduledAt` and the post goes onto the publish queue. Response is `202` with `status: "queued"`:
+
+```bash scheduled.sh
+curl -X POST https://api.letmepost.dev/v1/posts \
+  -H "Authorization: Bearer $LMP_KEY" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account": { "platform": "bluesky", "id": "..." },
+    "text": "Friday at noon UTC",
+    "scheduledAt": "2026-05-08T12:00:00Z"
+  }'
+```
+
+See [schedule a post](/guides/schedule-post) for the full lifecycle and constraints.
+
+## What to subscribe to
+
+A successful immediate publish fires `post.published`. A scheduled publish fires `post.queued` immediately and then `post.published` (or `post.rejected` / `post.failed`) when the worker runs. Subscribe via [`POST /v1/webhook-endpoints`](/api-reference/webhooks/create) and verify signatures per [webhooks](/webhooks).
+
+## Idempotency
+
+Every retry should reuse the same `Idempotency-Key`. Replays within 24 hours return the original response — same status code, same body. See [idempotency](/idempotency) for the full contract.
+
+## When it fails
+
+The error envelope is the same shape across every failure mode — `code`, `message`, `rule`, `platformResponse`, `remediation`, `requestId`. See [errors](/errors) for the eleven codes.
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Schedule posts" icon="calendar" href="/guides/schedule-post">
+    Defer publishes via `scheduledAt`.
+  </Card>
+  <Card title="Upload media" icon="image" href="/guides/upload-media">
+    Three media-source modes; when to use each.
+  </Card>
+  <Card title="Connect accounts" icon="link" href="/guides/connect-account">
+    OAuth flows per platform.
+  </Card>
+  <Card title="Webhooks" icon="webhook" href="/webhooks">
+    Stop polling; subscribe instead.
+  </Card>
+</CardGroup>

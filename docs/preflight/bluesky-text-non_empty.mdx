@@ -1,0 +1,30 @@
+---
+title: bluesky.text.non_empty
+description: Bluesky posts cannot be empty. Whitespace-only text is rejected.
+---
+
+## What it checks
+
+`text.trim().length > 0`. Bluesky requires a non-empty post body — there's no "image-only with no caption" surface like there is on Instagram.
+
+## Why
+
+Bluesky's `app.bsky.feed.post` record requires a `text` field. Sending an empty string or whitespace produces a record that's syntactically valid but semantically broken; Bluesky's appview hides empty posts from feeds.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "bluesky.text.non_empty",
+    "platform": "bluesky",
+    "message": "Post text cannot be empty.",
+    "remediation": "Provide a non-empty text body."
+  }
+}
+```
+
+## Remediation
+
+Send any non-whitespace `text`. If you want a media-only experience, attach the image and use a brief caption like the file name.

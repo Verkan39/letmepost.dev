@@ -1,0 +1,40 @@
+---
+title: bluesky.media.video_size_max
+description: Each video must be ≤ 100 MB.
+---
+
+## What it checks
+
+`byteLength <= 100_000_000` for video items.
+
+## Why
+
+Bluesky's video service caps individual video blobs at 100 MB. Beyond that the upload is rejected before transcoding.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "bluesky.media.video_size_max",
+    "platform": "bluesky",
+    "message": "Video is 156000000 bytes; Bluesky allows at most 100000000.",
+    "remediation": "Compress the video under 100000000 bytes (100 MB)."
+  }
+}
+```
+
+## Remediation
+
+Re-encode at a lower bitrate. For 1080p H.264, ~5 Mbps is plenty:
+
+```sh
+ffmpeg -i input.mp4 -c:v libx264 -b:v 5M -c:a aac -b:a 128k -movflags +faststart output.mp4
+```
+
+If the video is long, consider a short clip + linking to the full version on a host that doesn't have a 100 MB cap.
+
+## Related
+
+- [`bluesky.media.mime_allowed`](/preflight/bluesky-media-mime_allowed) — mp4 only.

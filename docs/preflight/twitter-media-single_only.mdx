@@ -1,0 +1,16 @@
+---
+title: twitter.media.single_only
+description: v1 supports single-image and single-video tweets only. Multi-image (4-up) ships in a follow-up slice.
+---
+
+## What it checks
+
+`media.length <= 1`.
+
+## Why
+
+Twitter's media-upload + tweet creation flow supports up to 4 images, but the v1 publisher targets the single-media surface. The 4-up surface ships once the publishing path is stable through review.
+
+## Remediation
+
+Attach one media item, or split into a thread.

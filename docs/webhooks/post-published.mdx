@@ -1,0 +1,42 @@
+---
+title: post.published
+description: The post was successfully published upstream.
+---
+
+Fires after a successful publish — both for immediate `POST /v1/posts` calls and for scheduled posts when the worker runs.
+
+## Payload
+
+```json post.published.json
+{
+  "id": "evt_...",
+  "type": "post.published",
+  "createdAt": "2026-05-08T12:00:01Z",
+  "organizationId": "org_...",
+  "data": {
+    "id": "post_...",
+    "platform": "bluesky",
+    "accountId": "...",
+    "profileId": "...",
+    "uri": "at://did:plc:abc/app.bsky.feed.post/3kr...",
+    "cid": "bafyrei...",
+    "firstCommentUri": null,
+    "firstCommentCid": null,
+    "publishedAt": "2026-05-08T12:00:01Z",
+    "warnings": []
+  }
+}
+```
+
+`warnings` is non-empty when the parent post succeeded but a follow-up step (e.g., first-comment) failed. We don't fail the whole publish for that — we surface a warning.
+
+## Use it for
+
+- Mark posts as published in your UI.
+- Capture the platform's native URI to link out to the post.
+- Trigger downstream workflows (announcements, analytics, attribution).
+
+## Related
+
+- [`post.failed`](/webhooks/post-failed)
+- [`post.rejected`](/webhooks/post-rejected)

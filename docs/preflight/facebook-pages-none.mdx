@@ -1,0 +1,36 @@
+---
+title: facebook.pages.none
+description: The connecting Facebook user has no Pages they can manage. Connection cannot complete.
+---
+
+## What it checks
+
+After OAuth completes, we call `GET /me/accounts` to discover Pages the user can publish to. If the response is empty, this rule fires — there's no Page to attach the connection to.
+
+## Why this happens
+
+- The user authenticated with a personal account that doesn't manage any Page.
+- The user manages Pages but didn't grant the `pages_show_list` scope.
+- The user manages Pages via Business Manager but didn't grant `business_management`.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "platform_rejected",
+    "rule": "facebook.pages.none",
+    "platform": "facebook",
+    "message": "No Pages were returned for this Facebook user.",
+    "remediation": "Ensure the user manages at least one Facebook Page and granted the pages_show_list and business_management scopes."
+  }
+}
+```
+
+## Remediation
+
+Re-run the connect flow and ensure all requested scopes are granted. If the user truly doesn't manage a Page, this is a wrong-account issue — they need to either be added to a Page or sign in as a user who manages one.
+
+## Related
+
+- [Accounts](/guides/connect-account) — full connect flow.

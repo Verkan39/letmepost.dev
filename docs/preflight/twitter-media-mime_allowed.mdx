@@ -1,0 +1,13 @@
+---
+title: twitter.media.mime_allowed
+description: Twitter accepts jpeg/png/webp images, gif animations, and mp4 video.
+---
+
+## What it checks
+
+For images: `mimeType ∈ { image/jpeg, image/png, image/webp, image/gif }`.
+For videos: `mimeType === "video/mp4"`.
+
+## Remediation
+
+Re-encode unsupported formats.

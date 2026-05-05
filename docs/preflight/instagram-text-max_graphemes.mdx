@@ -1,0 +1,31 @@
+---
+title: instagram.text.max_graphemes
+description: Instagram captions cap at 2200 graphemes. Same counter as Bluesky and Threads.
+---
+
+## What it checks
+
+`countGraphemes(text) <= 2200`.
+
+## Why 2200
+
+Meta's Instagram Graph API documents a 2200-character cap on the `caption` field of a media container. The cap is in user-perceived characters; we count graphemes to match.
+
+Empty captions are allowed — see [`instagram.media.required`](/preflight/instagram-media-required), which is the constraint that *does* apply when there's no media.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "instagram.text.max_graphemes",
+    "platform": "instagram",
+    "message": "Caption is 2400 graphemes; Instagram allows at most 2200."
+  }
+}
+```
+
+## Remediation
+
+Trim the caption. Use grapheme-aware splitting — see [`bluesky.text.max_graphemes`](/preflight/bluesky-text-max_graphemes) for an example.

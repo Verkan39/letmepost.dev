@@ -1,0 +1,88 @@
+---
+title: Accounts
+description: Connect, refresh, fan-out. The OAuth lifecycle for each platform.
+---
+
+A "platform account" is a single connected identity on an upstream platform — one Bluesky handle, one Facebook Page, one Twitter user. Posts are sent against an account `id`, never against bare credentials.
+
+## Two connect shapes
+
+| platform   | shape           | flow                                              |
+|------------|-----------------|---------------------------------------------------|
+| Bluesky    | `credentials`   | submit handle + app password, no OAuth round-trip |
+| everything else | `oauth`    | redirect → upstream consent → callback            |
+
+Both end with a row in `platform_accounts` and an `id` you reference from post bodies as `account.id`.
+
+## OAuth: connect → complete
+
+```bash connect.sh
+# 1. Start the flow.
+curl -X POST https://api.letmepost.dev/v1/accounts/connect/linkedin \\
+  -H "Authorization: Bearer $LMP_KEY"
+
+# Response: { "redirectUrl": "https://www.linkedin.com/oauth/...", "state": "..." }
+
+# 2. Send your user to redirectUrl. After they consent, LinkedIn
+#    redirects to https://api.letmepost.dev/v1/accounts/connect/linkedin/complete
+#    with a ?code= and ?state= the API exchanges for tokens.
+```
+
+The dashboard's **Accounts** page wraps both ends of this for you. Programmatically, you initiate the flow yourself and your user comes back to the API's complete endpoint.
+
+## Credentials: Bluesky
+
+Bluesky doesn't have OAuth; it uses scoped app passwords. Generate one at [bsky.app/settings/app-passwords](https://bsky.app/settings/app-passwords), then submit:
+
+```bash bluesky.sh
+curl -X POST https://api.letmepost.dev/v1/accounts/connect/bluesky/complete \\
+  -H "Authorization: Bearer $LMP_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "handle": "you.bsky.social", "appPassword": "abcd-efgh-ijkl-mnop" }'
+```
+
+We never store your main account password. Revoke an app password at any time on bsky.app and the connection breaks cleanly with `platform_auth_failed`.
+
+## Fan-out: Meta is one connect, two platforms
+
+Connecting `facebook` grants both Facebook Pages publish *and* the linked Instagram Business publish — Pages are discovered via `GET /me/accounts`, IG Business via the Page's `instagram_business_account` field. The single OAuth produces two `platform_accounts` rows: one for `facebook`, one for `instagram` (when an IG Business is linked).
+
+To post to Threads you connect separately — Threads has its own OAuth (`threads.net`), distinct from Facebook Login for Business.
+
+## Token lifecycle
+
+We refresh access tokens on each platform's published schedule and AES-256-GCM encrypt them at rest:
+
+| platform   | access token lifetime | strategy                                          |
+|------------|-----------------------|---------------------------------------------------|
+| Bluesky    | minutes               | refresh on 401; the AT Proto session is short-lived |
+| Twitter / X | 2 hours              | refresh ~5 min before expiry                       |
+| Threads    | ~60 days              | refresh long-lived token before expiry             |
+| Facebook / IG | ~60 days           | exchange short-lived for long-lived; refresh on schedule |
+| LinkedIn   | 60 days, no refresh   | re-auth required; we fire `token.expiring` 7 days ahead |
+| Pinterest  | 30 days               | refresh ~24 h before expiry                        |
+
+Subscribe to [`token.expiring`](/webhooks/token-expiring) and [`token.revoked`](/webhooks/token-revoked) to know when a connection needs user attention.
+
+## Listing and disconnecting
+
+```
+GET    /v1/accounts                — list connected accounts (no secrets)
+GET    /v1/accounts/:id            — single account detail
+DELETE /v1/accounts/:id            — disconnect (hard delete)
+```
+
+Secrets never come back from a read. Only the public profile (display name, platform user id), the token expiry timestamp, and platform-specific public extensions (Pinterest's default board, etc.) are exposed.
+
+## Errors during connect
+
+| code | when |
+|------|------|
+| [`platform_rejected`](/errors/platform_rejected) | Upstream OAuth flow failed (consent denied, bad scopes, missing business asset). |
+| [`platform_auth_failed`](/errors/platform_auth_failed) | A subsequent post hit a revoked or expired token. |
+| [`facebook.pages.none`](/preflight/facebook-pages-none) | The Facebook user has no Pages they can manage; can't connect. |
+
+## See also
+
+- [Authentication](/authentication) — letmepost API keys (separate from OAuth tokens).
+- [Per-platform pages](/platforms/bluesky) — exact scope sets and quirks.

@@ -1,0 +1,29 @@
+---
+title: post.validated
+description: Preflight passed. Today fired together with post.queued; reserved for an explicit validate step in a future slice.
+---
+
+Reserved for the explicit `POST /v1/posts/validate` flow. In v1 the publish path runs preflight inline, so the event isn't emitted on the synchronous `POST /v1/posts` path.
+
+This event is in the canonical type list so consumers can register for it now and have it just work when the validate endpoint ships.
+
+## Payload (planned)
+
+```json
+{
+  "type": "post.validated",
+  "data": {
+    "id": "post_...",
+    "platform": "bluesky",
+    "accountId": "...",
+    "profileId": "...",
+    "validatedAt": "2026-05-04T15:30:00Z",
+    "rules": [ /* every rule that ran, with pass/fail */ ]
+  }
+}
+```
+
+## Related
+
+- [`post.queued`](/webhooks/post-queued)
+- [Webhooks overview](/webhooks)

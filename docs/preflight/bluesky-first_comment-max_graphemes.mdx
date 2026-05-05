@@ -1,0 +1,25 @@
+---
+title: bluesky.first_comment.max_graphemes
+description: First-comment text is also capped at 300 graphemes — same as the parent post.
+---
+
+## What it checks
+
+`countGraphemes(firstComment.text) <= 300`. Same counter and same cap as the post itself, because a first comment is a reply post — Bluesky doesn't distinguish.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "bluesky.first_comment.max_graphemes",
+    "platform": "bluesky",
+    "message": "First comment text is 312 graphemes; Bluesky allows at most 300."
+  }
+}
+```
+
+## Remediation
+
+Same as for the parent post — see [`bluesky.text.max_graphemes`](/preflight/bluesky-text-max_graphemes) for grapheme-aware truncation guidance.

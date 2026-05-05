@@ -1,0 +1,60 @@
+---
+title: Idempotency
+description: Every write accepts an Idempotency-Key. Retries are safe. No double-posting.
+---
+
+Sending the same `POST /v1/posts` request twice should publish exactly one post. That's what the `Idempotency-Key` header buys you.
+
+## How it works
+
+Pass a unique key — typically a UUID v4 — on every write:
+
+```bash header.txt
+Idempotency-Key: 01HY6X4AWBJM2K9F2PTQMRD9JQ
+```
+
+The first request with that key executes normally. Any subsequent request with the same key, the same route, and a matching body hash returns the **first response** verbatim — same status code, same body. The platform call doesn't run a second time.
+
+If the body hash differs from the first request, you get back [`idempotency_conflict`](/errors/idempotency_conflict) so you don't accidentally publish two different posts under one key.
+
+## When to use a key
+
+- Every retry path. Network blip, lambda re-invocation, Temporal workflow restart — pin them to a key the caller computes deterministically.
+- Every webhook handler that publishes. Webhooks are at-least-once; keys make idempotent processing a one-line addition.
+- Every CI / cron job that posts on a schedule.
+
+## What counts as the "same request"
+
+The replay cache keys on:
+
+- API key
+- HTTP method + path
+- The exact `Idempotency-Key` header
+- A SHA-256 hash of the request body
+
+Change the body and the second request returns `idempotency_conflict` — that's a feature, not a bug. It catches the case where you reused a key by mistake but actually meant to publish something different.
+
+## TTL
+
+Replay records are kept for **24 hours** after the first request, then evicted. Beyond 24h the same key is treated as fresh, so don't rely on long-lived dedup; that's what idempotent application logic is for.
+
+## Generating keys
+
+UUID v4 from any standard library is fine. For deterministic retries, hash the upstream event id (e.g., your Temporal workflow run id):
+
+```ts key-strategies.ts
+// Random per-call — fine for ad-hoc scripts.
+const key = crypto.randomUUID();
+
+// Deterministic from your own correlation id — best for workflows.
+const key = sha256(\`workflow:\${workflowId}:step:\${stepName}\`);
+```
+
+## What this is *not*
+
+Idempotency keys do not deduplicate based on content. Two different keys, same body, will publish two posts. That's the contract — the key is the unit of "this is the same request"; we don't second-guess.
+
+## See also
+
+- [`POST /v1/posts` reference](/api-reference/#tag/posts/post/v1/posts) for the parameter on the endpoint itself.
+- [`idempotency_conflict`](/errors/idempotency_conflict) for the error you'll see on a key-with-different-body collision.

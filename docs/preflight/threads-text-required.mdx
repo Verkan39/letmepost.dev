@@ -1,0 +1,40 @@
+---
+title: threads.text.required
+description: Threads text-only posts require non-empty text. Media-less + empty-text combinations are rejected.
+---
+
+## What it checks
+
+If `media` is empty or absent, `text.trim().length > 0`.
+
+Threads supports four post shapes:
+
+- **Text-only**: text required, no media.
+- **Single image**: text optional, one image.
+- **Single video**: text optional, one video.
+- **Carousel (2–20)**: text optional, mixed images + videos.
+
+This rule covers the first row.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "threads.text.required",
+    "platform": "threads",
+    "message": "Threads text-only posts require non-empty text — pass `media: [...]` for an image/video/carousel.",
+    "remediation": "Provide non-whitespace `text`, or include at least one media item."
+  }
+}
+```
+
+## Remediation
+
+Add either non-whitespace `text` or at least one `media` item. Threads doesn't have an "image with no caption" surface that's also empty-text — there must be either text or media.
+
+## Related
+
+- [`threads.text.max_graphemes`](/preflight/threads-text-max_graphemes) — 500 graphemes max.
+- [Platforms / Threads](/platforms/threads)

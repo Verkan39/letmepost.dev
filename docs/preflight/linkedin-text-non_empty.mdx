@@ -1,0 +1,12 @@
+---
+title: linkedin.text.non_empty
+description: LinkedIn posts cannot be empty. Whitespace-only text is rejected.
+---
+
+## What it checks
+
+`text.trim().length > 0` on LinkedIn `/rest/posts` calls.
+
+## Remediation
+
+Provide non-empty text. LinkedIn doesn't have a media-only post shape on the standard publishing API.

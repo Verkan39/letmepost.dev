@@ -1,0 +1,61 @@
+---
+title: instagram.media.mime_allowed
+description: Instagram is JPEG-only for photos. PNG, WebP, HEIC, and GIF will all fail with opaque IG errors.
+---
+
+## What it checks
+
+For images: `mimeType === "image/jpeg"`. **JPEG only**, no exceptions.
+For videos: `mimeType ∈ { video/mp4, video/quicktime }`.
+
+The mime is sniffed from the resolved bytes, not trusted from the file extension.
+
+## Why JPEG-only for images
+
+Meta's Instagram container endpoint will accept a `image/png` URL but produces a `code 100, error subcode 2207003` (or similar) at container creation time. Same for WebP, HEIC, GIF. The only mime IG actually publishes through the photo path is JPEG.
+
+Catching this locally with a clear rule + remediation saves you the round-trip and the opaque error.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "instagram.media.mime_allowed",
+    "platform": "instagram",
+    "message": "Image mime 'image/png' is not accepted by Instagram (JPEG only).",
+    "remediation": "Re-encode to JPEG. Instagram's container endpoint rejects PNG, WebP, HEIC, and GIF on the photo path."
+  }
+}
+```
+
+## Remediation
+
+Re-encode to JPEG:
+
+```sh
+# ImageMagick
+magick input.png -quality 85 output.jpg
+
+# sharp (Node)
+await sharp(input).jpeg({ quality: 85 }).toFile("output.jpg");
+```
+
+If your asset is a transparent PNG, IG won't render the transparency anyway — flatten onto a background of your choice.
+
+For videos, re-encode to mp4 with H.264 + AAC (the codec subset IG accepts inside an mp4 container):
+
+```sh
+ffmpeg -i input.mov -c:v libx264 -c:a aac -movflags +faststart output.mp4
+```
+
+## Upstream documentation
+
+The 2207003 / 2207004 subcode family is undocumented in Meta's developer docs but consistently observable. The empirical mapping is what we encode.
+
+## Related
+
+- [`instagram.media.image_size_max`](/preflight/instagram-media-image_size_max)
+- [`instagram.media.video_size_max`](/preflight/instagram-media-video_size_max)
+- [`threads.media.mime_allowed`](/preflight/threads-media-mime_allowed) — Threads is more permissive (jpeg/png/webp).

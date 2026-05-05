@@ -1,0 +1,21 @@
+---
+title: linkedin.author.org_not_supported
+description: Org/Company posting requires LinkedIn's Marketing Developer Platform (MDP). Not in v1.
+---
+
+## What it checks
+
+If the connected LinkedIn account is bound to a `urn:li:organization:*` author, this rule fires. v1 of the publisher only supports personal posting (`urn:li:person:*`).
+
+## Why
+
+Org posting requires LinkedIn's Marketing Developer Platform (MDP) approval and the `w_organization_social` scope, which we request only as `extended` (off by default). MDP approval ships in a follow-up slice after the personal-posting wedge clears review.
+
+## Remediation
+
+For now, post from a personal account. Org/Company posting lands once MDP approval clears. Watch the [changelog](/changelog).
+
+## Related
+
+- [`linkedin.author.urn_format`](/preflight/linkedin-author-urn_format)
+- [Platforms / LinkedIn](/platforms/linkedin)

@@ -1,0 +1,34 @@
+---
+title: bluesky.media.image_video_exclusive
+description: A single Bluesky post is either images-only or video-only — not mixed.
+---
+
+## What it checks
+
+If the `media` array contains both `kind: "image"` and `kind: "video"` items, preflight rejects.
+
+## Why
+
+Bluesky's record schema (`app.bsky.embed.images` vs `app.bsky.embed.video`) is exclusive — a single post embeds *either* images *or* a video, never both. There's no embed shape that holds mixed media.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "bluesky.media.image_video_exclusive",
+    "platform": "bluesky",
+    "message": "Cannot attach both images and video to the same Bluesky post; pick one.",
+    "remediation": "Split the post: images in one post, video in another. Bluesky does not support mixed media in a single record."
+  }
+}
+```
+
+## Remediation
+
+Send two posts. The second can quote-post or thread-reply to the first if you want them visually linked. If you need mixed media in a single visual, [Threads](/platforms/threads) is the platform that supports that — same `media` shape, different `account.platform`.
+
+## Related
+
+- [`bluesky.media.count_max`](/preflight/bluesky-media-count_max) — also caps at 4 images / 1 video.

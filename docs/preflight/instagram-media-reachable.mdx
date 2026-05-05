@@ -1,0 +1,87 @@
+---
+title: instagram.media.reachable
+description: Instagram fetches media URLs from its own servers. Drive/Dropbox/auth-gated URLs fail as OAuthException 2207052.
+---
+
+This is the canonical translator for Instagram's notorious `OAuthException 2207052`. The upstream message is one of the most-cited opaque-rejection examples in the research that drove this product. We catch the platform's response and remap to a useful rule + remediation.
+
+## What it checks
+
+The `media_url` you sent (or the URL we built from your `mediaId`) must be **publicly reachable from Meta's servers**. Specifically:
+
+- It must respond `200` to an anonymous `GET` (no cookies, no auth headers).
+- It must redirect cleanly (Meta does follow redirects, but private session-bound redirect URLs break this).
+- It must serve the bytes — HTML preview pages don't count.
+
+Failure modes from the wild:
+
+- **Google Drive share links.** Drive returns an HTML preview page, not the bytes. Even "anyone with the link can view" links fail.
+- **Dropbox share URLs.** Same shape — HTML page, not the asset.
+- **S3 buckets with object ACLs locked.** Anonymous reads denied → 403 to Meta.
+- **CDNs requiring an auth token.** Meta isn't going to send your token.
+
+## Why it's caught here, not in static preflight
+
+We can't verify URL reachability without an HTTP request — and we don't HEAD third-party URLs from the API hot path. Instead we run an active probe inside the meta client: when Meta returns `OAuthException 2207052`, we map it to this rule and surface the remediation. The user-visible flow is identical — same rule id, same remediation — but the check happens at upstream-call time rather than statically.
+
+## Reproducing it
+
+```json reproduce.json
+{
+  "account": { "platform": "instagram", "id": "..." },
+  "text": "this will fail",
+  "media": [
+    { "kind": "image", "url": "https://drive.google.com/file/d/.../view" }
+  ]
+}
+```
+
+Response:
+
+```json error.json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "instagram.media.reachable",
+    "platform": "instagram",
+    "message": "Instagram couldn't fetch the media URL. Most often this is a Google Drive 'share' link, a Dropbox preview URL, or an S3 object with restricted ACLs.",
+    "remediation": "Instagram fetches media URLs from its own servers. The URL must be on a public CDN — not Google Drive, Dropbox 'share' links, S3 with object ACLs locked, or any auth-gated host. Upload via POST /v1/media first, then reference the returned id.",
+    "requestId": "req_..."
+  }
+}
+```
+
+## Remediation
+
+The reliable path is to upload the file via [`POST /v1/media`](/guides/upload-media) and reference the returned `mediaId`:
+
+```bash remediation.sh
+# 1. Upload the bytes to letmepost media storage.
+curl -X POST https://api.letmepost.dev/v1/media \\
+  -H "Authorization: Bearer $LMP_KEY" \\
+  -F file=@./hero.jpg
+# Response: { "id": "med_a1b2c3d4...", ... }
+
+# 2. Reference it from the post.
+curl -X POST https://api.letmepost.dev/v1/posts \\
+  -H "Authorization: Bearer $LMP_KEY" \\
+  -H "Idempotency-Key: $(uuidgen)" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "account": { "platform": "instagram", "id": "..." },
+    "text": "shipped",
+    "media": [{ "kind": "image", "mediaId": "med_a1b2c3d4..." }]
+  }'
+```
+
+If you're committed to using your own URL, verify with `curl -I` from a clean machine — no cookies, no auth headers — and confirm `Content-Type` is the actual image and the response is `200`, not a redirect to an HTML preview.
+
+## Upstream documentation
+
+The 2207052 subcode is documented in Meta's [Instagram Content Publishing API](https://developers.facebook.com/docs/instagram-api/guides/content-publishing) error reference. Meta's documented remediation is "ensure the URL is publicly accessible," with no further detail. We translate that to the specific failure modes we've seen in production.
+
+## Related
+
+- [`instagram.media.required`](/preflight/instagram-media-required) — IG has no text-only post surface.
+- [`instagram.media.mime_allowed`](/preflight/instagram-media-mime_allowed) — JPEG-only on the photo path.
+- [Media](/guides/upload-media) — the full guide on the three media-source modes.

@@ -1,0 +1,91 @@
+---
+title: Bluesky
+description: AT Proto. Live end-to-end. App-password connect, no OAuth.
+icon: bluesky
+iconType: brands
+---
+
+Bluesky is the only v1 platform that's live for everyone today. The integration uses scoped app passwords instead of OAuth — there's no app review, no API key request, no allowlist.
+
+## Connect
+
+Generate an app password at [bsky.app/settings/app-passwords](https://bsky.app/settings/app-passwords). The format is 19 characters with hyphens (e.g. `abcd-efgh-ijkl-mnop`). Submit it via the dashboard's **Accounts** page or programmatically:
+
+```bash connect.sh
+curl -X POST https://api.letmepost.dev/v1/accounts/connect/bluesky/complete \\
+  -H "Authorization: Bearer $LMP_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "handle": "you.bsky.social", "appPassword": "abcd-efgh-ijkl-mnop" }'
+```
+
+The `complete` response carries the `id` you'll send posts against. App passwords can be revoked at any time on bsky.app — when that happens the connection breaks cleanly with [`platform_auth_failed`](/errors/platform_auth_failed).
+
+## Scopes
+
+App passwords don't have OAuth scopes; they grant the same permissions as the password itself. We never store or see your main account password.
+
+## Token lifecycle
+
+AT Protocol JWTs are short-lived (minutes). We refresh on every 401 from the platform; you don't manage this. Subscribe to [`token.revoked`](/webhooks/token-revoked) if you want to know when the user revoked the app password upstream.
+
+## Posting
+
+Minimal example:
+
+```json post.json
+{
+  "account": { "platform": "bluesky", "id": "..." },
+  "text": "Shipping letmepost.dev"
+}
+```
+
+With media:
+
+```json post-with-media.json
+{
+  "account": { "platform": "bluesky", "id": "..." },
+  "text": "Look at this",
+  "media": [
+    { "kind": "image", "mediaId": "med_…", "altText": "Status page screenshot" }
+  ]
+}
+```
+
+## Constraints
+
+- Text: 300 graphemes max ([`bluesky.text.max_graphemes`](/preflight/bluesky-text-max_graphemes))
+- Images: up to 4 per post; jpeg, png, webp, gif; ≤ 976 KB each
+- Video: 1 per post; mp4 only; ≤ 100 MB
+- Mixed image + video: rejected ([`bluesky.media.image_video_exclusive`](/preflight/bluesky-media-image_video_exclusive))
+- Alt text: 2000 graphemes max
+- First comment: supported; same constraints as the parent post
+
+## Preflight rules
+
+- [`bluesky.text.non_empty`](/preflight/bluesky-text-non_empty)
+- [`bluesky.text.max_graphemes`](/preflight/bluesky-text-max_graphemes)
+- [`bluesky.media.image_video_exclusive`](/preflight/bluesky-media-image_video_exclusive)
+- [`bluesky.media.count_max`](/preflight/bluesky-media-count_max)
+- [`bluesky.media.alt_text_max_graphemes`](/preflight/bluesky-media-alt_text_max_graphemes)
+- [`bluesky.media.mime_allowed`](/preflight/bluesky-media-mime_allowed)
+- [`bluesky.media.image_size_max`](/preflight/bluesky-media-image_size_max)
+- [`bluesky.media.video_size_max`](/preflight/bluesky-media-video_size_max)
+- [`bluesky.first_comment.non_empty`](/preflight/bluesky-first_comment-non_empty)
+- [`bluesky.first_comment.max_graphemes`](/preflight/bluesky-first_comment-max_graphemes)
+
+## Response
+
+A successful publish returns the AT Proto URI + CID:
+
+```json response.json
+{
+  "id": "post_…",
+  "platform": "bluesky",
+  "status": "published",
+  "uri": "at://did:plc:abc/app.bsky.feed.post/3kr…",
+  "cid": "bafyrei…",
+  "createdAt": "2026-05-04T12:00:00Z"
+}
+```
+
+The `uri` resolves to the post on bsky.app; you can construct the public URL from it.

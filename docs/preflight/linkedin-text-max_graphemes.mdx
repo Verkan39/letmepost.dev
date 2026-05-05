@@ -1,0 +1,16 @@
+---
+title: linkedin.text.max_graphemes
+description: LinkedIn caps post commentary at 3000 graphemes. Emoji-aware.
+---
+
+## What it checks
+
+`countGraphemes(text) <= 3000`.
+
+## Why 3000
+
+LinkedIn's `/rest/posts` commentary cap is 3000 graphemes — emoji and ZWJ sequences count as 1 character, matching our counter. The cap is documented in LinkedIn's Versioned API docs.
+
+## Remediation
+
+Trim the post. Use grapheme-aware splitting — see [`bluesky.text.max_graphemes`](/preflight/bluesky-text-max_graphemes) for example code.

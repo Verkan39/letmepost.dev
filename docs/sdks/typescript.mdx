@@ -1,0 +1,34 @@
+---
+title: TypeScript SDK
+description: An official TypeScript SDK is in flight. Use raw fetch in the meantime.
+---
+
+The official TypeScript SDK ships once the API surface stabilizes past the LinkedIn and Meta-trio approvals. Until then, use raw `fetch` against the documented endpoints — the API surface is small (one POST and a few GETs for v1).
+
+A starting point that works today:
+
+```ts
+type LmpKey = `lmp_${"live" | "test"}_${string}`;
+
+export class Letmepost {
+  constructor(private readonly key: LmpKey, private readonly baseUrl = "https://api.letmepost.dev") {}
+
+  async post(body: object, idempotencyKey: string) {
+    const res = await fetch(`${this.baseUrl}/v1/posts`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.key}`,
+        "Idempotency-Key": idempotencyKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
+  }
+}
+```
+
+The schemas live in [`@letmepost/schemas`](https://github.com/rosekamallove/letmepost.dev/tree/main/packages/schemas) — once published, importing types from there is the safe path.
+
+Watch the [GitHub release feed](https://github.com/rosekamallove/letmepost.dev/releases) for the SDK announcement.

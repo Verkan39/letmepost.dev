@@ -1,0 +1,16 @@
+---
+title: facebook.media.image_size_max
+description: Each Facebook Page image must be ≤ 4 MB.
+---
+
+## What it checks
+
+`byteLength <= 4_000_000` per image, on the Pages `/photos` endpoint.
+
+## Remediation
+
+Re-encode at lower quality or smaller dimensions:
+
+```sh
+magick input.jpg -quality 82 -resize 2048x2048\> output.jpg
+```

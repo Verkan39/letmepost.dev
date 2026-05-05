@@ -1,0 +1,35 @@
+---
+title: bluesky.media.count_max
+description: Up to 4 images per post, or 1 video. No exceptions.
+---
+
+## What it checks
+
+`images.length <= 4` AND `videos.length <= 1`. Mixed image+video is rejected separately by [`bluesky.media.image_video_exclusive`](/preflight/bluesky-media-image_video_exclusive).
+
+## Why
+
+Bluesky's `app.bsky.embed.images` schema caps `images` at 4 entries. Video posts use a different embed (`app.bsky.embed.video`) which holds exactly one.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "bluesky.media.count_max",
+    "platform": "bluesky",
+    "message": "Attached 6 images; Bluesky allows at most 4 per post.",
+    "remediation": "Reduce to 4 images or fewer."
+  }
+}
+```
+
+## Remediation
+
+Trim to 4. For longer galleries, post them as a thread — each reply can attach 4 more.
+
+## Related
+
+- [`bluesky.media.image_video_exclusive`](/preflight/bluesky-media-image_video_exclusive)
+- [Platforms / Bluesky](/platforms/bluesky)

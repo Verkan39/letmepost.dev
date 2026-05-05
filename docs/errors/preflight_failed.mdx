@@ -1,0 +1,45 @@
+---
+title: preflight_failed
+description: A documented platform constraint failed before we touched the upstream API. The rule field carries the canonical rule id.
+---
+
+The request was syntactically valid but failed a platform-specific rule we check locally before the upstream call. This is the canonical "we caught it before the platform did" error.
+
+## What triggers it
+
+Anything in the [preflight rule catalog](/preflight). A few high-frequency examples:
+
+- Bluesky post text > 300 graphemes ([`bluesky.text.max_graphemes`](/preflight/bluesky-text-max_graphemes))
+- Instagram post with no media ([`instagram.media.required`](/preflight/instagram-media-required))
+- Instagram media URL not publicly fetchable ([`instagram.media.reachable`](/preflight/instagram-media-reachable) — the canonical `OAuthException 2207052` translator)
+- Pinterest pin without a board id and no default board on the connected account ([`pinterest.board.required`](/preflight/pinterest-board-required))
+
+## Response shape
+
+```json preflight_failed.json
+{
+  "error": {
+    "code": "preflight_failed",
+    "message": "Post text is 312 graphemes; Bluesky allows at most 300.",
+    "rule": "bluesky.text.max_graphemes",
+    "platform": "bluesky",
+    "remediation": "Shorten the post to 300 graphemes or fewer.",
+    "requestId": "req_..."
+  }
+}
+```
+
+`rule` is always set on `preflight_failed`. Look it up at `/docs/preflight/<rule-with-dashes>/` for the full explainer + the upstream platform doc the constraint derives from.
+
+## Why preflight matters
+
+Without preflight you'd see this same constraint failure as an opaque platform response — a generic IG `code 100`, a LinkedIn 422 with no field path, a Threads HTTP 200 carrying a status code in the body. Preflight surfaces the rule id directly, with a remediation, before the upstream call ever happens.
+
+## Remediation
+
+Open the rule's page and follow the remediation. Every preflight rule has one.
+
+## Related
+
+- [Preflight](/preflight) — the full rule catalog.
+- [`platform_rejected`](/errors/platform_rejected) — preflight passed but the platform still rejected. We treat this as a preflight gap and add a rule.

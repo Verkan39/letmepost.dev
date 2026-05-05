@@ -1,0 +1,37 @@
+---
+title: threads.container.error
+description: Threads's media container transitioned to ERROR during preparation. Carries the upstream error.
+---
+
+## What it checks
+
+The Threads publish worker polls the container status until it reports `FINISHED`. If the status transitions to `ERROR` instead, this rule fires with the upstream message attached on `platformResponse`.
+
+## Common causes
+
+- The provided media URL became unreachable mid-fetch.
+- Threads's transcoder rejected the asset (corrupt mp4, unsupported codec inside an otherwise mp4 container).
+- Account-level temporary block.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "threads.container.error",
+    "platform": "threads",
+    "platformResponse": { "error_message": "...", "error_code": 100 },
+    "remediation": "Inspect platformResponse for the upstream message; usually a transcoder rejection — re-encode the asset and retry."
+  }
+}
+```
+
+## Remediation
+
+Inspect `platformResponse.error_message`. The most common cause is an mp4 container that has unsupported codec inside it (e.g., HEVC inside `.mp4`). Re-encode with `ffmpeg -c:v libx264 -c:a aac` and retry.
+
+## Related
+
+- [`threads.container.expired`](/preflight/threads-container-expired) — 24 h TTL exceeded.
+- [`threads.media.mime_allowed`](/preflight/threads-media-mime_allowed)

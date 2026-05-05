@@ -1,0 +1,30 @@
+---
+title: bluesky.first_comment.non_empty
+description: When firstComment is set, its text must be non-empty.
+---
+
+## What it checks
+
+If `firstComment` is present in the request body, `firstComment.text.trim().length > 0`.
+
+## Why
+
+A first comment is a separate Bluesky reply post; it has the same non-empty constraint as any post.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "bluesky.first_comment.non_empty",
+    "platform": "bluesky",
+    "message": "First comment text cannot be empty.",
+    "remediation": "Provide non-empty firstComment.text, or omit firstComment entirely."
+  }
+}
+```
+
+## Remediation
+
+Either provide non-whitespace text or drop the `firstComment` field. There's no semantic difference between an empty first comment and no first comment.

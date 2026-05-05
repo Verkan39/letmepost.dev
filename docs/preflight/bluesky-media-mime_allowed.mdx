@@ -1,0 +1,38 @@
+---
+title: bluesky.media.mime_allowed
+description: Bluesky accepts jpeg/png/webp/gif images and mp4 video. Other formats are rejected.
+---
+
+## What it checks
+
+For images: `mimeType ∈ { image/jpeg, image/png, image/webp, image/gif }`.
+For videos: `mimeType === video/mp4`.
+
+The mime is sniffed from the resolved bytes, not trusted from the file extension.
+
+## Why
+
+The PDS (Personal Data Server) blob endpoint enforces the same allowlist. Sending HEIC, BMP, MOV, etc. produces a `BlobUnsupportedMimeType` error from Bluesky — opaque, async, hard to debug. We catch it locally.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "bluesky.media.mime_allowed",
+    "platform": "bluesky",
+    "message": "Image mime type 'image/heic' is not allowed on Bluesky.",
+    "remediation": "Use one of: image/jpeg, image/png, image/webp, image/gif."
+  }
+}
+```
+
+## Remediation
+
+Re-encode the asset. ImageMagick, sharp, ffmpeg — any of them. For video, `ffmpeg -i input.mov -c:v libx264 -c:a aac output.mp4` produces a Bluesky-compatible mp4.
+
+## Related
+
+- [`bluesky.media.image_size_max`](/preflight/bluesky-media-image_size_max)
+- [`bluesky.media.video_size_max`](/preflight/bluesky-media-video_size_max)

@@ -1,0 +1,89 @@
+---
+title: Threads
+description: Meta's Threads via the standalone Threads Graph API. Two-step container publish.
+icon: threads
+iconType: brands
+---
+
+Threads uses Meta's Threads Graph API, with a separate OAuth flow at threads.net (distinct from Facebook Login for Business). Connecting Threads does **not** connect Facebook or Instagram, and vice versa.
+
+## Connect
+
+OAuth 2.0 against threads.net. Start at `POST /v1/accounts/connect/threads`, send the user through the redirect, and the callback completes the handshake.
+
+## Scopes
+
+| scope                       | requested |
+|-----------------------------|-----------|
+| `threads_basic`             | always — required to call `GET /me`. |
+| `threads_content_publish`   | always — unlocks create-container + publish. |
+| `threads_manage_replies`    | only when the caller opts into `extended` scopes. |
+| `threads_read_replies`      | only when the caller opts into `extended` scopes. |
+
+The publisher uses neither replies scope — Threads supports replying via `replyToId` on the request body, which is a write and needs no extra scope.
+
+## Token lifecycle
+
+Threads issues long-lived tokens (~60 days). We refresh ahead of expiry; subscribe to [`token.expiring`](/webhooks/token-expiring).
+
+## Posting
+
+Threads supports four post shapes:
+
+- **Text-only** — text required, no media.
+- **Single image / single video** — text optional.
+- **Carousel (2–20)** — text optional, mixed images and videos.
+
+```json text-only.json
+{
+  "account": { "platform": "threads", "id": "..." },
+  "text": "Threads-only thought"
+}
+```
+
+```json carousel.json
+{
+  "account": { "platform": "threads", "id": "..." },
+  "text": "Mixed carousel",
+  "media": [
+    { "kind": "image", "mediaId": "med_…", "altText": "first" },
+    { "kind": "video", "mediaId": "med_…", "altText": "second" },
+    { "kind": "image", "mediaId": "med_…", "altText": "third" }
+  ]
+}
+```
+
+```json reply.json
+{
+  "account": { "platform": "threads", "id": "..." },
+  "text": "Replying to my own post",
+  "threads": { "replyToId": "<thread id>" }
+}
+```
+
+## Constraints
+
+- Text: 500 graphemes ([`threads.text.max_graphemes`](/preflight/threads-text-max_graphemes))
+- Carousel: 2–20 items ([`threads.media.count_max`](/preflight/threads-media-count_max))
+- Image mimes: jpeg, png, webp ([`threads.media.mime_allowed`](/preflight/threads-media-mime_allowed))
+- Video mimes: mp4, mov
+- Image size: 8 MB max
+- Video size: 1 GB max
+- Alt text: 1000 graphemes max
+
+## Preflight rules
+
+- [`threads.text.required`](/preflight/threads-text-required)
+- [`threads.text.max_graphemes`](/preflight/threads-text-max_graphemes)
+- [`threads.media.count_max`](/preflight/threads-media-count_max)
+- [`threads.media.alt_text_max_graphemes`](/preflight/threads-media-alt_text_max_graphemes)
+- [`threads.media.mime_allowed`](/preflight/threads-media-mime_allowed)
+- [`threads.media.image_size_max`](/preflight/threads-media-image_size_max)
+- [`threads.media.video_size_max`](/preflight/threads-media-video_size_max)
+- [`threads.container.expired`](/preflight/threads-container-expired)
+- [`threads.container.error`](/preflight/threads-container-error)
+
+## Notes
+
+- Threads's two-step publish (create-container → poll-status → publish) is hidden from the caller — the immediate `POST /v1/posts` call runs both steps and returns when the publish finishes.
+- Containers expire after 24 hours. For deferred publishes that exceed that window, the dispatcher creates a fresh container — see [`threads.container.expired`](/preflight/threads-container-expired).

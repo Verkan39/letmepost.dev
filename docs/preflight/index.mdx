@@ -1,0 +1,120 @@
+---
+title: Preflight
+description: Every documented platform constraint is checked locally before we touch the upstream API. Here are all the rules.
+---
+
+Before the API forwards a post to a platform, it runs every documented constraint locally — character count, media format, alt-text length, URL reachability, scope checks. When something fails the response is an [`preflight_failed`](/errors/preflight_failed) error carrying the **rule id** that fired, so you can look it up by exact string.
+
+## Why preflight
+
+The most-cited developer complaint about social media APIs is that constraints are documented somewhere, but the runtime error doesn't say which constraint you tripped. Examples from the research corpus that drove this product:
+
+- Instagram Reels rejecting Google Drive URLs as `OAuthException 2207052`.
+- LinkedIn returning generic 422s for URN format mismatches.
+- Threads returning HTTP 200 with a status code embedded in the body.
+
+Preflight runs every documented rule **before** the upstream call. If we know it'll fail, we surface the rule id immediately rather than wait for the platform to reject opaquely.
+
+## Reading a rule id
+
+Rule ids look like `<platform>.<surface>.<check>`:
+
+```
+bluesky.text.max_graphemes
+threads.media.alt_text_max_graphemes
+instagram.media.reachable
+pinterest.image.size_max
+```
+
+Each one has its own page below — the rule id is the canonical link.
+
+## Rule catalog
+
+### Bluesky
+
+- [`bluesky.text.non_empty`](/preflight/bluesky-text-non_empty)
+- [`bluesky.text.max_graphemes`](/preflight/bluesky-text-max_graphemes)
+- [`bluesky.media.image_video_exclusive`](/preflight/bluesky-media-image_video_exclusive)
+- [`bluesky.media.count_max`](/preflight/bluesky-media-count_max)
+- [`bluesky.media.alt_text_max_graphemes`](/preflight/bluesky-media-alt_text_max_graphemes)
+- [`bluesky.media.mime_allowed`](/preflight/bluesky-media-mime_allowed)
+- [`bluesky.media.image_size_max`](/preflight/bluesky-media-image_size_max)
+- [`bluesky.media.video_size_max`](/preflight/bluesky-media-video_size_max)
+- [`bluesky.first_comment.non_empty`](/preflight/bluesky-first_comment-non_empty)
+- [`bluesky.first_comment.max_graphemes`](/preflight/bluesky-first_comment-max_graphemes)
+
+### Threads
+
+- [`threads.text.required`](/preflight/threads-text-required)
+- [`threads.text.max_graphemes`](/preflight/threads-text-max_graphemes)
+- [`threads.media.count_max`](/preflight/threads-media-count_max)
+- [`threads.media.alt_text_max_graphemes`](/preflight/threads-media-alt_text_max_graphemes)
+- [`threads.media.mime_allowed`](/preflight/threads-media-mime_allowed)
+- [`threads.media.image_size_max`](/preflight/threads-media-image_size_max)
+- [`threads.media.video_size_max`](/preflight/threads-media-video_size_max)
+- [`threads.container.expired`](/preflight/threads-container-expired)
+- [`threads.container.error`](/preflight/threads-container-error)
+
+### Instagram
+
+- [`instagram.media.required`](/preflight/instagram-media-required)
+- [`instagram.text.max_graphemes`](/preflight/instagram-text-max_graphemes)
+- [`instagram.media.count_max`](/preflight/instagram-media-count_max)
+- [`instagram.media.alt_text_max_graphemes`](/preflight/instagram-media-alt_text_max_graphemes)
+- [`instagram.media.mime_allowed`](/preflight/instagram-media-mime_allowed)
+- [`instagram.media.image_size_max`](/preflight/instagram-media-image_size_max)
+- [`instagram.media.video_size_max`](/preflight/instagram-media-video_size_max)
+- [`instagram.media.reachable`](/preflight/instagram-media-reachable) — the canonical `OAuthException 2207052` translator.
+- [`instagram.media.aspect_ratio`](/preflight/instagram-media-aspect_ratio)
+
+### Facebook
+
+- [`facebook.text.required`](/preflight/facebook-text-required)
+- [`facebook.text.max_graphemes`](/preflight/facebook-text-max_graphemes)
+- [`facebook.media.image_video_exclusive`](/preflight/facebook-media-image_video_exclusive)
+- [`facebook.media.count_max`](/preflight/facebook-media-count_max)
+- [`facebook.media.mime_allowed`](/preflight/facebook-media-mime_allowed)
+- [`facebook.media.image_size_max`](/preflight/facebook-media-image_size_max)
+- [`facebook.media.video_size_max`](/preflight/facebook-media-video_size_max)
+- [`facebook.pages.none`](/preflight/facebook-pages-none)
+
+### LinkedIn
+
+- [`linkedin.text.non_empty`](/preflight/linkedin-text-non_empty)
+- [`linkedin.text.max_graphemes`](/preflight/linkedin-text-max_graphemes)
+- [`linkedin.author.urn_format`](/preflight/linkedin-author-urn_format)
+- [`linkedin.author.org_not_supported`](/preflight/linkedin-author-org_not_supported)
+- [`linkedin.author.unresolved`](/preflight/linkedin-author-unresolved)
+- [`linkedin.visibility.enum`](/preflight/linkedin-visibility-enum)
+
+### Pinterest
+
+- [`pinterest.board.required`](/preflight/pinterest-board-required)
+- [`pinterest.media.required`](/preflight/pinterest-media-required)
+- [`pinterest.media.single_only`](/preflight/pinterest-media-single_only)
+- [`pinterest.media.image_only`](/preflight/pinterest-media-image_only)
+- [`pinterest.image.mime_allowed`](/preflight/pinterest-image-mime_allowed)
+- [`pinterest.image.size_max`](/preflight/pinterest-image-size_max)
+- [`pinterest.image_url.reachable`](/preflight/pinterest-image_url-reachable)
+- [`pinterest.destination_url.reachable`](/preflight/pinterest-destination_url-reachable)
+- [`pinterest.url.reachable`](/preflight/pinterest-url-reachable)
+
+### Twitter / X
+
+- [`twitter.text.non_empty`](/preflight/twitter-text-non_empty)
+- [`twitter.text.max_graphemes`](/preflight/twitter-text-max_graphemes)
+- [`twitter.media.single_only`](/preflight/twitter-media-single_only)
+- [`twitter.media.mime_allowed`](/preflight/twitter-media-mime_allowed)
+- [`twitter.media.image_size_max`](/preflight/twitter-media-image_size_max)
+- [`twitter.media.gif_size_max`](/preflight/twitter-media-gif_size_max)
+- [`twitter.media.video_size_max`](/preflight/twitter-media-video_size_max)
+
+### Cross-platform
+
+- [`media.unknown`](/preflight/media-unknown) — referenced media id doesn't exist or is out of scope.
+- [`media.bytes_inline_unsupported`](/preflight/media-bytes_inline_unsupported) — `bytesBase64` not allowed for this surface.
+- [`meta.container.expired`](/preflight/meta-container-expired) — IG/Threads container ttl exceeded.
+
+## Validation without publishing
+
+When `POST /v1/posts/validate` ships, you'll be able to run the same preflight without the upstream call — useful in CI or before queueing a scheduled post. Today, the same validation runs synchronously on `POST /v1/posts` and returns the rule id on the first failure.

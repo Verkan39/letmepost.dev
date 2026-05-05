@@ -1,0 +1,17 @@
+---
+title: pinterest.board.required
+description: A Pinterest pin needs a board id — either explicit or set as the account default.
+---
+
+## What it checks
+
+The pin must have a `boardId` — either provided in the request as `pinterest.boardId`, or set as the account's default board on the `platform_accounts` row.
+
+## Remediation
+
+Either:
+
+1. Pass `pinterest.boardId` on the request body, or
+2. Set a default board on the connected account (in the dashboard's **Accounts** page, or via the account update endpoint).
+
+If the connected account has no boards, the user needs to create one on Pinterest first. The `boards:write` scope lets the dashboard offer a "create your first board" flow.

@@ -1,0 +1,12 @@
+---
+title: pinterest.url.reachable
+description: Generic URL-reachable failure on Pinterest pin creation.
+---
+
+## What it checks
+
+Pinterest's create-pin endpoint returns a URL-not-reachable error in some edge cases that don't match the more specific [`pinterest.image_url.reachable`](/preflight/pinterest-image_url-reachable) or [`pinterest.destination_url.reachable`](/preflight/pinterest-destination_url-reachable) rules. We surface those as this generic rule.
+
+## Remediation
+
+Inspect `platformResponse` for the specific URL Pinterest couldn't fetch. The fix is the same — make it publicly reachable, or upload via [`POST /v1/media`](/guides/upload-media).

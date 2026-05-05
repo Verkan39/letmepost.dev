@@ -1,0 +1,34 @@
+---
+title: version.deprecated
+description: An upstream platform announced an API version sunset. We're migrating internally; this is informational.
+---
+
+Fires when an upstream platform announces a sunset for an API version we're pinned to. Most-cited example: LinkedIn sunset five API versions in six months from 2024–2025.
+
+This event is informational. **You do not need to act on it.** We pin the new version internally and migrate before the sunset. The event exists so integrators can render an "upcoming change" banner in their own UIs if they want — and so we have a public audit trail of every migration.
+
+## Payload
+
+```json
+{
+  "type": "version.deprecated",
+  "data": {
+    "platform": "linkedin",
+    "currentPin": "202504",
+    "nextPin": "202505",
+    "sunsetAt": "2026-08-01T00:00:00Z",
+    "announcedAt": "2026-05-04T15:30:00Z",
+    "migrationStatus": "in_flight",
+    "noticeUrl": "https://learn.microsoft.com/..."
+  }
+}
+```
+
+## Why we surface this
+
+The whole product principle of "API version abstraction" rests on the idea that *we* handle the migration, not you. This event makes that work legible from the outside — you can see when a migration is in flight and confirm your account isn't affected.
+
+## Related
+
+- `GET /v1/platform-versions` — the public version tracker, with current pins and pending migrations.
+- [Changelog](/changelog)

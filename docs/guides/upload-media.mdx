@@ -1,0 +1,94 @@
+---
+title: Media
+description: Three ways to attach media. Why mediaId is the production answer.
+---
+
+A post body's `media` array accepts three sources per item. Pick exactly one.
+
+| field         | what it is                            | when to use                                            |
+|---------------|---------------------------------------|--------------------------------------------------------|
+| `mediaId`     | reference to a `POST /v1/media` upload | production. Preferred — bytes already on our CDN.      |
+| `url`         | passthrough; we fetch from your CDN   | you host your own assets and want zero copies.         |
+| `bytesBase64` | inline base64                         | tiny images, scripts, tests. Don't use for video.      |
+
+## The mediaId path
+
+The two-step flow: upload bytes once, then reference them on every post that uses them. Latency at publish time stays low because the platform fetches from our CDN (or we already have the bytes).
+
+```bash upload.sh
+# Step 1 — upload.
+curl -X POST https://api.letmepost.dev/v1/media \\
+  -H "Authorization: Bearer $LMP_KEY" \\
+  -F file=@./hero.jpg
+
+# Response: { "id": "med_…", "url": "https://media.letmepost.dev/...", ... }
+```
+
+```json post-with-media.json
+{
+  "account": { "platform": "bluesky", "id": "..." },
+  "text": "shipped",
+  "media": [
+    { "kind": "image", "mediaId": "med_a1b2c3d4e5f6g7h8i9j0k1", "altText": "Status page screenshot" }
+  ]
+}
+```
+
+`mediaId` matches the regex `^med_[0-9A-Za-z]{22}$` — anything else fails request validation.
+
+## The url path
+
+Send a public URL we can `GET` anonymously:
+
+```json url.json
+{
+  "media": [
+    { "kind": "image", "url": "https://cdn.example.com/hero.jpg", "altText": "..." }
+  ]
+}
+```
+
+The URL **must be publicly reachable**. Google Drive share links, Dropbox preview URLs, and S3 buckets with object ACLs locked down will all fail — see [`instagram.media.reachable`](/preflight/instagram-media-reachable) for the canonical version of that failure (Instagram's `OAuthException 2207052`).
+
+When in doubt, upload via `POST /v1/media` and use `mediaId`.
+
+## The bytesBase64 path
+
+Inline base64. Convenient for tests and tiny assets:
+
+```json inline.json
+{
+  "media": [
+    { "kind": "image", "bytesBase64": "iVBORw0KGgoAAAANSUhEUgAAA...", "altText": "..." }
+  ]
+}
+```
+
+A few platforms refuse inline bytes outright (URL-only ingest paths). When that happens the response is [`media.bytes_inline_unsupported`](/preflight/media-bytes_inline_unsupported) — upload via `POST /v1/media` and switch to `mediaId`.
+
+## Per-platform constraints
+
+Each platform has its own ceilings. The full set is enforced in preflight; here's the headline shape:
+
+| platform   | image max | video max | mime allowed                        | carousel size |
+|------------|-----------|-----------|-------------------------------------|---------------|
+| Bluesky    | 976 KB    | 100 MB    | jpeg, png, webp, gif / mp4          | up to 4 imgs / 1 vid |
+| Threads    | 8 MB      | 1 GB      | jpeg, png, webp / mp4, mov          | 2–20 mixed    |
+| Instagram  | 8 MB      | 1 GB      | **jpeg only** / mp4, mov            | 2–10 mixed    |
+| Facebook   | 4 MB      | 4 GB      | jpeg, png / mp4, mov                | up to 10      |
+| Pinterest  | 20 MB     | —         | jpeg, png / —                       | single only   |
+| Twitter / X | 5 MB     | 512 MB    | jpeg, png, webp / mp4 (gif: 15 MB)  | single (v1)   |
+| LinkedIn   | (uploads handled per-asset by LinkedIn) | | | |
+
+The exact constants live in `packages/schemas/src/post.ts`. Each ceiling has a preflight rule with its own page; e.g. [`instagram.media.image_size_max`](/preflight/instagram-media-image_size_max).
+
+## Notes per platform
+
+- **Instagram is JPEG-only on the photo path.** PNG, WebP, HEIC, and GIF all surface as opaque IG `code 100` errors upstream — preflight catches them with [`instagram.media.mime_allowed`](/preflight/instagram-media-mime_allowed) and points you at the remediation.
+- **Bluesky enforces image-vs-video exclusivity.** A single post can have images *or* a video, not both. See [`bluesky.media.image_video_exclusive`](/preflight/bluesky-media-image_video_exclusive).
+- **Pinterest is single-image only in v1.** Multi-pin and video pins are deferred.
+- **Threads is the most permissive carousel.** 2–20 children, mixed images and videos.
+
+## Alt text
+
+Always provide `altText`. Most platforms cap it (Bluesky 2000, Instagram 2200, Threads 1000); see the per-rule pages for the exact ceiling.

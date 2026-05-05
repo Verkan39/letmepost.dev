@@ -1,0 +1,86 @@
+---
+title: Webhooks
+description: HMAC-signed deliveries for queued, validated, published, rejected, failed, token, and version events.
+---
+
+Register an HTTPS URL once via `POST /v1/webhook-endpoints` and we'll deliver signed JSON for every event. No polling.
+
+## Event types
+
+| event | when |
+|-------|------|
+| [`post.queued`](/webhooks/post-queued) | scheduled post accepted; job enqueued |
+| [`post.validated`](/webhooks/post-validated) | preflight passed (currently fired together with `post.queued` on schedule) |
+| [`post.published`](/webhooks/post-published) | upstream returned success |
+| [`post.rejected`](/webhooks/post-rejected) | preflight or platform rejected; not retried |
+| [`post.failed`](/webhooks/post-failed) | transient failure; the worker may retry |
+| [`token.expiring`](/webhooks/token-expiring) | platform token approaching expiry |
+| [`token.revoked`](/webhooks/token-revoked) | platform token rejected by upstream |
+| [`version.deprecated`](/webhooks/version-deprecated) | upstream platform announced an API version sunset |
+
+This list is canonical — see `WEBHOOK_EVENT_TYPES` in `packages/schemas/src/webhook-events.ts`. Adding an event is non-breaking; removing one is breaking and shows up in the [changelog](/changelog).
+
+## Envelope
+
+Every delivery has the same outer shape:
+
+```json envelope.json
+{
+  "id": "evt_01HY6X4AWBJM2K9F2PTQMRD9JQ",
+  "type": "post.published",
+  "createdAt": "2026-05-04T15:30:00.000Z",
+  "organizationId": "org_…",
+  "data": { /* event-specific shape — see per-event pages */ }
+}
+```
+
+The `data` field is the only thing that varies between event types. The envelope is stable so consumers can write one verifier and one router.
+
+## Signature verification
+
+Every delivery includes:
+
+```
+X-Letmepost-Signature: t=1715000000,v1=<hex hmac>
+X-Letmepost-Event: post.published
+X-Letmepost-Delivery: evt_01HY6X4AWBJM2K9F2PTQMRD9JQ
+Content-Type: application/json
+```
+
+`v1` is `HMAC-SHA256(secret, t + "." + raw_body)` in hex. Verify before parsing the body:
+
+```ts verify.ts
+import crypto from "node:crypto";
+
+function verify(rawBody: string, header: string, secret: string): boolean {
+  const parts = Object.fromEntries(
+    header.split(",").map((s) => s.split("=")),
+  ) as { t: string; v1: string };
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(\`\${parts.t}.\${rawBody}\`)
+    .digest("hex");
+  // Constant-time compare.
+  return crypto.timingSafeEqual(
+    Buffer.from(parts.v1, "hex"),
+    Buffer.from(expected, "hex"),
+  );
+}
+```
+
+Reject the request if verification fails. Accept the request even on duplicate `X-Letmepost-Delivery` ids — at-least-once is the contract.
+
+## Retries
+
+Delivery is retried with exponential backoff for any non-2xx response. After ~5 attempts the delivery is dropped and surfaces in the dashboard's webhook log.
+
+Respond `2xx` quickly — within 5 seconds. Defer your work to a background queue if it takes longer.
+
+## Replay window
+
+Reject deliveries where `t` is more than 5 minutes from `now`. That window catches replay attacks while tolerating clock skew.
+
+## See also
+
+- Per-event pages link from the table above for the exact `data` shape.
+- [`POST /v1/webhook-endpoints`](/api-reference/#post-/v1/webhook-endpoints) reference.

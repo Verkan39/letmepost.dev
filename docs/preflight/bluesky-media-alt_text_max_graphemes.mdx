@@ -1,0 +1,34 @@
+---
+title: bluesky.media.alt_text_max_graphemes
+description: Alt text caps at 2000 graphemes per media item.
+---
+
+## What it checks
+
+`countGraphemes(item.altText) <= 2000` for every media item that supplies `altText`.
+
+## Why
+
+Bluesky's `app.bsky.embed.images#image` schema's `alt` field is documented at 2000 graphemes. Same Unicode segmentation as the post-text rule.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "bluesky.media.alt_text_max_graphemes",
+    "platform": "bluesky",
+    "message": "Alt text is 2400 graphemes; Bluesky allows at most 2000.",
+    "remediation": "Shorten alt text to 2000 graphemes or fewer."
+  }
+}
+```
+
+## Remediation
+
+Tighten the description. Alt text is for accessibility — it should describe the image's content concisely, not act as a hidden caption.
+
+## Related
+
+- [`bluesky.text.max_graphemes`](/preflight/bluesky-text-max_graphemes) — same Unicode counter.

@@ -1,0 +1,35 @@
+---
+title: token.expiring
+description: A connected platform token is approaching expiry and cannot be auto-refreshed. The user must reconnect.
+---
+
+Fires before an unrefreshable platform token expires — at 7 days for LinkedIn (no refresh-token mechanism), and on equivalent windows for any other platform that doesn't support automatic refresh.
+
+For platforms with refresh tokens (Twitter, Facebook, Instagram, Pinterest, Threads), refresh runs silently on schedule — you won't see this event in the normal flow, only if a refresh attempt itself fails.
+
+## Payload
+
+```json
+{
+  "type": "token.expiring",
+  "data": {
+    "accountId": "...",
+    "profileId": "...",
+    "platform": "linkedin",
+    "platformAccountId": "...",
+    "displayName": "...",
+    "expiresAt": "2026-05-11T12:00:00Z",
+    "daysUntilExpiry": 7
+  }
+}
+```
+
+## Use it for
+
+- Email or in-app notification: "Your LinkedIn account needs to reconnect by Tuesday."
+- Trigger a re-auth flow before publishing breaks.
+
+## Related
+
+- [`token.revoked`](/webhooks/token-revoked) — already revoked.
+- [`platform_auth_failed`](/errors/platform_auth_failed) — the publish-time error if reconnect doesn't happen.

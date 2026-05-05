@@ -1,0 +1,41 @@
+---
+title: post.rejected
+description: Preflight failed, the platform rejected the post, or auth failed. Not retried.
+---
+
+Fires when the post will not be retried — preflight, platform rejection, or platform auth failure. Distinct from `post.failed`, which is a transient failure that the worker may retry.
+
+## Payload
+
+```json post.rejected.json
+{
+  "id": "evt_...",
+  "type": "post.rejected",
+  "data": {
+    "id": "post_...",
+    "platform": "instagram",
+    "accountId": "...",
+    "profileId": "...",
+    "error": {
+      "code": "preflight_failed",
+      "rule": "instagram.media.reachable",
+      "message": "Instagram couldn't fetch the media URL.",
+      "remediation": "Upload via POST /v1/media first..."
+    },
+    "rejectedAt": "2026-05-04T15:30:00Z"
+  }
+}
+```
+
+The `error` shape mirrors the API's HTTP error body. `code` is one of `preflight_failed`, `platform_auth_failed`, or `platform_rejected`.
+
+## Use it for
+
+- Surface "rejected" state in the post log.
+- Page the user with the remediation when their action is required.
+- Capture metrics on rule frequency — the most-fired rules become candidates for tighter local validation.
+
+## Related
+
+- [Errors](/errors) — the full error envelope.
+- [`post.failed`](/webhooks/post-failed) — the transient cousin.

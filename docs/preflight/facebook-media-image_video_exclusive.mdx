@@ -1,0 +1,25 @@
+---
+title: facebook.media.image_video_exclusive
+description: A Facebook Page post is either images-only or video-only. No mixing.
+---
+
+## What it checks
+
+`media` cannot contain both image and video items. Pages's `/photos` and `/videos` endpoints are mutually exclusive surfaces.
+
+## Failure response
+
+```json
+{
+  "error": {
+    "code": "preflight_failed",
+    "rule": "facebook.media.image_video_exclusive",
+    "platform": "facebook",
+    "message": "Cannot attach both images and video to the same Facebook post."
+  }
+}
+```
+
+## Remediation
+
+Split into two posts.

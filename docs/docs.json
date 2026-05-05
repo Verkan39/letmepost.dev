@@ -1,0 +1,293 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "maple",
+  "name": "letmepost.dev",
+  "description": "Open-source social media publishing API. Preflight validation, transparent errors, idempotency, stable platform versions.",
+  "colors": {
+    "primary": "#2D7652",
+    "light": "#53C68C",
+    "dark": "#185838"
+  },
+  "favicon": "/favicon.svg",
+  "styling": {
+    "codeblocks": "system"
+  },
+  "appearance": {
+    "default": "system"
+  },
+  "css": "/style.css",
+  "logo": {
+    "light": "/images/logo-light.svg",
+    "dark": "/images/logo-dark.svg",
+    "href": "https://letmepost.dev"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Overview",
+        "icon": "book-open",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": ["quickstart", "authentication", "idempotency", "errors/index", "preflight/index"]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/connect-account",
+              "guides/publish-post",
+              "guides/schedule-post",
+              "guides/upload-media",
+              "guides/self-host"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "webhooks/index",
+              "webhooks/post-queued",
+              "webhooks/post-validated",
+              "webhooks/post-published",
+              "webhooks/post-rejected",
+              "webhooks/post-failed",
+              "webhooks/token-expiring",
+              "webhooks/token-revoked",
+              "webhooks/version-deprecated"
+            ]
+          },
+          {
+            "group": "SDKs",
+            "pages": ["sdks/typescript", "sdks/python", "sdks/go"]
+          },
+          {
+            "group": "Tools",
+            "pages": ["cli", "mcp"]
+          },
+          {
+            "group": "Reference",
+            "pages": ["pricing", "changelog"]
+          }
+        ]
+      },
+      {
+        "tab": "Platforms",
+        "icon": "layers",
+        "pages": [
+          "platforms-overview",
+          "platforms/bluesky",
+          "platforms/threads",
+          "platforms/instagram",
+          "platforms/facebook",
+          "platforms/linkedin",
+          "platforms/pinterest",
+          "platforms/twitter"
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "icon": "code",
+        "openapi": {
+          "source": "/api-reference/openapi.json",
+          "directory": "api-reference"
+        }
+      },
+      {
+        "tab": "Resources",
+        "icon": "book",
+        "groups": [
+          {
+            "group": "Errors",
+            "pages": [
+              "errors/validation_failed",
+              "errors/preflight_failed",
+              "errors/platform_auth_failed",
+              "errors/platform_rejected",
+              "errors/platform_unavailable",
+              "errors/internal_error",
+              "errors/unauthenticated",
+              "errors/unauthorized",
+              "errors/not_found",
+              "errors/idempotency_conflict",
+              "errors/rate_limited"
+            ]
+          },
+          {
+            "group": "Preflight rules",
+            "pages": [
+              {
+                "group": "Bluesky",
+                "pages": [
+                  "preflight/bluesky-text-non_empty",
+                  "preflight/bluesky-text-max_graphemes",
+                  "preflight/bluesky-media-image_video_exclusive",
+                  "preflight/bluesky-media-count_max",
+                  "preflight/bluesky-media-alt_text_max_graphemes",
+                  "preflight/bluesky-media-mime_allowed",
+                  "preflight/bluesky-media-image_size_max",
+                  "preflight/bluesky-media-video_size_max",
+                  "preflight/bluesky-first_comment-non_empty",
+                  "preflight/bluesky-first_comment-max_graphemes"
+                ]
+              },
+              {
+                "group": "Threads",
+                "pages": [
+                  "preflight/threads-text-required",
+                  "preflight/threads-text-max_graphemes",
+                  "preflight/threads-media-count_max",
+                  "preflight/threads-media-alt_text_max_graphemes",
+                  "preflight/threads-media-mime_allowed",
+                  "preflight/threads-media-image_size_max",
+                  "preflight/threads-media-video_size_max",
+                  "preflight/threads-container-expired",
+                  "preflight/threads-container-error"
+                ]
+              },
+              {
+                "group": "Instagram",
+                "pages": [
+                  "preflight/instagram-media-required",
+                  "preflight/instagram-text-max_graphemes",
+                  "preflight/instagram-media-count_max",
+                  "preflight/instagram-media-alt_text_max_graphemes",
+                  "preflight/instagram-media-mime_allowed",
+                  "preflight/instagram-media-image_size_max",
+                  "preflight/instagram-media-video_size_max",
+                  "preflight/instagram-media-reachable",
+                  "preflight/instagram-media-aspect_ratio"
+                ]
+              },
+              {
+                "group": "Facebook",
+                "pages": [
+                  "preflight/facebook-text-required",
+                  "preflight/facebook-text-max_graphemes",
+                  "preflight/facebook-media-image_video_exclusive",
+                  "preflight/facebook-media-count_max",
+                  "preflight/facebook-media-mime_allowed",
+                  "preflight/facebook-media-image_size_max",
+                  "preflight/facebook-media-video_size_max",
+                  "preflight/facebook-pages-none"
+                ]
+              },
+              {
+                "group": "LinkedIn",
+                "pages": [
+                  "preflight/linkedin-text-non_empty",
+                  "preflight/linkedin-text-max_graphemes",
+                  "preflight/linkedin-author-org_not_supported",
+                  "preflight/linkedin-author-urn_format",
+                  "preflight/linkedin-author-unresolved",
+                  "preflight/linkedin-visibility-enum"
+                ]
+              },
+              {
+                "group": "Pinterest",
+                "pages": [
+                  "preflight/pinterest-board-required",
+                  "preflight/pinterest-media-required",
+                  "preflight/pinterest-media-single_only",
+                  "preflight/pinterest-media-image_only",
+                  "preflight/pinterest-image-mime_allowed",
+                  "preflight/pinterest-image-size_max",
+                  "preflight/pinterest-image_url-reachable",
+                  "preflight/pinterest-destination_url-reachable",
+                  "preflight/pinterest-url-reachable"
+                ]
+              },
+              {
+                "group": "Twitter / X",
+                "pages": [
+                  "preflight/twitter-text-non_empty",
+                  "preflight/twitter-text-max_graphemes",
+                  "preflight/twitter-media-single_only",
+                  "preflight/twitter-media-mime_allowed",
+                  "preflight/twitter-media-image_size_max",
+                  "preflight/twitter-media-gif_size_max",
+                  "preflight/twitter-media-video_size_max"
+                ]
+              },
+              {
+                "group": "Cross-platform",
+                "pages": [
+                  "preflight/media-unknown",
+                  "preflight/media-bytes_inline_unsupported",
+                  "preflight/meta-container-expired"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/letmepost/letmepost.dev",
+        "icon": "github",
+        "iconType": "brands"
+      },
+      {
+        "label": "X",
+        "href": "https://x.com/letmepostdotdev",
+        "icon": "x-twitter",
+        "iconType": "brands"
+      },
+      {
+        "label": "llms.txt",
+        "href": "/llms.txt",
+        "icon": "file-lines"
+      },
+      {
+        "label": "OpenAPI",
+        "href": "/api-reference/openapi.json",
+        "icon": "download"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Dashboard",
+      "href": "https://dashboard.letmepost.dev"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/rosekamallove/letmepost.dev",
+      "x": "https://x.com/letmepostdotdev"
+    },
+    "links": [
+      {
+        "header": "Product",
+        "items": [
+          { "label": "Landing", "href": "https://letmepost.dev" },
+          { "label": "Status", "href": "https://letmepost.dev/status" },
+          { "label": "Changelog", "href": "/changelog" }
+        ]
+      },
+      {
+        "header": "Resources",
+        "items": [
+          { "label": "OpenAPI spec", "href": "/api-reference/openapi.json" },
+          { "label": "llms.txt", "href": "/llms.txt" },
+          { "label": "GitHub", "href": "https://github.com/rosekamallove/letmepost.dev" }
+        ]
+      },
+      {
+        "header": "Legal",
+        "items": [
+          { "label": "Privacy", "href": "https://letmepost.dev/privacy" },
+          { "label": "Terms", "href": "https://letmepost.dev/terms" },
+          { "label": "Data deletion", "href": "https://letmepost.dev/data-deletion" }
+        ]
+      }
+    ]
+  },
+  "contextual": {
+    "options": ["copy", "view", "chatgpt", "claude"]
+  },
+  "search": {
+    "prompt": "Search docs..."
+  }
+}

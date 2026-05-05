@@ -1,0 +1,66 @@
+---
+title: Pinterest
+description: Pinterest v5 API. Single-image pins in v1; carousels and video pins ship later.
+icon: pinterest
+iconType: brands
+---
+
+Pinterest v5 API. The connect flow doubles as the cheapest integration in v1 — the API is well-documented, OAuth is standard, and the publish surface is small.
+
+## Connect
+
+`POST /v1/accounts/connect/pinterest`. OAuth 2.0. After complete we call `GET /v5/user_account` to pin the platform_account_id to the real Pinterest user.
+
+## Scopes
+
+```
+boards:read       — read the caller's boards
+boards:write      — create boards from the dashboard
+pins:read         — required alongside pins:write because some endpoints echo the pin back
+pins:write        — create pins
+user_accounts:read — required to mint the platform_account_id at connect
+```
+
+Extended: `pins:read_secret` (off by default) for callers that publish to secret boards.
+
+## Token lifecycle
+
+30-day access tokens, refreshable. We refresh ~24 h before expiry; subscribe to [`token.expiring`](/webhooks/token-expiring).
+
+## Posting
+
+```json pin.json
+{
+  "account": { "platform": "pinterest", "id": "..." },
+  "text": "Pin description",
+  "media": [{ "kind": "image", "mediaId": "med_…" }],
+  "pinterest": {
+    "boardId": "<board id>",
+    "destinationUrl": "https://example.com/blog-post",
+    "title": "Pin title"
+  }
+}
+```
+
+The `pinterest` extension is optional. If you set a default board on the account, `pinterest.boardId` can be omitted; if you don't supply `destinationUrl` we fall back to the image's letmepost URL.
+
+## Constraints
+
+- Single image only in v1 ([`pinterest.media.single_only`](/preflight/pinterest-media-single_only))
+- Image-only ([`pinterest.media.image_only`](/preflight/pinterest-media-image_only))
+- Image mimes: jpeg, png ([`pinterest.image.mime_allowed`](/preflight/pinterest-image-mime_allowed))
+- Image size: 20 MB max ([`pinterest.image.size_max`](/preflight/pinterest-image-size_max))
+- Image URL must be reachable ([`pinterest.image_url.reachable`](/preflight/pinterest-image_url-reachable))
+- Destination URL must be reachable ([`pinterest.destination_url.reachable`](/preflight/pinterest-destination_url-reachable))
+
+## Preflight rules
+
+- [`pinterest.board.required`](/preflight/pinterest-board-required)
+- [`pinterest.media.required`](/preflight/pinterest-media-required)
+- [`pinterest.media.single_only`](/preflight/pinterest-media-single_only)
+- [`pinterest.media.image_only`](/preflight/pinterest-media-image_only)
+- [`pinterest.image.mime_allowed`](/preflight/pinterest-image-mime_allowed)
+- [`pinterest.image.size_max`](/preflight/pinterest-image-size_max)
+- [`pinterest.image_url.reachable`](/preflight/pinterest-image_url-reachable)
+- [`pinterest.destination_url.reachable`](/preflight/pinterest-destination_url-reachable)
+- [`pinterest.url.reachable`](/preflight/pinterest-url-reachable)

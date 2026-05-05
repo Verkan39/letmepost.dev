@@ -370,4 +370,141 @@ describeIfDb("POST /v1/posts (pinterest)", () => {
       expect(row?.status).toBe("rejected");
     });
   });
+
+  it("publishes a video pin via register-media + S3 upload + status poll + createPin", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const { fixture, account } = await seedWithPinterest(tx);
+      const calls = {
+        coverHead: 0,
+        registerMedia: 0,
+        s3Upload: 0,
+        statusGet: 0,
+        createPin: 0,
+      };
+      let pinBody: Record<string, unknown> | null = null;
+      server.use(
+        // Cover image preflight reachability — Pinterest mandates the
+        // cover frame URL be publicly fetchable.
+        http.get("https://example.com/cover.jpg", () => {
+          calls.coverHead += 1;
+          return new HttpResponse(null, {
+            status: 200,
+            headers: { "Content-Type": "image/jpeg" },
+          });
+        }),
+        // POST /v5/media → register a slot. Returns presigned S3 endpoint.
+        http.post(
+          "https://api.pinterest.com/v5/media",
+          () => {
+            calls.registerMedia += 1;
+            return HttpResponse.json({
+              media_id: "vid-media-1",
+              media_type: "video",
+              upload_url: "https://pinterest-uploads.s3.example.com/upload",
+              upload_parameters: {
+                "x-amz-signature": "fake-sig",
+                "x-amz-date": "20260505T000000Z",
+                policy: "fake-policy",
+                key: "uploads/vid-media-1",
+              },
+            });
+          },
+        ),
+        // S3 multipart upload — returns 204 No Content on success.
+        http.post(
+          "https://pinterest-uploads.s3.example.com/upload",
+          () => {
+            calls.s3Upload += 1;
+            return new HttpResponse(null, { status: 204 });
+          },
+        ),
+        // GET /v5/media/{id} — first call processing, second succeeded.
+        http.get(
+          "https://api.pinterest.com/v5/media/vid-media-1",
+          () => {
+            calls.statusGet += 1;
+            return HttpResponse.json({
+              media_id: "vid-media-1",
+              media_type: "video",
+              status: calls.statusGet === 1 ? "processing" : "succeeded",
+            });
+          },
+        ),
+        http.post(
+          "https://api.pinterest.com/v5/pins",
+          async ({ request }) => {
+            calls.createPin += 1;
+            pinBody = (await request.json()) as Record<string, unknown>;
+            return HttpResponse.json({
+              id: "pin-vid-1",
+              board_id: "board-abc",
+              link: "https://www.pinterest.com/pin/pin-vid-1/",
+            });
+          },
+        ),
+      );
+
+      const app = createApp({ db: tx });
+      const res = await app.request("/v1/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+        },
+        body: JSON.stringify({
+          account: { platform: "pinterest", id: account.id },
+          text: "video pin",
+          media: [{ kind: "video", bytesBase64: "AAAAAAAAAAA=" }],
+          pinterest: {
+            coverImageUrl: "https://example.com/cover.jpg",
+          },
+        }),
+      });
+
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as { id: string; platform: string };
+      expect(body.platform).toBe("pinterest");
+      expect(calls.coverHead).toBeGreaterThanOrEqual(1);
+      expect(calls.registerMedia).toBe(1);
+      expect(calls.s3Upload).toBe(1);
+      expect(calls.statusGet).toBeGreaterThanOrEqual(2);
+      expect(calls.createPin).toBe(1);
+      expect(pinBody).toMatchObject({
+        board_id: "board-abc",
+        media_source: {
+          source_type: "video_id",
+          media_id: "vid-media-1",
+          cover_image_url: "https://example.com/cover.jpg",
+        },
+      });
+    });
+  });
+
+  it("rejects a video pin without a coverImageUrl (preflight_failed, no upstream call)", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const { fixture, account } = await seedWithPinterest(tx);
+      // No MSW handlers — any upstream call would raise.
+      const app = createApp({ db: tx });
+      const res = await app.request("/v1/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+        },
+        body: JSON.stringify({
+          account: { platform: "pinterest", id: account.id },
+          text: "missing cover",
+          media: [{ kind: "video", bytesBase64: "AAAAAAAAAAA=" }],
+        }),
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as {
+        error: { code: string; rule?: string };
+      };
+      expect(body.error.code).toBe("preflight_failed");
+      expect(body.error.rule).toBe("pinterest.video.cover_required");
+    });
+  });
 });

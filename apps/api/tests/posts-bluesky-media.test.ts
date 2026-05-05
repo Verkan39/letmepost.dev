@@ -169,23 +169,72 @@ describeIfDb("POST /v1/posts (bluesky, media)", () => {
     });
   });
 
-  it("publishes a single video", async () => {
+  it("publishes a single video through the video service (poll path)", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
       const fixture = await seed(tx);
+      let pollCalls = 0;
       server.use(
         sessionHandler(),
-        http.post(
-          "https://bsky.social/xrpc/com.atproto.repo.uploadBlob",
+        // Service auth mint on the user's PDS — narrow-scoped JWT for the
+        // video service. The Bluesky video service identifies as the
+        // `did:web:video.bsky.app` audience.
+        http.get(
+          "https://bsky.social/xrpc/com.atproto.server.getServiceAuth",
+          () => HttpResponse.json({ token: "service-auth-jwt" }),
+        ),
+        // getUploadLimits — best-effort, allow.
+        http.get(
+          "https://video.bsky.app/xrpc/app.bsky.video.getUploadLimits",
           () =>
             HttpResponse.json({
-              blob: {
-                $type: "blob",
-                ref: { $link: "bafkreivid" },
-                mimeType: "video/mp4",
-                size: 999,
+              canUpload: true,
+              remainingDailyVideos: 25,
+              remainingDailyBytes: 5_000_000_000,
+            }),
+        ),
+        // Initial upload returns CREATED with a jobId.
+        http.post(
+          "https://video.bsky.app/xrpc/app.bsky.video.uploadVideo",
+          () =>
+            HttpResponse.json({
+              jobStatus: {
+                jobId: "job-123",
+                did: "did:plc:test",
+                state: "JOB_STATE_CREATED",
               },
             }),
+        ),
+        // Job status: first call returns IN_PROGRESS, second returns COMPLETED
+        // with the blob. Mirrors a typical 1-2-poll transcode for a tiny file.
+        http.get(
+          "https://video.bsky.app/xrpc/app.bsky.video.getJobStatus",
+          () => {
+            pollCalls += 1;
+            if (pollCalls === 1) {
+              return HttpResponse.json({
+                jobStatus: {
+                  jobId: "job-123",
+                  did: "did:plc:test",
+                  state: "JOB_STATE_ENCODING_IN_PROGRESS",
+                  progress: 50,
+                },
+              });
+            }
+            return HttpResponse.json({
+              jobStatus: {
+                jobId: "job-123",
+                did: "did:plc:test",
+                state: "JOB_STATE_COMPLETED",
+                blob: {
+                  $type: "blob",
+                  ref: { $link: "bafkreivid" },
+                  mimeType: "video/mp4",
+                  size: 999,
+                },
+              },
+            });
+          },
         ),
         createRecordOk("at://did:plc:test/app.bsky.feed.post/video", "bafy-video"),
       );
@@ -215,6 +264,183 @@ describeIfDb("POST /v1/posts (bluesky, media)", () => {
       expect(res.status).toBe(201);
       const body = (await res.json()) as { cid?: string };
       expect(body.cid).toBe("bafy-video");
+      expect(pollCalls).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  it("short-circuits when the video service returns COMPLETED on first response (dedupe path)", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+      let jobStatusCalls = 0;
+      server.use(
+        sessionHandler(),
+        http.get(
+          "https://bsky.social/xrpc/com.atproto.server.getServiceAuth",
+          () => HttpResponse.json({ token: "service-auth-jwt" }),
+        ),
+        http.get(
+          "https://video.bsky.app/xrpc/app.bsky.video.getUploadLimits",
+          () => HttpResponse.json({ canUpload: true }),
+        ),
+        // Bluesky dedupes identical re-uploads — flips straight to COMPLETED
+        // with the blob already attached.
+        http.post(
+          "https://video.bsky.app/xrpc/app.bsky.video.uploadVideo",
+          () =>
+            HttpResponse.json({
+              jobStatus: {
+                jobId: "job-dedupe",
+                did: "did:plc:test",
+                state: "JOB_STATE_COMPLETED",
+                blob: {
+                  $type: "blob",
+                  ref: { $link: "bafkreivid-dedupe" },
+                  mimeType: "video/mp4",
+                  size: 999,
+                },
+              },
+            }),
+        ),
+        http.get(
+          "https://video.bsky.app/xrpc/app.bsky.video.getJobStatus",
+          () => {
+            jobStatusCalls += 1;
+            return HttpResponse.json({ jobStatus: {} });
+          },
+        ),
+        createRecordOk(
+          "at://did:plc:test/app.bsky.feed.post/dedupe",
+          "bafy-dedupe",
+        ),
+      );
+
+      const app = createApp({ db: tx });
+      const res = await app.request("/v1/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+        },
+        body: JSON.stringify({
+          account: { platform: "bluesky", id: fixture.accountId },
+          text: "dedupe video",
+          media: [{ kind: "video", bytesBase64: "AAAAAAAAAAA=" }],
+        }),
+      });
+
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as { cid?: string };
+      expect(body.cid).toBe("bafy-dedupe");
+      expect(jobStatusCalls).toBe(0);
+    });
+  });
+
+  it("surfaces JOB_STATE_FAILED as platform_rejected with bluesky.video.job_failed", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+      server.use(
+        sessionHandler(),
+        http.get(
+          "https://bsky.social/xrpc/com.atproto.server.getServiceAuth",
+          () => HttpResponse.json({ token: "service-auth-jwt" }),
+        ),
+        http.get(
+          "https://video.bsky.app/xrpc/app.bsky.video.getUploadLimits",
+          () => HttpResponse.json({ canUpload: true }),
+        ),
+        http.post(
+          "https://video.bsky.app/xrpc/app.bsky.video.uploadVideo",
+          () =>
+            HttpResponse.json({
+              jobStatus: {
+                jobId: "job-fail",
+                did: "did:plc:test",
+                state: "JOB_STATE_CREATED",
+              },
+            }),
+        ),
+        http.get(
+          "https://video.bsky.app/xrpc/app.bsky.video.getJobStatus",
+          () =>
+            HttpResponse.json({
+              jobStatus: {
+                jobId: "job-fail",
+                did: "did:plc:test",
+                state: "JOB_STATE_FAILED",
+                error: "TranscodeError",
+                message: "Unsupported codec.",
+              },
+            }),
+        ),
+      );
+
+      const app = createApp({ db: tx });
+      const res = await app.request("/v1/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+        },
+        body: JSON.stringify({
+          account: { platform: "bluesky", id: fixture.accountId },
+          text: "bad video",
+          media: [{ kind: "video", bytesBase64: "AAAAAAAAAAA=" }],
+        }),
+      });
+
+      expect(res.status).toBe(502);
+      const body = (await res.json()) as {
+        error: { code: string; rule?: string };
+      };
+      expect(body.error.code).toBe("platform_rejected");
+      expect(body.error.rule).toBe("bluesky.video.job_failed");
+    });
+  });
+
+  it("rejects when the video service reports the user is out of daily quota", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+      server.use(
+        sessionHandler(),
+        http.get(
+          "https://bsky.social/xrpc/com.atproto.server.getServiceAuth",
+          () => HttpResponse.json({ token: "service-auth-jwt" }),
+        ),
+        http.get(
+          "https://video.bsky.app/xrpc/app.bsky.video.getUploadLimits",
+          () =>
+            HttpResponse.json({
+              canUpload: false,
+              message: "Daily video upload limit reached.",
+              remainingDailyVideos: 0,
+              remainingDailyBytes: 0,
+            }),
+        ),
+      );
+
+      const app = createApp({ db: tx });
+      const res = await app.request("/v1/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+        },
+        body: JSON.stringify({
+          account: { platform: "bluesky", id: fixture.accountId },
+          text: "quota out",
+          media: [{ kind: "video", bytesBase64: "AAAAAAAAAAA=" }],
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as {
+        error: { code: string; rule?: string };
+      };
+      expect(body.error.code).toBe("preflight_failed");
+      expect(body.error.rule).toBe("bluesky.video.quota_exhausted");
     });
   });
 

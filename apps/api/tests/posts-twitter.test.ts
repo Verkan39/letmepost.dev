@@ -228,6 +228,169 @@ describeIfDb("POST /v1/posts (twitter)", () => {
     });
   });
 
+  it("uploads video via INIT/APPEND/FINALIZE/STATUS chunked path and tweets", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const { fixture, account } = await seedWithTwitter(tx);
+      // 6 MB of zeros — larger than the 4 MB chunk size, so we'll see
+      // exactly two APPEND calls.
+      const videoBytes = new Uint8Array(6 * 1024 * 1024);
+      const calls = {
+        init: 0,
+        append: 0,
+        finalize: 0,
+        status: 0,
+      };
+      server.use(
+        // INIT, APPEND, FINALIZE all hit the same URL with different
+        // `command` values. Branch in the handler so we can assert each
+        // ran.
+        http.post(
+          "https://upload.twitter.com/1.1/media/upload.json",
+          async ({ request }) => {
+            const ct = request.headers.get("content-type") ?? "";
+            if (ct.includes("multipart/form-data")) {
+              calls.append += 1;
+              return new HttpResponse(null, { status: 204 });
+            }
+            const text = await request.text();
+            const params = new URLSearchParams(text);
+            const command = params.get("command");
+            if (command === "INIT") {
+              calls.init += 1;
+              return HttpResponse.json({ media_id_string: "vid-1234" });
+            }
+            if (command === "FINALIZE") {
+              calls.finalize += 1;
+              return HttpResponse.json({
+                media_id_string: "vid-1234",
+                processing_info: {
+                  state: "in_progress",
+                  check_after_secs: 1,
+                  progress_percent: 30,
+                },
+              });
+            }
+            return HttpResponse.json(
+              { error: `unknown command: ${command}` },
+              { status: 400 },
+            );
+          },
+        ),
+        http.get(
+          "https://upload.twitter.com/1.1/media/upload.json",
+          () => {
+            calls.status += 1;
+            return HttpResponse.json({
+              media_id_string: "vid-1234",
+              processing_info: {
+                state: "succeeded",
+                progress_percent: 100,
+              },
+            });
+          },
+        ),
+        http.post("https://api.twitter.com/2/tweets", () =>
+          HttpResponse.json({
+            data: { id: "1700000099", text: "video tweet" },
+          }),
+        ),
+      );
+
+      const app = createApp({ db: tx });
+      const res = await app.request("/v1/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+        },
+        body: JSON.stringify({
+          account: { platform: "twitter", id: account.id },
+          text: "video tweet",
+          media: [
+            {
+              kind: "video",
+              bytesBase64: Buffer.from(videoBytes).toString("base64"),
+            },
+          ],
+        }),
+      });
+
+      expect(res.status).toBe(201);
+      expect(calls.init).toBe(1);
+      // 6 MB / 4 MB chunk size → 2 APPEND calls (4 MB + 2 MB).
+      expect(calls.append).toBe(2);
+      expect(calls.finalize).toBe(1);
+      // FINALIZE returned in_progress → at least one STATUS poll.
+      expect(calls.status).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  it("surfaces a failed video transcode as platform_rejected with a remediation", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const { fixture, account } = await seedWithTwitter(tx);
+      const videoBytes = new Uint8Array(1024); // tiny — single APPEND.
+      server.use(
+        http.post(
+          "https://upload.twitter.com/1.1/media/upload.json",
+          async ({ request }) => {
+            const ct = request.headers.get("content-type") ?? "";
+            if (ct.includes("multipart/form-data")) {
+              return new HttpResponse(null, { status: 204 });
+            }
+            const text = await request.text();
+            const params = new URLSearchParams(text);
+            const command = params.get("command");
+            if (command === "INIT") {
+              return HttpResponse.json({ media_id_string: "vid-fail" });
+            }
+            if (command === "FINALIZE") {
+              return HttpResponse.json({
+                media_id_string: "vid-fail",
+                processing_info: {
+                  state: "failed",
+                  error: {
+                    code: 3,
+                    name: "InvalidMedia",
+                    message: "The video is invalid.",
+                  },
+                },
+              });
+            }
+            return HttpResponse.json({}, { status: 400 });
+          },
+        ),
+      );
+
+      const app = createApp({ db: tx });
+      const res = await app.request("/v1/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+        },
+        body: JSON.stringify({
+          account: { platform: "twitter", id: account.id },
+          text: "bad video",
+          media: [
+            {
+              kind: "video",
+              bytesBase64: Buffer.from(videoBytes).toString("base64"),
+            },
+          ],
+        }),
+      });
+
+      expect(res.status).toBe(502);
+      const body = (await res.json()) as {
+        error: { code: string; rule?: string };
+      };
+      expect(body.error.code).toBe("platform_rejected");
+      expect(body.error.rule).toBe("twitter.media.video_processing_failed");
+    });
+  });
+
   it("marks row failed + emits post.failed when X is unreachable (network error)", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {

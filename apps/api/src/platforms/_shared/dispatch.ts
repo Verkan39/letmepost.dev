@@ -68,10 +68,19 @@ export async function publishForAccount(
       if (input.mediaContext !== undefined) {
         blueskyInput.mediaContext = input.mediaContext;
       }
-      return blueskyPublisher.publish(
-        { handle: account.platformAccountId, appPassword: account.token },
-        blueskyInput,
-      );
+      // Pull the user's PDS off tokenMetadata so self-hosted PDSes route
+      // service-auth + image uploads correctly. The video service base
+      // remains the canonical bsky.app endpoint regardless of PDS — it's
+      // a single shared service across the network.
+      const meta = (account.tokenMetadata ?? {}) as { pdsUrl?: string };
+      const blueskyCreds: Parameters<typeof blueskyPublisher.publish>[0] = {
+        handle: account.platformAccountId,
+        appPassword: account.token,
+      };
+      if (typeof meta.pdsUrl === "string" && meta.pdsUrl.length > 0) {
+        blueskyCreds.pdsUrl = meta.pdsUrl;
+      }
+      return blueskyPublisher.publish(blueskyCreds, blueskyInput);
     }
     case "linkedin": {
       const meta = (account.tokenMetadata ?? {}) as Record<string, unknown>;
@@ -204,6 +213,9 @@ export async function publishForAccount(
             : {}),
           ...(input.pinterest?.title !== undefined
             ? { title: input.pinterest.title }
+            : {}),
+          ...(input.pinterest?.coverImageUrl !== undefined
+            ? { coverImageUrl: input.pinterest.coverImageUrl }
             : {}),
           ...(input.mediaContext !== undefined
             ? { mediaContext: input.mediaContext }

@@ -1,5 +1,6 @@
 import {
   PINTEREST_IMAGE_MAX_BYTES,
+  PINTEREST_VIDEO_MAX_BYTES,
   type MediaInput,
 } from "@letmepost/schemas";
 import { LetmepostError } from "../../errors.js";
@@ -11,6 +12,12 @@ const ALLOWED_IMAGE_MIMES = new Set<string>([
   "image/jpeg",
   "image/png",
   "image/webp",
+]);
+
+const ALLOWED_VIDEO_MIMES = new Set<string>([
+  "video/mp4",
+  "video/quicktime",
+  "video/m4v",
 ]);
 
 /**
@@ -28,8 +35,14 @@ export interface PinterestPublishInput {
   destinationUrl?: string;
   /** Optional pin title. */
   title?: string;
-  /** Single media item — image MVP. Multi-image and video land in Phase 11. */
+  /** Single media item — image OR video. Multi-image carousel deferred. */
   media: MediaInput[];
+  /**
+   * REQUIRED for video pins. Pinterest mandates a public still-frame URL
+   * shown before video play. We surface a clean preflight error if absent
+   * rather than letting Pinterest's createPin 400 with a vague message.
+   */
+  coverImageUrl?: string;
 }
 
 /**
@@ -72,16 +85,23 @@ export function validatePinterestInput(input: PinterestPublishInput): void {
     });
   }
   const item = input.media[0]!;
-  if (item.kind !== "image") {
-    throw new LetmepostError({
-      code: "preflight_failed",
-      status: 400,
-      message: "Pinterest MVP supports image pins only.",
-      rule: "pinterest.media.image_only",
-      platform: PLATFORM,
-      remediation:
-        "Use kind: \"image\". Video pins land in Phase 11 once core publishing is locked.",
-    });
+  // Video pins require a publicly reachable cover image — that's
+  // Pinterest's hard requirement, not ours. Catch it here instead of
+  // letting createPin 400 with a vague message.
+  if (item.kind === "video") {
+    if (!input.coverImageUrl) {
+      throw new LetmepostError({
+        code: "preflight_failed",
+        status: 400,
+        message:
+          "Pinterest video pins require a cover image — the still frame shown before play.",
+        rule: "pinterest.video.cover_required",
+        platform: PLATFORM,
+        remediation:
+          "Pass `pinterest: { coverImageUrl: '<public-https-url>' }` on the request body.",
+      });
+    }
+    assertHttpUrl(input.coverImageUrl, "pinterest.cover_image_url.http");
   }
 
   if (input.destinationUrl !== undefined) {
@@ -171,6 +191,66 @@ export async function assertPinterestUrlsReachable(input: {
         remediation: `Re-encode under ${PINTEREST_IMAGE_MAX_BYTES} bytes (20 MB).`,
       });
     }
+  }
+}
+
+/**
+ * Byte-aware preflight for the resolved video bytes. Pinterest only
+ * publishes the resulting media_id, so size + mime checks happen here
+ * (no upstream HEAD; we own the bytes).
+ */
+export function validatePinterestVideoBytes(input: {
+  mimeType: string;
+  byteLength: number;
+}): void {
+  if (!ALLOWED_VIDEO_MIMES.has(input.mimeType)) {
+    throw new LetmepostError({
+      code: "preflight_failed",
+      status: 400,
+      message: `Video mime type '${input.mimeType}' is not allowed on Pinterest.`,
+      rule: "pinterest.video.mime_allowed",
+      platform: PLATFORM,
+      remediation: `Use one of: ${[...ALLOWED_VIDEO_MIMES].join(", ")}.`,
+    });
+  }
+  if (input.byteLength > PINTEREST_VIDEO_MAX_BYTES) {
+    throw new LetmepostError({
+      code: "preflight_failed",
+      status: 400,
+      message: `Video is ${input.byteLength} bytes; Pinterest allows at most ${PINTEREST_VIDEO_MAX_BYTES}.`,
+      rule: "pinterest.video.size_max",
+      platform: PLATFORM,
+      remediation: `Compress under ${PINTEREST_VIDEO_MAX_BYTES} bytes (~2 GB).`,
+    });
+  }
+}
+
+/**
+ * Verify the cover image URL points to a publicly reachable image.
+ * Pinterest's createPin will 400 with a generic message if the cover
+ * is unreachable — better to surface it here with a clear rule.
+ */
+export async function assertPinterestCoverImageReachable(
+  coverImageUrl: string,
+): Promise<void> {
+  const res = await fetchAndAssertOk(coverImageUrl, {
+    rule: "pinterest.cover_image_url.reachable",
+    remediation:
+      "Pinterest must be able to fetch the cover image URL; verify it is public and returns 2xx.",
+  });
+  const contentType = (res.headers.get("content-type") ?? "")
+    .split(";")[0]!
+    .trim()
+    .toLowerCase();
+  if (contentType && !ALLOWED_IMAGE_MIMES.has(contentType)) {
+    throw new LetmepostError({
+      code: "preflight_failed",
+      status: 400,
+      message: `Cover image mime type '${contentType}' is not allowed on Pinterest.`,
+      rule: "pinterest.cover_image.mime_allowed",
+      platform: PLATFORM,
+      remediation: `Use one of: ${[...ALLOWED_IMAGE_MIMES].join(", ")}.`,
+    });
   }
 }
 

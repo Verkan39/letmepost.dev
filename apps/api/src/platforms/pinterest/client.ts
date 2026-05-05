@@ -48,8 +48,41 @@ export interface PinterestCreatePinInput {
   title?: string;
   /** Pin description / caption. */
   description?: string;
-  /** Public image URL. MVP: single image only. */
-  imageUrl: string;
+  /** Public image URL. Set this for image pins; mutually exclusive with `videoMediaId`. */
+  imageUrl?: string;
+  /**
+   * Pinterest media id from `POST /v5/media` after a successful video
+   * upload. Set this for video pins; mutually exclusive with `imageUrl`.
+   */
+  videoMediaId?: string;
+  /** Required when `videoMediaId` is set — public still-frame URL for the pin. */
+  coverImageUrl?: string;
+}
+
+/**
+ * Upload-target descriptor returned by `POST /v5/media` when registering
+ * a new video. Pinterest hands us a presigned S3 endpoint + the form
+ * fields we have to echo back on the multipart upload — none of the
+ * fields are documented as stable, so we pass the bag through verbatim.
+ */
+export interface PinterestRegisterMediaResponse {
+  media_id: string;
+  media_type: "video";
+  upload_url: string;
+  upload_parameters: Record<string, string>;
+}
+
+export type PinterestMediaStatus =
+  | "registered"
+  | "processing"
+  | "succeeded"
+  | "failed";
+
+/** Subset of `GET /v5/media/{id}` we read while polling. */
+export interface PinterestMedia {
+  media_id: string;
+  media_type: "image" | "video";
+  status: PinterestMediaStatus;
 }
 
 export interface PinterestPin {
@@ -96,13 +129,29 @@ export class PinterestClient {
    *   - other non-2xx        → platform_rejected
    */
   async createPin(input: PinterestCreatePinInput): Promise<PinterestPin> {
+    // Branch the media_source shape based on whether this is an image or
+    // video pin. Both source types live on the same /v5/pins endpoint —
+    // Pinterest infers the pin type from the source_type alone.
+    const mediaSource: Record<string, unknown> = input.videoMediaId
+      ? {
+          source_type: "video_id",
+          media_id: input.videoMediaId,
+          // Pinterest's video pin spec requires a publicly reachable
+          // cover image URL. The publisher enforces this in preflight,
+          // so we trust the caller here.
+          ...(input.coverImageUrl
+            ? { cover_image_url: input.coverImageUrl }
+            : {}),
+        }
+      : {
+          source_type: "image_url",
+          url: input.imageUrl,
+        };
+
     const body: Record<string, unknown> = {
       board_id: input.boardId,
       link: input.destinationUrl,
-      media_source: {
-        source_type: "image_url",
-        url: input.imageUrl,
-      },
+      media_source: mediaSource,
     };
     if (input.title !== undefined) body.title = input.title;
     if (input.description !== undefined) body.description = input.description;
@@ -180,6 +229,178 @@ export class PinterestClient {
       platformResponse: res.body ?? res.raw ?? undefined,
       ...(upstreamMessage !== undefined ? { upstreamMessage } : {}),
     });
+  }
+
+  /**
+   * `POST /v5/media` — register a new media upload slot. Returns the
+   * presigned S3 endpoint + form-field bag we have to echo on the
+   * subsequent multipart upload. Pinterest only exposes async video
+   * upload through this two-step path; there is no synchronous video pin.
+   */
+  async registerMedia(): Promise<PinterestRegisterMediaResponse> {
+    const res = await platformFetch<PinterestRegisterMediaResponse>({
+      method: "POST",
+      url: `${this.apiBase}/media`,
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      body: { media_type: "video" },
+      platform: PLATFORM,
+    });
+
+    if (
+      res.ok &&
+      res.body?.media_id &&
+      res.body.upload_url &&
+      res.body.upload_parameters
+    ) {
+      return res.body;
+    }
+
+    const upstreamMessage = extractUpstreamMessage(res.body);
+    if (
+      res.status === 401 ||
+      (upstreamMessage ?? "").toLowerCase().includes("invalid_token")
+    ) {
+      throw authFailed({
+        platform: PLATFORM,
+        platformResponse: res.body ?? res.raw ?? undefined,
+        remediation:
+          "Re-connect the Pinterest account — the access token is invalid or revoked.",
+      });
+    }
+
+    throw rejected({
+      platform: PLATFORM,
+      platformResponse: res.body ?? res.raw ?? undefined,
+      ...(upstreamMessage !== undefined ? { upstreamMessage } : {}),
+      rule: "pinterest.media.register_failed",
+      remediation:
+        "Pinterest refused to register a video upload slot — most commonly missing the boards:write / pins:write scope on the connected account.",
+    });
+  }
+
+  /**
+   * Upload video bytes to the presigned S3 endpoint Pinterest handed back.
+   * The endpoint expects multipart/form-data containing every field in
+   * `upload_parameters` PLUS a final `file` field with the bytes.
+   *
+   * S3 returns 204 No Content on success — anything else is a hard fail.
+   */
+  async uploadVideoBytes(params: {
+    uploadUrl: string;
+    uploadParameters: Record<string, string>;
+    bytes: Uint8Array;
+    mimeType: string;
+  }): Promise<void> {
+    const form = new FormData();
+    // Pinterest's order matters for S3: every signed parameter MUST come
+    // before the file part. We iterate the bag, then append `file` last.
+    for (const [k, v] of Object.entries(params.uploadParameters)) {
+      form.append(k, v);
+    }
+    const part = new Uint8Array(params.bytes.byteLength);
+    part.set(params.bytes);
+    form.append(
+      "file",
+      new Blob([part], { type: params.mimeType }),
+      "video.bin",
+    );
+
+    let res: Response;
+    try {
+      res = await fetch(params.uploadUrl, {
+        method: "POST",
+        body: form,
+        // S3 streams the upload — give it more rope for multi-hundred-MB
+        // videos over slow connections.
+        signal: AbortSignal.timeout(10 * 60_000),
+      });
+    } catch (err) {
+      const isTimeout = err instanceof DOMException && err.name === "TimeoutError";
+      throw new LetmepostError({
+        code: "platform_unavailable",
+        status: 503,
+        platform: PLATFORM,
+        message: isTimeout
+          ? "Pinterest's upload S3 endpoint timed out."
+          : "Failed to reach Pinterest's upload S3 endpoint.",
+        rule: "pinterest.video.upload_unreachable",
+        remediation:
+          "The S3 upload target may be transiently unreachable; retry the publish.",
+      });
+    }
+
+    if (res.status >= 200 && res.status < 300) return;
+
+    // S3 returns XML on error — surface verbatim because the user (or
+    // Pinterest support) needs the AWS-style error code to debug a
+    // signature mismatch or bucket-policy reject.
+    const text = await res.text();
+    throw rejected({
+      platform: PLATFORM,
+      platformResponse: { status: res.status, body: text },
+      upstreamMessage: text || `S3 returned ${res.status}.`,
+      rule: "pinterest.video.upload_failed",
+      remediation:
+        "Pinterest's S3 upload rejected the bytes. Common causes: signed-URL clock skew, file mime mismatch, or the file size exceeded the registered slot. Retry; if it persists the registered slot has expired.",
+    });
+  }
+
+  /**
+   * `GET /v5/media/{id}` — poll until the media transcode finishes.
+   * Pinterest's docs say transcode is "usually" under a minute for short
+   * clips; we cap at 5 min to match the Twitter ceiling. `failed` surfaces
+   * as a `platform_rejected`.
+   */
+  async waitForMediaReady(
+    mediaId: string,
+    opts: { timeoutMs?: number; intervalMs?: number } = {},
+  ): Promise<void> {
+    const timeoutMs = opts.timeoutMs ?? 5 * 60_000;
+    const intervalMs = opts.intervalMs ?? 2_000;
+    const deadline = Date.now() + timeoutMs;
+
+    while (true) {
+      const res = await platformFetch<PinterestMedia>({
+        method: "GET",
+        url: `${this.apiBase}/media/${encodeURIComponent(mediaId)}`,
+        headers: { Authorization: `Bearer ${this.accessToken}` },
+        platform: PLATFORM,
+      });
+      if (!res.ok || !res.body) {
+        throw rejected({
+          platform: PLATFORM,
+          platformResponse: res.body ?? res.raw ?? undefined,
+          ...(extractUpstreamMessage(res.body) !== undefined
+            ? { upstreamMessage: extractUpstreamMessage(res.body)! }
+            : {}),
+          rule: "pinterest.media.status_unavailable",
+          remediation:
+            "Pinterest did not return media status — retry the publish.",
+        });
+      }
+      if (res.body.status === "succeeded") return;
+      if (res.body.status === "failed") {
+        throw rejected({
+          platform: PLATFORM,
+          platformResponse: res.body,
+          rule: "pinterest.video.transcode_failed",
+          remediation:
+            "Pinterest's video transcode failed. Common causes: codec other than h.264 + AAC, mp4 container errors, video > 5 min. Re-encode and retry.",
+        });
+      }
+      if (Date.now() >= deadline) {
+        throw new LetmepostError({
+          code: "platform_unavailable",
+          status: 504,
+          platform: PLATFORM,
+          message: `Pinterest media ${mediaId} did not finish transcoding within ${timeoutMs}ms.`,
+          rule: "pinterest.video.transcode_timeout",
+          remediation:
+            "Pinterest is still processing the video; retry the publish in a minute or two.",
+        });
+      }
+      await sleep(intervalMs);
+    }
   }
 
   /**
@@ -377,6 +598,10 @@ export async function refreshPinterestToken(params: {
     });
   }
   return res.body;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** Raised by preflight when URL reachability is probed via HEAD. */

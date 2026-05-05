@@ -19,6 +19,14 @@ import {
   validateBlueskyMediaShape,
   validateBlueskyText,
 } from "./preflight.js";
+import {
+  BLUESKY_VIDEO_BASE,
+  getServiceAuth,
+  getUploadLimits,
+  pollJobUntilComplete,
+  uploadVideo,
+} from "./video.js";
+import { LetmepostError } from "../../errors.js";
 
 /**
  * Credentials the Bluesky publisher needs to authenticate + post. Callers
@@ -30,6 +38,10 @@ export type BlueskyCredentials = {
   handle: string;
   /** Decrypted app password. */
   appPassword: string;
+  /** Override the user's PDS — defaults to bsky.social. */
+  pdsUrl?: string;
+  /** Override the video service base — tests point at MSW. */
+  videoBase?: string;
 };
 
 export type BlueskyPublishInput = {
@@ -139,13 +151,65 @@ export const blueskyPublisher: Publisher<BlueskyCredentials, BlueskyPublishInput
     // so a bad comment fails before we spend upstream calls on the main post.
     if (firstComment) validateBlueskyFirstComment(firstComment.text);
 
-    const client = new BlueskyClient(creds.handle, creds.appPassword);
+    const pdsUrl = creds.pdsUrl ?? "https://bsky.social";
+    const videoBase = creds.videoBase ?? BLUESKY_VIDEO_BASE;
+    const client = new BlueskyClient(creds.handle, creds.appPassword, pdsUrl);
     const session = await client.createSession();
 
+    // Upload each media item via the right pipe:
+    //   - image → com.atproto.repo.uploadBlob (fast, blob-ref returned)
+    //   - video → app.bsky.video.uploadVideo on the video service +
+    //             poll app.bsky.video.getJobStatus until COMPLETED, then
+    //             use the returned blob ref. Required because the image
+    //             upload endpoint can't produce a playable video blob.
     const blobRefs: BlueskyBlobRef[] = [];
     for (const item of loaded) {
-      const ref = await client.uploadBlob(session, item.bytes, item.mimeType);
-      blobRefs.push(ref);
+      if (item.kind === "video") {
+        const serviceAuth = await getServiceAuth(session, pdsUrl);
+
+        // Cheap pre-check: ask the video service whether the user has
+        // any daily quota left. Failing here is much louder than letting
+        // the upload 200 and the job state flip to FAILED a minute later.
+        const limits = await getUploadLimits(serviceAuth);
+        if (limits && limits.canUpload === false) {
+          throw new LetmepostError({
+            code: "preflight_failed",
+            status: 400,
+            platform: "bluesky",
+            message:
+              limits.message ??
+              "Bluesky reports the account is out of daily video upload quota.",
+            rule: "bluesky.video.quota_exhausted",
+            remediation:
+              "Bluesky enforces a per-user daily cap on video uploads + total bytes. Wait for the quota to reset or use a different account.",
+            platformResponse: limits,
+          });
+        }
+
+        const filename = `lmp-${Date.now()}.mp4`;
+        const job = await uploadVideo(
+          serviceAuth,
+          session.did,
+          filename,
+          item.bytes,
+          item.mimeType,
+          videoBase,
+        );
+
+        // Bluesky dedupes by content hash, so a re-upload of the same
+        // bytes can land in COMPLETED on the first response with a blob
+        // already attached. Skip the poll in that case.
+        const ref =
+          job.state === "JOB_STATE_COMPLETED" && job.blob
+            ? job.blob
+            : await pollJobUntilComplete(serviceAuth, job.jobId, {
+                videoBase,
+              });
+        blobRefs.push(ref);
+      } else {
+        const ref = await client.uploadBlob(session, item.bytes, item.mimeType);
+        blobRefs.push(ref);
+      }
     }
 
     const embed = buildEmbed(loaded, blobRefs);

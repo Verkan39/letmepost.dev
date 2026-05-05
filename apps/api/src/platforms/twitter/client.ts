@@ -4,8 +4,23 @@ import {
   extractUpstreamMessage,
   rejected,
 } from "../_shared/errors.js";
+import { LetmepostError } from "../../errors.js";
 
 const PLATFORM = "twitter";
+
+/**
+ * Twitter chunked-upload chunk size. Spec ceiling is 5 MiB per APPEND;
+ * we use 4 MiB to leave headroom for the multipart envelope so a chunk
+ * + boundary doesn't tip over the request size limit.
+ */
+const CHUNK_SIZE_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Upper bound on how long we wait for X to finish transcoding a video
+ * before surfacing `platform_unavailable`. Real videos finish in
+ * seconds-to-a-minute; large 2-minute clips occasionally take 3-4 min.
+ */
+const FINALIZE_POLL_TIMEOUT_MS = 5 * 60_000;
 
 /**
  * X / Twitter API v2 + OAuth 2.0. MVP only touches the `tweets` publish
@@ -44,6 +59,26 @@ export interface TwitterTweetResponse {
 export interface TwitterMediaUploadResponse {
   media_id_string: string;
   size: number;
+}
+
+/**
+ * Shape of the `processing_info` block returned by FINALIZE / STATUS for
+ * chunked video uploads. `check_after_secs` is X's hint for when to poll
+ * next; we honor it.
+ */
+export interface TwitterProcessingInfo {
+  state: "pending" | "in_progress" | "succeeded" | "failed";
+  check_after_secs?: number;
+  progress_percent?: number;
+  error?: {
+    code?: number;
+    name?: string;
+    message?: string;
+  };
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export class TwitterClient {
@@ -116,21 +151,36 @@ export class TwitterClient {
   }
 
   /**
-   * v1.1 simple upload (`media/upload.json`) — MVP path for images.
-   * v1.1 chunked + v2 media is deferred; leaving a TODO here.
-   * TODO(phase-8): chunked upload for video (INIT/APPEND/FINALIZE/STATUS).
+   * Upload media to X. Routes between two pipes:
+   *   - image / GIF → v1.1 simple upload (single base64-encoded request).
+   *   - video       → v1.1 chunked upload (INIT / APPEND / FINALIZE +
+   *                   STATUS poll). The simple route silently ignores
+   *                   `media_category=tweet_video` past a tiny threshold
+   *                   and tweets fail later with a vague "media not
+   *                   ready" — so video MUST go through chunked.
+   *
+   * Spec: https://developer.x.com/en/docs/twitter-api/v1/media/upload-media/api-reference
    */
   async uploadMedia(bytes: Uint8Array, mimeType: string): Promise<string> {
-    // X's v1.1 upload accepts multipart form; for MVP we use the simpler
-    // `media_data` base64 route which the v1.1 endpoint supports for
-    // small images. Keeps us off multipart until there's a real need.
+    if (mimeType.startsWith("video/")) {
+      return this.uploadVideoChunked(bytes, mimeType);
+    }
+    return this.uploadImageSimple(bytes, mimeType);
+  }
+
+  /**
+   * v1.1 simple upload — `media_data` base64 path. The endpoint supports
+   * multipart but the form-encoded base64 route is simpler and keeps the
+   * fast image path free of multipart boundary handling.
+   */
+  private async uploadImageSimple(
+    bytes: Uint8Array,
+    mimeType: string,
+  ): Promise<string> {
     const form = new URLSearchParams({
       media_data: Buffer.from(bytes).toString("base64"),
-      media_category: mimeType.startsWith("video/")
-        ? "tweet_video"
-        : mimeType === "image/gif"
-          ? "tweet_gif"
-          : "tweet_image",
+      media_category:
+        mimeType === "image/gif" ? "tweet_gif" : "tweet_image",
     });
 
     const res = await platformFetch<TwitterMediaUploadResponse>({
@@ -146,6 +196,236 @@ export class TwitterClient {
 
     if (res.ok && res.body?.media_id_string) return res.body.media_id_string;
     this.throwForError(res);
+  }
+
+  /**
+   * v1.1 chunked upload for video. Four phases:
+   *
+   *   INIT    → declares total_bytes + mime + tweet_video category, returns
+   *             a media_id we'll use for the rest of the dance.
+   *   APPEND  → uploads bytes in ≤5 MiB chunks (we use 4 MiB). Multipart
+   *             body with a `media` binary field. Returns 204 on success.
+   *   FINALIZE→ tells X "all bytes uploaded". Response may include
+   *             `processing_info` if the asset needs transcoding.
+   *   STATUS  → polled when FINALIZE returned `processing_info`. We honor
+   *             `check_after_secs` so we don't hammer the endpoint and
+   *             flap into rate limiting on a long transcode.
+   *
+   * Failure modes mapped to letmepost errors:
+   *   - INIT 401 / FINALIZE 401         → platform_auth_failed
+   *   - APPEND non-2xx                  → platform_rejected
+   *   - STATUS state=failed             → platform_rejected with X's
+   *                                       reported reason
+   *   - STATUS doesn't reach succeeded
+   *     within FINALIZE_POLL_TIMEOUT_MS → platform_unavailable
+   */
+  private async uploadVideoChunked(
+    bytes: Uint8Array,
+    mimeType: string,
+  ): Promise<string> {
+    // INIT
+    const initForm = new URLSearchParams({
+      command: "INIT",
+      total_bytes: String(bytes.byteLength),
+      media_type: mimeType,
+      media_category: "tweet_video",
+    });
+    const initRes = await platformFetch<TwitterMediaUploadResponse>({
+      method: "POST",
+      url: `${this.uploadBase}/media/upload.json`,
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: initForm.toString(),
+      platform: PLATFORM,
+    });
+    if (!initRes.ok || !initRes.body?.media_id_string) {
+      this.throwForError(initRes);
+    }
+    const mediaId = initRes.body.media_id_string;
+
+    // APPEND — one segment per chunk. Sequential because X assigns segment
+    // indices in upload order; parallel uploads risk reordering on retry.
+    const totalChunks = Math.ceil(bytes.byteLength / CHUNK_SIZE_BYTES);
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * CHUNK_SIZE_BYTES;
+      const end = Math.min(start + CHUNK_SIZE_BYTES, bytes.byteLength);
+      const chunk = bytes.subarray(start, end);
+      await this.appendChunk(mediaId, i, chunk, mimeType);
+    }
+
+    // FINALIZE
+    const finalizeForm = new URLSearchParams({
+      command: "FINALIZE",
+      media_id: mediaId,
+    });
+    const finalizeRes = await platformFetch<{
+      media_id_string: string;
+      processing_info?: TwitterProcessingInfo;
+    }>({
+      method: "POST",
+      url: `${this.uploadBase}/media/upload.json`,
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: finalizeForm.toString(),
+      platform: PLATFORM,
+    });
+    if (!finalizeRes.ok || !finalizeRes.body) {
+      this.throwForError(finalizeRes);
+    }
+
+    const info = finalizeRes.body.processing_info;
+    if (!info || info.state === "succeeded") {
+      // Sufficiently small clips return ready immediately.
+      return mediaId;
+    }
+    if (info.state === "failed") {
+      throw rejected({
+        platform: PLATFORM,
+        platformResponse: info,
+        upstreamMessage: info.error?.message ?? "Video processing failed.",
+        rule: "twitter.media.video_processing_failed",
+        remediation:
+          info.error?.message ??
+          "X rejected the video during processing — check codec (h.264 + AAC), duration (≤140s for tweet_video), and aspect ratio.",
+      });
+    }
+
+    // STATUS poll — start with the upstream-suggested wait, then back off
+    // gently if the next status still says pending.
+    return this.pollMediaStatus(mediaId, info.check_after_secs ?? 1);
+  }
+
+  /**
+   * APPEND a single chunk via multipart/form-data. Twitter's v1.1 endpoint
+   * is the only X media path that requires multipart — INIT/FINALIZE/STATUS
+   * are all url-encoded — so we keep the boundary-handling localized here.
+   */
+  private async appendChunk(
+    mediaId: string,
+    segmentIndex: number,
+    chunk: Uint8Array,
+    mimeType: string,
+  ): Promise<void> {
+    const form = new FormData();
+    form.append("command", "APPEND");
+    form.append("media_id", mediaId);
+    form.append("segment_index", String(segmentIndex));
+    // Wrap the chunk in a Blob so fetch's multipart serializer treats it
+    // as a binary part with the right Content-Type.
+    // Copy into a fresh ArrayBuffer-backed Uint8Array so the Blob constructor
+    // gets a concrete BlobPart type (Uint8Array<SharedArrayBuffer> is rejected
+    // by the lib.dom Blob signature in some TS versions).
+    const part = new Uint8Array(chunk.byteLength);
+    part.set(chunk);
+    form.append(
+      "media",
+      new Blob([part], { type: mimeType }),
+      `chunk-${segmentIndex}`,
+    );
+
+    let res: Response;
+    try {
+      res = await fetch(`${this.uploadBase}/media/upload.json`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`,
+          // Don't set Content-Type — fetch must set it with the boundary.
+        },
+        body: form,
+        // Generous timeout; a 4MB chunk over a slow link can take a bit.
+        signal: AbortSignal.timeout(2 * 60_000),
+      });
+    } catch (err) {
+      const isTimeout = err instanceof DOMException && err.name === "TimeoutError";
+      throw new LetmepostError({
+        code: "platform_unavailable",
+        status: 503,
+        platform: PLATFORM,
+        message: isTimeout
+          ? "Upstream X chunked upload timed out."
+          : "Failed to reach X's chunked upload endpoint.",
+        rule: "twitter.media.upload_unreachable",
+        remediation:
+          "The upstream X media endpoint may be unreachable; retry the publish shortly.",
+      });
+    }
+
+    // 204 No Content is the documented success for APPEND.
+    if (res.status >= 200 && res.status < 300) return;
+
+    let parsed: unknown;
+    let raw: string | null = null;
+    const text = await res.text();
+    if (text) {
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        raw = text;
+      }
+    }
+    this.throwForError({ status: res.status, body: parsed, raw });
+  }
+
+  /**
+   * Poll FINALIZE → succeeded. Twitter returns `check_after_secs` on each
+   * STATUS call telling us when to come back; we respect it (capped to a
+   * reasonable max so a misbehaving upstream can't stall us forever).
+   */
+  private async pollMediaStatus(
+    mediaId: string,
+    initialWaitSecs: number,
+  ): Promise<string> {
+    const deadline = Date.now() + FINALIZE_POLL_TIMEOUT_MS;
+    let nextWaitSecs = Math.max(1, Math.min(initialWaitSecs, 30));
+
+    while (true) {
+      await delay(nextWaitSecs * 1000);
+
+      const res = await platformFetch<{
+        media_id_string: string;
+        processing_info: TwitterProcessingInfo;
+      }>({
+        method: "GET",
+        url:
+          `${this.uploadBase}/media/upload.json` +
+          `?command=STATUS&media_id=${encodeURIComponent(mediaId)}`,
+        headers: { Authorization: `Bearer ${this.accessToken}` },
+        platform: PLATFORM,
+      });
+
+      if (!res.ok || !res.body?.processing_info) {
+        this.throwForError(res);
+      }
+      const info = res.body.processing_info;
+      if (info.state === "succeeded") return mediaId;
+      if (info.state === "failed") {
+        throw rejected({
+          platform: PLATFORM,
+          platformResponse: info,
+          upstreamMessage: info.error?.message ?? "Video processing failed.",
+          rule: "twitter.media.video_processing_failed",
+          remediation:
+            info.error?.message ??
+            "X rejected the video during processing — check codec, duration, and aspect ratio.",
+        });
+      }
+      if (Date.now() >= deadline) {
+        throw new LetmepostError({
+          code: "platform_unavailable",
+          status: 504,
+          platform: PLATFORM,
+          message: `X did not finish processing media ${mediaId} within ${FINALIZE_POLL_TIMEOUT_MS}ms.`,
+          rule: "twitter.media.processing_timeout",
+          remediation:
+            "X's video transcoder is occasionally slow; retry the publish or shorten the clip.",
+        });
+      }
+      nextWaitSecs = Math.max(1, Math.min(info.check_after_secs ?? 5, 30));
+    }
   }
 
   private throwForError(res: {

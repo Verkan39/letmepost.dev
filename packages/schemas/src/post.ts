@@ -8,8 +8,11 @@ export const BLUESKY_IMAGE_MAX_BYTES = 1_000_000;
 export const BLUESKY_VIDEO_MAX_BYTES = 100_000_000;
 export const BLUESKY_ALT_TEXT_MAX_GRAPHEMES = 2000;
 
-// Pinterest (v5 API, OAuth 2.0). MVP: single-image pin from URL only.
+// Pinterest (v5 API, OAuth 2.0). Image pins use direct `media_source.url`;
+// video pins go through the register-media → S3 multipart → poll → pin
+// dance documented at https://developers.pinterest.com/docs/api-features/upload-media-videos.
 export const PINTEREST_IMAGE_MAX_BYTES = 20_000_000;
+export const PINTEREST_VIDEO_MAX_BYTES = 2_000_000_000; // 2 GB cap per Pinterest video upload spec.
 
 // LinkedIn (Versioned REST API, OAuth 2.0 3-legged).
 // LinkedIn's "ugcPost" / "/rest/posts" commentary cap is 3,000 graphemes.
@@ -146,6 +149,13 @@ export const PinterestPostOverrides = z.object({
   boardId: z.string().min(1).optional(),
   destinationUrl: z.string().url().optional(),
   title: z.string().min(1).optional(),
+  /**
+   * REQUIRED when the pin's media is a video — Pinterest mandates a
+   * separate cover image URL on every video pin (the still frame shown
+   * before play). MVP: caller supplies a public URL; Phase 12 may add
+   * server-side first-frame extraction.
+   */
+  coverImageUrl: z.string().url().optional(),
 });
 export type PinterestPostOverrides = z.infer<typeof PinterestPostOverrides>;
 

@@ -77,8 +77,23 @@ export type ConnectContext = {
    * When unset (tests, credentials providers), providers fall back to a
    * random UUID — fine for unit tests, but a real connect flow must pass
    * the signed token in.
+   *
+   * PKCE providers (Twitter) ignore this and re-sign the state themselves
+   * with a `pkce.codeVerifier` field so the GET callback can recover the
+   * verifier — the dashboard does a full-page redirect immediately and
+   * loses any client-side state.
    */
   oauthState?: string;
+  /**
+   * Raw signed-state inputs. PKCE providers re-sign with `encodeOAuthState`
+   * to embed extra fields (codeVerifier). Other providers can ignore this
+   * and use `oauthState` as-is.
+   */
+  oauthStatePayload?: {
+    organizationId: string;
+    profileId: string | null;
+    platform: string;
+  };
 };
 
 /**

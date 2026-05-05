@@ -172,16 +172,20 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
       // Sign a state token carrying the org/profile/platform context. The
       // GET callback recovers this from the URL after the platform redirects
       // back, so we don't need a server-side session lookup at that point.
-      const oauthState = encodeOAuthState({
-        organizationId,
-        profileId,
-        platform,
-      });
+      //
+      // PKCE providers (Twitter) re-sign this themselves to embed
+      // `pkce.codeVerifier` — the dashboard does a full-page redirect right
+      // after this call, so the verifier can't ride client-side state.
+      // Passing the raw payload alongside the pre-signed token lets PKCE
+      // providers compose without introducing a separate code path.
+      const oauthStatePayload = { organizationId, profileId, platform };
+      const oauthState = encodeOAuthState(oauthStatePayload);
 
       const descriptor = await provider.describeConnect({
         organizationId,
         baseUrl,
         oauthState,
+        oauthStatePayload,
       });
       return c.json({ platform, descriptor });
     },
@@ -589,7 +593,7 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
         return redirect(`connect_error=platform_mismatch&platform=${platform}`);
       }
 
-      const { organizationId, profileId } = decoded.payload;
+      const { organizationId, profileId, pkce } = decoded.payload;
       const provider = getProvider(platform);
       const redirectUri = new URL(
         `/v1/accounts/oauth/${platform}/callback`,
@@ -598,11 +602,20 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
 
       // Server-side token exchange. Each provider's completeConnect knows
       // its own request shape; we just hand it { code, state, redirectUri }.
+      // PKCE providers (Twitter) get the `codeVerifier` recovered from the
+      // signed state — the dashboard can't keep it across the redirect.
       let connected;
       try {
         connected = await provider.completeConnect(
           { organizationId, baseUrl, oauthState: state },
-          { code, state, redirectUri },
+          {
+            code,
+            state,
+            redirectUri,
+            ...(pkce?.codeVerifier
+              ? { codeVerifier: pkce.codeVerifier }
+              : {}),
+          },
         );
       } catch (err) {
         // Always log the underlying detail — LetmepostError instances skip

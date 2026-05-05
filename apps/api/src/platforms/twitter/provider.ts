@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { LetmepostError } from "../../errors.js";
+import { encodeOAuthState } from "../../oauth/state.js";
 import type {
   AccountProvider,
   ConnectContext,
@@ -102,11 +103,29 @@ export class TwitterProvider implements AccountProvider {
 
   describeConnect(ctx: ConnectContext): ConnectDescriptor {
     const scopes = [...scopeSetFor(PLATFORM).write];
-    const state = ctx.oauthState ?? randomUUID();
     const codeVerifier = base64UrlEncode(randomBytes(32));
     const codeChallenge = base64UrlEncode(
       createHash("sha256").update(codeVerifier).digest(),
     );
+
+    // Re-sign the state to embed the PKCE verifier. The dashboard does a
+    // full-page redirect to Twitter immediately after this call returns,
+    // so anything kept in client-side state vanishes. The signed state
+    // round-trips through Twitter and back to our GET callback intact;
+    // embedding the verifier here is what makes the exchange step recover
+    // it.
+    //
+    // If `oauthStatePayload` isn't on ctx (test paths), fall back to the
+    // pre-signed token from `ctx.oauthState`, then to a random UUID. The
+    // first two paths drop the verifier — only acceptable for tests.
+    const state =
+      ctx.oauthStatePayload != null
+        ? encodeOAuthState({
+            ...ctx.oauthStatePayload,
+            pkce: { codeVerifier },
+          })
+        : (ctx.oauthState ?? randomUUID());
+
     const redirectUri = computeRedirectUri(ctx.baseUrl);
     const url = new URL(
       this.config.authorizeUrl ?? TWITTER_OAUTH_AUTHORIZE_URL,

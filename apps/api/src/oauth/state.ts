@@ -30,6 +30,18 @@ export type OAuthStatePayload = {
   exp: number;
   /** Random nonce for tamper detection / replay-window narrowing. */
   nonce: string;
+  /**
+   * PKCE provider-specific data round-tripped via the state token. Twitter
+   * needs `codeVerifier` at exchange time but the dashboard does a
+   * full-page redirect immediately after `describeConnect` and loses any
+   * client-side state — embedding here lets the GET callback recover it.
+   *
+   * The state token is HMAC-signed, tamper-resistant, and short-lived
+   * (10 min), so this stays inside the existing security envelope.
+   */
+  pkce?: {
+    codeVerifier: string;
+  };
 };
 
 function readSecret(): string {
@@ -65,15 +77,20 @@ export function encodeOAuthState(input: {
   organizationId: string;
   profileId: string | null;
   platform: string;
+  /** Provider-specific PKCE bundle for OAuth 2.0 PKCE flows. */
+  pkce?: { codeVerifier: string };
 }): string {
   const payload: OAuthStatePayload = {
-    ...input,
+    organizationId: input.organizationId,
+    profileId: input.profileId,
+    platform: input.platform,
     exp: Date.now() + STATE_TTL_MS,
     // Random per-token suffix so two concurrent connects from the same
     // org/platform aren't byte-identical (defense against replay caches).
     nonce: b64urlEncode(
       Buffer.from(crypto.getRandomValues(new Uint8Array(8))),
     ),
+    ...(input.pkce ? { pkce: input.pkce } : {}),
   };
   const json = JSON.stringify(payload);
   const encoded = b64urlEncode(json);

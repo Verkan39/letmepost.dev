@@ -1,0 +1,64 @@
+---
+title: "Hello, world."
+description: "First post. The thesis behind letmepost.dev — what it is, what it isn't, and why we're building it in the open."
+pubDate: 2026-05-06
+tags: ["meta"]
+draft: true
+---
+
+This is a scaffold post — replace it with the real first launch piece.
+The frontmatter above is the source of truth: the index sorts by
+`pubDate`, search engines read `description`, and `draft: true` keeps
+this post out of production builds until you flip the flag.
+
+## What you can write here
+
+MDX gives you Markdown plus Astro components inline. Code blocks render
+with the same theme as the marketing site:
+
+```ts
+await fetch("https://api.letmepost.dev/v1/posts", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer lmp_live_…",
+    "Idempotency-Key": crypto.randomUUID(),
+  },
+  body: JSON.stringify({
+    account: { platform: "bluesky", id: "acc_…" },
+    text: "Shipping letmepost.dev",
+  }),
+});
+```
+
+Inline `code` works. **Bold** and *italic*. Links land at the
+[brand color](https://letmepost.dev). Lists, tables, blockquotes —
+all rendered through the `prose-blog` styles in the post layout.
+
+## How to publish
+
+1. Drop a new `.mdx` file in `src/content/blog/`. The file name
+   becomes the URL slug (`my-post.mdx` → `/blog/my-post`).
+2. Fill out the frontmatter — `title`, `description`, `pubDate` are
+   required. The schema lives in `src/content.config.ts`.
+3. Set `draft: false` (or remove the line) when ready to ship.
+4. Push. Sitemap, RSS, and per-post structured data update on deploy.
+
+## What to write about
+
+Some prompts that fit the corpus:
+
+- The fails-loudly thesis: every error envelope has a `code`, a
+  `rule`, a `platform_response`, and a `remediation`. Why that's
+  load-bearing.
+- LinkedIn's five API-version sunsets in six months. What it cost the
+  ecosystem. How a single pinned header avoids it.
+- OAuth lifecycle: Bluesky JWTs (minutes), LinkedIn (60d), Pinterest
+  (30d). The refresh scheduler design.
+- Idempotency keys vs retry storms — the canonical Postiz #1321 bug
+  and the body-hash conflict pattern.
+- Per-platform gotchas: IG's `OAuthException 2207052`, TikTok's
+  `file_format_check_failed`, Threads's `2207020` container expiry.
+
+Pick whichever has the most reach for the audience you want to bring
+in. Keep posts short, code-dense, and honest about what's still
+broken — that's the voice that fits the rest of the site.

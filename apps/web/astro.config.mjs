@@ -1,5 +1,6 @@
 import { defineConfig } from "astro/config";
 import sitemap from "@astrojs/sitemap";
+import mdx from "@astrojs/mdx";
 import icon from "astro-icon";
 import tailwindcss from "@tailwindcss/vite";
 
@@ -25,6 +26,12 @@ function classify(pathname) {
   if (pathname.startsWith("/platforms/") || pathname.startsWith("/api/")) {
     return ROUTE_WEIGHT.product;
   }
+  // /blog/[slug] are content; the index lives at /blog. Both get the
+  // same weight as product pages — blog posts are the long-tail SEO
+  // surface that brings in the developer audience over time.
+  if (pathname === "/blog" || pathname.startsWith("/blog/")) {
+    return ROUTE_WEIGHT.product;
+  }
   if (pathname.startsWith("/pricing")) return ROUTE_WEIGHT.pricing;
   if (
     pathname.startsWith("/privacy") ||
@@ -39,6 +46,10 @@ function classify(pathname) {
 export default defineConfig({
   site: "https://letmepost.dev",
   integrations: [
+    // MDX support for the /blog content collection. Order matters —
+    // mdx() must come before sitemap() so the sitemap integration sees
+    // the generated /blog/[slug] routes.
+    mdx(),
     sitemap({
       // `serialize` runs per URL — Astro hands us the auto-discovered
       // entry, we add the priority + changefreq + lastmod that Google's

@@ -1,0 +1,117 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { Icon } from "astro-icon/components";
+
+/**
+ * Blog index — sorted newest first. Drafts hidden in production
+ * builds (`import.meta.env.PROD`). When the directory is empty we
+ * still render a graceful "we're cooking" state so the route never
+ * 404s on a fresh deploy.
+ */
+const allPosts = await getCollection("blog", ({ data }) => {
+  return import.meta.env.PROD ? data.draft !== true : true;
+});
+
+const posts = allPosts.sort(
+  (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
+);
+
+function fmtDate(d: Date) {
+  return d.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+---
+
+<BaseLayout
+  title="Blog"
+  description="Notes from the team building letmepost.dev — API design, platform integrations, OAuth lifecycle, the failure-modes corpus that drove our product principles."
+>
+  <section class="pt-22 pb-12 max-[640px]:pt-14 max-[640px]:pb-8">
+    <div class="container">
+      <div
+        class="inline-flex items-center gap-2 text-[0.72rem] uppercase tracking-[0.1em] mb-7 py-[0.3rem] px-[0.6rem] border border-border-strong"
+      >
+        <span class="w-[7px] h-[7px] inline-block bg-accent" aria-hidden="true"></span>
+        Blog
+      </div>
+
+      <h1 class="!m-0">Field notes from the build.</h1>
+
+      <p
+        class="text-[1.1rem] leading-[1.6] max-w-[42rem] mt-5 mb-2 text-text-secondary"
+      >
+        API design, platform-integration gotchas, and the failure-modes corpus that drove our product principles. <a href="/rss.xml" class="text-accent">RSS</a>.
+      </p>
+    </div>
+  </section>
+
+  <section class="pt-4 pb-18 max-[640px]:pb-12">
+    <div class="container">
+      {
+        posts.length === 0 ? (
+          <div
+            class="border border-dashed border-border-strong p-8 text-center"
+          >
+            <Icon
+              name="ph:book-open"
+              width={32}
+              height={32}
+              class="mx-auto mb-3 text-text-muted"
+            />
+            <h3 class="!mt-0 !mb-1 !text-base">First post landing soon.</h3>
+            <p class="text-text-muted text-[0.9rem] m-0">
+              We're drafting the launch series — version churn, OAuth lifecycle, the fails-loudly thesis. Subscribe via <a href="/rss.xml" class="text-accent">RSS</a> to be notified.
+            </p>
+          </div>
+        ) : (
+          <ul class="list-none p-0 m-0">
+            {posts.map((post) => (
+              <li class="py-6 border-t border-border first:border-t-0">
+                <a
+                  href={`/blog/${post.id}`}
+                  class="no-underline text-text block group"
+                >
+                  <div class="flex items-baseline gap-3 mb-2 text-[0.78rem] text-text-muted">
+                    <time datetime={post.data.pubDate.toISOString()}>
+                      {fmtDate(post.data.pubDate)}
+                    </time>
+                    {post.data.tags.length > 0 ? (
+                      <span class="opacity-50">·</span>
+                    ) : null}
+                    {post.data.tags.map((t) => (
+                      <span class="uppercase tracking-[0.08em] text-[0.7rem]">
+                        {t}
+                      </span>
+                    ))}
+                    {post.data.draft ? (
+                      <span
+                        class="ml-auto uppercase tracking-[0.1em] text-[0.65rem] py-[0.1rem] px-[0.4rem] border border-accent text-accent"
+                        aria-label="Draft (visible only in dev)"
+                      >
+                        draft
+                      </span>
+                    ) : null}
+                  </div>
+                  <h2 class="!m-0 !text-[1.3rem] !font-bold group-hover:text-accent transition-colors">
+                    {post.data.title}
+                  </h2>
+                  <p class="text-text-muted m-0 mt-2 text-[0.95rem]">
+                    {post.data.description}
+                  </p>
+                  <div class="mt-3 inline-flex items-center gap-1 text-[0.82rem] text-accent">
+                    Read
+                    <Icon name="ph:arrow-right" width={12} height={12} />
+                  </div>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    </div>
+  </section>
+</BaseLayout>

@@ -122,9 +122,31 @@ function glyphClasses(status: string): string {
 
 const liveGlyphShadow =
   "box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success) 18%, transparent);";
+
+/**
+ * FAQPage structured data — Google renders these as expandable rich
+ * results on the SERP. The `name` strings must match the visible
+ * question text on the page (Google penalizes mismatch). Answers
+ * are HTML-stripped to plain prose so the SERP card stays legible
+ * without our anchor formatting.
+ */
+const stripHtml = (html: string) => html.replace(/<[^>]+>/g, "");
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: stripHtml(f.a),
+    },
+  })),
+};
 ---
 
-<BaseLayout title="letmepost.dev">
+<BaseLayout title="letmepost.dev" jsonLd={[faqJsonLd]}>
   <!-- Hero -->
   <section class="pt-22 pb-14">
     <div class="container">
@@ -142,7 +164,7 @@ const liveGlyphShadow =
         A publishing API that <span class="text-accent">fails loudly.</span>
       </h1>
       <p
-        class="text-[1.1rem] leading-[1.6] max-w-[34rem] mt-5 mb-10 text-text-secondary"
+        class="text-[1.1rem] leading-[1.6] mt-5 mb-10 text-text-secondary"
       >
         An open-source publishing API for developers and AI agents. When a
         post fails, you get the rule that failed, the raw platform response,

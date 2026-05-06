@@ -9,12 +9,34 @@ import { ClientRouter } from "astro:transitions";
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
 
+/**
+ * `jsonLd` lets a page contribute additional structured-data graphs on
+ * top of the default Organization + WebSite ones we always emit.
+ * Common shapes:
+ *
+ *   - FAQPage         — for the home FAQ section
+ *   - BreadcrumbList  — for /platforms/[slug] and /api/[slug]
+ *   - SoftwareApplication / Product — for per-platform marketing pages
+ *
+ * Each entry renders as its own <script type="application/ld+json">
+ * tag — Google parses each block independently.
+ */
+interface JsonLdGraph {
+  "@context"?: string;
+  "@type": string;
+  [key: string]: unknown;
+}
+
 interface Props {
   title: string;
   description?: string;
   /** Override the OG image (absolute path or full URL). Defaults to /og-image.png (generated at build time from og-image.svg). */
   ogImage?: string;
   noindex?: boolean;
+  /** Additional JSON-LD graphs to emit alongside the default Organization + WebSite. */
+  jsonLd?: JsonLdGraph[];
+  /** og:type — defaults to website. Override per page when applicable. */
+  ogType?: "website" | "article" | "product";
 }
 
 const {
@@ -22,12 +44,52 @@ const {
   description = "Open-source social media publishing API for developers and AI agents. Preflight validation, transparent errors, stable versions, idempotency by default.",
   ogImage = "/og-image.png",
   noindex = false,
+  jsonLd = [],
+  ogType = "website",
 } = Astro.props;
 
 const siteName = "letmepost.dev";
 const fullTitle = title === siteName ? title : `${title} — ${siteName}`;
 const canonical = new URL(Astro.url.pathname, Astro.site).toString();
 const ogImageUrl = new URL(ogImage, Astro.site).toString();
+const siteUrl = Astro.site!.toString().replace(/\/$/, "");
+
+/**
+ * Default structured-data graphs every page emits. `Organization`
+ * establishes the brand entity (logo, sameAs links to social profiles)
+ * so Google can render a knowledge panel. `WebSite` enables the
+ * sitelinks-search-box on Google SERPs once docs is indexed.
+ *
+ * Both graphs use stable `@id` URIs so additional graphs on per-page
+ * `jsonLd` reference the SAME entity instead of fragmenting it across
+ * the index.
+ */
+const defaultGraphs: JsonLdGraph[] = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": `${siteUrl}/#organization`,
+    name: siteName,
+    url: siteUrl,
+    logo: `${siteUrl}/og-image.png`,
+    description:
+      "Open-source social media publishing API for developers and AI agents.",
+    sameAs: [
+      "https://github.com/rosekamallove/letmepost.dev",
+      "https://x.com/letmepostdotdev",
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": `${siteUrl}/#website`,
+    name: siteName,
+    url: siteUrl,
+    publisher: { "@id": `${siteUrl}/#organization` },
+  },
+];
+
+const allGraphs: JsonLdGraph[] = [...defaultGraphs, ...jsonLd];
 ---
 
 <!doctype html>
@@ -75,7 +137,7 @@ const ogImageUrl = new URL(ogImage, Astro.site).toString();
     <!-- Open Graph -->
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={ogType} />
     <meta property="og:url" content={canonical} />
     <meta property="og:site_name" content={siteName} />
     <meta property="og:image" content={ogImageUrl} />
@@ -90,6 +152,8 @@ const ogImageUrl = new URL(ogImage, Astro.site).toString();
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@letmepostdotdev" />
+    <meta name="twitter:creator" content="@letmepostdotdev" />
     <meta name="twitter:title" content={fullTitle} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImageUrl} />
@@ -97,6 +161,17 @@ const ogImageUrl = new URL(ogImage, Astro.site).toString();
       name="twitter:image:alt"
       content="letmepost.dev — social media publishing that fails loudly."
     />
+
+    {/*
+      JSON-LD structured data. Default graphs (Organization + WebSite)
+      are always emitted; per-page graphs (FAQPage on home,
+      BreadcrumbList on platform pages, etc.) layer on via the `jsonLd`
+      prop. Each block is its own <script> so Google parses them
+      independently — broken JSON in one doesn't taint the rest.
+    */}
+    {allGraphs.map((graph) => (
+      <script type="application/ld+json" set:html={JSON.stringify(graph)} />
+    ))}
 
     <ClientRouter />
   </head>

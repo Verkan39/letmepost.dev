@@ -99,11 +99,63 @@ const features = [
     body: "Idempotency-Key on every write. Retries are safe; double-posting from a worker restart isn't a thing.",
   },
 ];
+
+const siteUrl = Astro.site!.toString().replace(/\/$/, "");
+
+/**
+ * Two structured-data graphs:
+ *   - BreadcrumbList lights up the breadcrumb display on Google's SERP
+ *   - SoftwareApplication tells search engines this is an API integration,
+ *     which can surface as a richer result for ICP-shape queries
+ *     ("twitter publishing api", etc).
+ */
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    {
+      "@type": "ListItem",
+      position: 1,
+      name: "Home",
+      item: `${siteUrl}/`,
+    },
+    {
+      "@type": "ListItem",
+      position: 2,
+      name: "Platforms",
+      item: `${siteUrl}/#platforms`,
+    },
+    {
+      "@type": "ListItem",
+      position: 3,
+      name: platform.name,
+      item: `${siteUrl}/platforms/${platform.slug}/`,
+    },
+  ],
+};
+
+const softwareJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: `${platform.name} API via letmepost.dev`,
+  description: platform.pitch,
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "Web",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+    description: "Free during alpha",
+  },
+  publisher: { "@id": `${siteUrl}/#organization` },
+};
 ---
 
 <BaseLayout
   title={`${platform.name} API`}
   description={`Publish to ${platform.name} via letmepost.dev — preflight validation, idempotency keys, transparent errors.`}
+  ogType="product"
+  jsonLd={[breadcrumbJsonLd, softwareJsonLd]}
 >
   <!-- Hero -->
   <section class="pt-22 pb-12 max-[640px]:pt-14 max-[640px]:pb-8">

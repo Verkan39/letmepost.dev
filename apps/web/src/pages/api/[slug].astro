@@ -145,11 +145,40 @@ const features: Record<string, { icon: string; title: string; body: string }[]> 
 };
 
 const featureList = features[api.slug] ?? features.publishing;
+
+const siteUrl = Astro.site!.toString().replace(/\/$/, "");
+
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    {
+      "@type": "ListItem",
+      position: 1,
+      name: "Home",
+      item: `${siteUrl}/`,
+    },
+    {
+      "@type": "ListItem",
+      position: 2,
+      name: "APIs",
+      item: `${siteUrl}/`,
+    },
+    {
+      "@type": "ListItem",
+      position: 3,
+      name: api.name,
+      item: `${siteUrl}/api/${api.slug}/`,
+    },
+  ],
+};
 ---
 
 <BaseLayout
   title={api.name}
   description={`${api.name} — ${api.tagline}`}
+  ogType="product"
+  jsonLd={[breadcrumbJsonLd]}
 >
   <!-- Hero -->
   <section class="pt-22 pb-12 max-[640px]:pt-14 max-[640px]:pb-8">

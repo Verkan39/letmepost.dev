@@ -2,64 +2,15 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { Code } from "astro:components";
 import { Icon } from "astro-icon/components";
+import {
+  LINKEDIN_VERSIONS as VERSIONS,
+  LINKEDIN_VERSIONS_GENERATED_AT,
+} from "../../data/linkedin-versions.ts";
 
-/**
- * LinkedIn API versions are YYYYMM strings sent in the
- * `LinkedIn-Version` header. Each version is supported for 12 months
- * from its release date — that's the rule the table below applies.
- *
- * This list is hand-curated from LinkedIn's public versioning page
- * (learn.microsoft.com/linkedin/marketing/versioning) and the dates
- * referenced in our research corpus. We re-verify roughly quarterly;
- * the build-time `LAST_VERIFIED` constant below is shown to readers so
- * they can judge freshness.
- *
- * If you spot a missing or wrong row, send a PR — single source of
- * truth lives right here.
- */
-type LinkedInVersion = {
-  /** YYYYMM identifier, used in the LinkedIn-Version request header. */
-  version: string;
-  /** ISO release date — typically the 1st of the version month. */
-  released: string;
-  /** ISO sunset date — release + 12 months. */
-  sunset: string;
-  /** Optional callout (notable breaking change, deprecation note, etc.). */
-  notes?: string;
-};
-
-const LAST_VERIFIED = "2026-05-08";
-
-const VERSIONS: LinkedInVersion[] = [
-  { version: "202307", released: "2023-07-01", sunset: "2024-07-01" },
-  { version: "202310", released: "2023-10-01", sunset: "2024-10-01" },
-  { version: "202401", released: "2024-01-01", sunset: "2025-01-01" },
-  {
-    version: "202404",
-    released: "2024-04-01",
-    sunset: "2025-04-01",
-    notes: "First version cited in our wedge incident — n8n / Zapier / Make / Postiz all broke at sunset.",
-  },
-  { version: "202407", released: "2024-07-01", sunset: "2025-07-01" },
-  { version: "202410", released: "2024-10-01", sunset: "2025-10-01" },
-  {
-    version: "202411",
-    released: "2024-11-01",
-    sunset: "2025-11-01",
-    notes: "Off-cadence release. Sunset hit during peak Q4 — most automations failed.",
-  },
-  { version: "202501", released: "2025-01-01", sunset: "2026-01-01" },
-  { version: "202504", released: "2025-04-01", sunset: "2026-04-01" },
-  { version: "202507", released: "2025-07-01", sunset: "2026-07-01" },
-  { version: "202510", released: "2025-10-01", sunset: "2026-10-01" },
-  { version: "202601", released: "2026-01-01", sunset: "2027-01-01" },
-  {
-    version: "202604",
-    released: "2026-04-01",
-    sunset: "2027-04-01",
-    notes: "Latest stable at last verification.",
-  },
-];
+// Build-stamp shown to readers. Rebuilds happen on every deploy, so a
+// fresh list of versions appears each push without any manual table
+// editing. The off-cadence overrides live in src/data/linkedin-versions.ts.
+const GENERATED_DATE = LINKEDIN_VERSIONS_GENERATED_AT.slice(0, 10);
 
 const headerSnippet = `// Pin a specific version on every LinkedIn API call.
 // If you don't, LinkedIn picks the oldest supported version
@@ -114,11 +65,11 @@ await fetch("https://api.linkedin.com/rest/posts", {
 
       <div class="lmp-version-meta">
         <span class="text-[0.72rem] uppercase tracking-[0.1em] text-text-muted"
-          >Last verified</span
+          >Auto-generated</span
         >
-        <span class="lmp-version-date">{LAST_VERIFIED}</span>
+        <span class="lmp-version-date">{GENERATED_DATE}</span>
         <span class="text-text-muted text-[0.78rem] ml-2"
-          >· countdowns refresh on page load</span
+          >· quarterly schedule, 12-month support, computed at build time · countdowns refresh on page load</span
         >
       </div>
 

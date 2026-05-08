@@ -2,19 +2,39 @@
 
 ## Context
 
-**Status (April 2026):** Phases 1–5.5 landed; **Phase 6 LinkedIn MVP shipped** (personal-account text UGC + 3,000-grapheme preflight + URN validation + version-pinning client) with MDP-gated org/Company-Page posting deferred; **Phase 7 dashboard substantially complete** — sign-in/up, /onboarding silent recovery, 3-step accordion onboarding (API key + connect platform + send first post) with auto-advance + step-locking, brand-aligned theme (paper cream + forest green + Commit Mono + Instrument Serif wordmark), framer-motion blur transitions, full sidebar with org switcher + profile switcher + nav, /profiles CRUD, profile picker on connect flows, profile scope on API key create, profile filter + time-range + error-code multi-select + manual refresh + focus refetch on the Post Log (now a TanStack Table), inline OAuth/credentials connect (no detour), webhook chip multi-select + synchronous test-deliver dialog with editable JSON preview; MVP slices of Phase 9 (Twitter/X) and Phase 11 (Pinterest) publishers shipped behind the AccountProvider framework. **179+ API tests green.** Bluesky publishes end-to-end today; LinkedIn personal posts publish; Pinterest connects end-to-end via the OAuth callback handler but the publish path is gated on the media-upload service (Phase 7.5).
+**Status (May 2026):** Phases 1–7.5 landed in code; **Phase 8 Meta trio shipped (awaiting App Review)**; **Phase 9 X/Twitter shipped (incl. chunked video upload, multi-image, reply chains, quote tweets, PKCE fix — awaiting Pay Per Use signup decision)**; **Phase 11 Pinterest extras shipped (video pin via register-media → S3 → poll)**; **Phase 13 marketing + docs site shipped** (Mintlify-pivoted docs at `docs.letmepost.dev` with full preflight/error/webhook/platform coverage, Astro landing with Docs+Product navbar dropdowns, dynamic per-platform + per-API pages, /pricing page, /blog scaffolded MDX+RSS, full SEO suite — sitemap priorities, JSON-LD Organization/WebSite/FAQPage/BreadcrumbList/SoftwareApplication/BlogPosting, AI-crawler robots.txt, twitter:site, /sitemap.xml alias). **All 8 v1 platforms publish in code.** **341+ API tests passing** (5 unrelated session-auth tests are pre-existing baseline failures). Bluesky live end-to-end; everything else awaiting approvals.
 
-**Production live:** API at `https://api.letmepost.dev` (Railway), dashboard at `https://dashboard.letmepost.dev`, landing at `https://letmepost.dev`. NeonDB Postgres + Upstash Redis. The OAuth callback handler ships server-side state (HMAC-signed, 10-min TTL) so Pinterest/LinkedIn round-trips complete without a server-side session table. Cross-subdomain cookies wired via `COOKIE_DOMAIN=.letmepost.dev`.
+**Production live:** API at `https://api.letmepost.dev` (Railway), dashboard at `https://dashboard.letmepost.dev`, landing at `https://letmepost.dev`, docs at `https://docs.letmepost.dev` (Mintlify). NeonDB Postgres + Upstash Redis. Cross-subdomain cookies via `COOKIE_DOMAIN=.letmepost.dev`. OAuth state HMAC-signed (10-min TTL); Twitter PKCE `codeVerifier` rides the same signed state envelope so the dashboard never has to stash it across the redirect.
 
-**Approvals in flight (April 2026):**
-- **Meta App Review** — business verification in progress; submission tomorrow
+**Approvals in flight (May 2026):**
+- **Meta App Review** — submitted; need demo videos for some scopes
 - **LinkedIn MDP** — submitted, awaiting review
-- **Pinterest Standard Access** — pending demo video recording (Trial Access works today; pins are private to the creator until Standard clears)
-- **X paid tier + YouTube CASA** — not yet submitted
+- **Pinterest Standard Access** — pending demo video recording (Trial Access works; pins private until Standard clears)
+- **X Pay Per Use** — signup decision pending (Basic/Pro tiers closed to new signups Feb 2026; pay-per-use is the only path; signed-up = budget burns from first call)
+- **YouTube CASA verification** — not yet submitted
 
-**Scope decision (April 2026):** YouTube replaces TikTok for v1. TikTok is deferred to v2. Reasoning: YouTube's OAuth verification is a one-time annual security review with a known timeline; TikTok's Content Posting API approval is two separate audits (Upload + Direct Post), each on a 4–10-week manual review with frequent rejections, and the audit-state SELF_ONLY constraint complicates the demo path. We pick the platform where the gating cost is bounded.
+**Scope decision (April 2026):** YouTube replaces TikTok for v1. TikTok deferred to v2.
 
-**Immediate next slice (April 2026):** before resuming the new-platform phases, lock Bluesky and Pinterest to "perfect" — every API endpoint, every preflight rule, every webhook event verified end-to-end against production. This requires the media-upload service (Phase 7.5) as a foundation; Pinterest's publish path can't function without per-post media, and Bluesky video needs the same plumbing. Two-platform polish first, then Meta / X / YouTube once approvals clear.
+**Recent session shipped (May 2026):**
+- Bluesky video upload via `app.bsky.video.uploadVideo` service flow (service auth → upload → poll job status → embed)
+- Twitter v1.1 chunked video upload (INIT/APPEND/FINALIZE/STATUS) replacing the placeholder simple-upload path
+- Pinterest video pin (POST /v5/media → presigned-S3 multipart → poll → createPin with `source_type: video_id`)
+- Profile-switching UX bug fixed: promoted `useActiveProfile` to a Context provider (single source of truth across sidebar + every page), profile-scoped query keys for accounts/api-keys/posts, `?profileId=` filter on `GET /v1/accounts`, top-level prefix invalidation on switch
+- X OAuth PKCE bug fixed: `codeVerifier` now embedded in the signed state token (round-trips via Twitter and back) — was failing with `validation_failed` because the dashboard's full-page redirect lost client-side state
+- Dashboard tab titles via per-route `layout.tsx` files (Dashboard / Logs / Accounts / Connect / Profiles / API keys / Webhooks / Media / Welcome / Sign in / Sign up)
+- Mintlify docs accuracy audit: 5 stale field-name fixes (`handle` → `identifier` on Bluesky connect), 13 new preflight rule pages for video work, removed 2 obsolete rule pages, fixed Twitter/Pinterest/Bluesky platform pages to reflect actual capabilities, refreshed nav
+- Astro landing redesign: navbar with Docs + Product dropdowns (8 platforms, 3 API surfaces), wider container, borderless chrome, bigger nav fonts
+- Per-platform marketing pages (`/platforms/[slug]` × 8) + per-API marketing pages (`/api/[slug]` × 3) — shared shell, status badges, code samples, content-type chips, demo placeholders, FAQ
+- /pricing page (TBD content)
+- Blog scaffolded — `@astrojs/mdx` + content collection at `src/content/blog/` + `/blog` index + `/blog/[...slug]` post page + `/rss.xml` feed + Article JSON-LD per post + sample seed post (`draft: true`)
+- Full SEO suite: sitemap priority/changefreq/lastmod, JSON-LD on every page (Organization + WebSite default; FAQPage on home; BreadcrumbList + SoftwareApplication on platform pages; BreadcrumbList on API pages; BlogPosting on posts), `twitter:site`/`creator`, AI-crawler robots.txt directives, `/sitemap.xml` convention alias
+
+**Immediate next slice:**
+- Submit Meta demo videos (per-scope) and Pinterest demo video to clear approvals
+- Decide on X Pay Per Use signup
+- Begin YouTube CASA submission
+- Draft + publish first 2–3 blog posts (LinkedIn version-churn flagship; "fails loudly" thesis; OAuth lifecycle deep-dive)
+- Wire `/2/users/me` lookup at Twitter connect-complete to replace the synthetic `twitter-${uuid}` platform_account_id with the real X user id (one-line TODO in `apps/api/src/platforms/twitter/provider.ts`)
 
 What's still missing from the original plan: Phase 6 LinkedIn org/Company-Page posting (MDP-gated), Phase 7.5 Media Upload Service (in flight), **Phase 8 Meta trio (was Phase 9 — promoted ahead of X because it's buildable today against Tester accounts while X waits on a paid-tier signup decision)**, Phase 9 Twitter/X (was Phase 8), Phase 10 YouTube, Phase 11 Pinterest extras, Phase 12 SDK pipeline, Phase 13 docs polish, Phase 14 obs + launch prep, Phase 15 launch. Phase 5.5 (Profiles) was added after the initial plan to pick up the agency / multi-brand use case without per-profile pricing — both API and dashboard are done.
 
@@ -175,7 +195,9 @@ Destructive actions (disconnect account, revoke key, delete endpoint, delete pro
 **Effort:** Done.
 **NOT in scope:** Billing, analytics dashboards, team invites beyond single-org, whitelabel, theming switcher, mobile-first layout, API call log (request-level, as opposed to post-level), webhook delivery log (deferred — needs a backend ticket to expose BullMQ delivery history; today only the synchronous test-deliver round-trip is visible).
 
-## Phase 7.5 — Media Upload Service + Bluesky/Pinterest hardening
+## Phase 7.5 — Media Upload Service + Bluesky/Pinterest hardening — DONE
+
+**Status (May 2026):** All ship items landed. `POST /v1/media` live with S3-backed storage; `MediaInput` schema accepts `mediaId` / `url` / `bytesBase64`; shared resolver in `apps/api/src/platforms/_shared/media.ts`; Bluesky carousel + alt text + video service auth flow; Pinterest publish path rewritten off the metadata bag. Bluesky video routes through `app.bsky.video.uploadVideo` (service auth + getJobStatus poll, NOT `com.atproto.repo.uploadBlob` — the canonical naive-implementation gotcha caught at preflight via `bluesky.video.quota_exhausted` and friends).
 
 **Goal:** Per-post media as a first-class concept across every publisher, plus the foundation that lets Pinterest, YouTube, and any future video platform actually publish without per-platform carve-outs. Then lock Bluesky and Pinterest to "perfect" against the live API before we resume new-platform work.
 
@@ -217,7 +239,9 @@ Destructive actions (disconnect account, revoke key, delete endpoint, delete pro
 **Risks:** S3 IAM policy footguns (public-read object ACLs disabled by default on new buckets — set bucket policy + Object Ownership = "Bucket owner enforced"); `@aws-sdk/lib-storage` chunk size tuning for slow uploaders.
 **NOT in scope:** S3 lifecycle deletion, CloudFront, byte-range serving, image transformation (resize / re-encode), video transcoding, signed-URL upload flow (callers go through our multipart endpoint; presigned PUT is a future option once we hit bandwidth pain).
 
-## Phase 8 — Meta Trio (IG + FB + Threads)
+## Phase 8 — Meta Trio (IG + FB + Threads) — CODE DONE, AWAITING APP REVIEW
+
+**Status (May 2026):** All publishers shipped: Facebook (text, single photo, multi-photo, video), Instagram (single image, single video / Reels, 2–10 mixed-media carousel), Threads (text, image, video, 2–20 mixed carousel, replies). FBLB OAuth fan-out — one consent grants Pages + linked IG Business rows in a single `completeConnect`. Error mappers for `OAuthException 2207052` (IG URL-not-publicly-fetchable) + IG rate-limit code 4. Async media-publish polling (we await + surface; never silently-success). Awaiting Meta App Review approval (demo videos pending for some scopes); same-day deploy on approval.
 
 **Order rationale (April 2026):** moved ahead of X/Twitter because Meta is buildable today against the developer's own account + Tester accounts in Dev Mode (same Graph API endpoints, approval only lifts the testers-only restriction), while X requires a paid-tier signup decision that hasn't happened. Meta's gate is calendar (App Review submitted), X's is commercial — calendar moves whether we work or not, so we pick the platform we can ship code for in parallel.
 
@@ -232,9 +256,9 @@ Destructive actions (disconnect account, revoke key, delete endpoint, delete pro
 **Risks:** Biggest external blocker in the plan. Keep engineering ready-to-ship so you deploy same-day on approval. IG's async media-publish polling is the publish-path edge case most likely to bite (silently-success patterns are the original wedge — don't reintroduce them here).
 **NOT in scope:** Shopping tags, collab posts, branded content, ads, Threads DM.
 
-## Phase 9 — Twitter/X
+## Phase 9 — Twitter/X — CODE DONE, AWAITING PAY-PER-USE DECISION
 
-**Status (April 2026):** waits on a paid-tier signup decision. X killed Basic/Pro tiers for new signups in Feb 2026 — pay-per-use is the only option, with budget accruing from the first call. Revisit whether X stays in v1 once Phase 8 lands and we have signal on Meta-driven volume.
+**Status (May 2026):** All publisher code shipped. v2 OAuth 2.0 PKCE; up to 4 images per tweet; alt-text via v1.1 metadata endpoint (best-effort — tweet still publishes if alt-text fails, the v1.1 endpoint is on a separate deprecation track from /2/tweets); reply chains via `twitter.replyToTweetId`; quote tweets via `twitter.quoteTweetId` (mutually exclusive — preflight rejects both); image/video exclusivity preflight; `twitter.media.count_max` (replaced obsolete `twitter.media.single_only`); chunked video upload via INIT/APPEND/FINALIZE/STATUS poll with `twitter.media.video_processing_failed` + `twitter.media.processing_timeout` mapped; t.co-aware grapheme counter (URLs always count as 23 chars). PKCE codeVerifier embedded in signed OAuth state token so it survives the dashboard's full-page redirect to X (was the production blocker — fixed). Awaits commercial decision on X Pay Per Use signup.
 
 **Goal:** Third commercial platform; the framework's already proven generic by then (Bluesky + LinkedIn + Pinterest + Meta), so the slice is about platform-specific quirks, not framework validation.
 
@@ -260,20 +284,19 @@ Destructive actions (disconnect account, revoke key, delete endpoint, delete pro
 **Risks:** Verification timeline (CASA cost + scheduling); per-project quota cap on burst uploads — surface clearly, document raising it.
 **NOT in scope:** Live streams, community tab posts, comment moderation, Shorts-specific Reels-cross-posting, Studio analytics.
 
-## Phase 11 — Pinterest extras (post-7.5)
+## Phase 11 — Pinterest extras (post-7.5) — VIDEO DONE
 
-**Status:** Core publish path subsumed by Phase 7.5 (board fetch on connect, default-board with per-post override, image pin via `media: [{ kind: "image", url | mediaId }]`). What remains here is the long tail.
+**Status (May 2026):** Video pin support shipped — `POST /v5/media` registers a slot, multipart-uploads bytes to the presigned S3 endpoint Pinterest hands back, polls `GET /v5/media/{id}` until status flips to `succeeded`, then `POST /v5/pins` with `media_source: { source_type: "video_id", media_id, cover_image_url }`. `pinterest.video.cover_required` preflight catches the most common gotcha (Pinterest mandates a still-frame URL on every video pin) before the upload runs. Mime + size + transcode-failed + transcode-timeout + register-failed + upload-failed all mapped as preflight rules. Image pin path unchanged.
 
-**Ships:**
-- Video pin support — Pinterest accepts MP4 via `cover_image_url` + media; preflight on duration / resolution / size
+**Still on the plate:**
 - Rich pins (article / product) — schema.org markup + URL preflight
-- Board ownership preflight (verify the user can pin to the supplied `boardId` before hitting Pinterest's API)
+- Board ownership preflight (verify the user can pin to `boardId` before hitting Pinterest's API)
 - Pinterest-specific error mapper polish — duplicate-pin, board-deleted, content-policy
 - Standard Access submission (the demo-video gate)
 
 **Depends on:** Phase 7.5.
 **Effort:** 2–3 days plus Standard Access wait.
-**Risks:** Low — image MVP is already proven by 7.5.
+**Risks:** Low — image MVP + video pins are proven by 7.5.
 **NOT in scope:** Catalog/feed sync, ads, idea pins.
 
 ## Phase 12 — OpenAPI Pipeline, TS SDK, Autogen'd Python + Go
@@ -289,20 +312,32 @@ Destructive actions (disconnect account, revoke key, delete endpoint, delete pro
 **Risks:** Autogen façade is where quality dies. Budget naming-polish time.
 **NOT in scope:** CLI, MCP adapter, LangGraph / CrewAI adapters.
 
-## Phase 13 — Marketing + Docs Site (Major Phase)
+## Phase 13 — Marketing + Docs Site — STRUCTURE DONE, CONTENT DRIPPING
 
-**Goal:** The site is a product surface. SEO is a core bet. Docs are a principle.
+**Status (May 2026):** Docs pivoted from the originally-planned Astro-Starlight-Scalar single-deploy to **Mintlify at `docs.letmepost.dev`** (custom looked amateur — Mintlify ships Stripe-tier defaults). Marketing landing stays on `apps/web` (Astro). Live today:
 
-**Docs narrative starts at week 3** (drip 1–2h/day from Phase 1 onward). Weeks 24–26 are for polish, Scalar integration, SEO, and information architecture — **not for writing from scratch**. Error-code and preflight-rule pages should publish incrementally so Google indexes them months ahead of launch.
+- **Mintlify docs**: ~120 MDX pages — auth / API keys / idempotency / errors / webhooks / OAuth lifecycle / per-platform guides / **one page per error code** (11/11) / **one page per preflight rule** (~80) / API reference rendered from `docs/api-reference/openapi.json` (Zod-derived). Maple theme, navbar with Docs/Product tabs.
+- **Astro landing** at `letmepost.dev`: hero, "fails loudly" pitch, request + error sample, three-step how-it-works, four principles, endpoint list, platform-status list, FAQ, final CTA. Borderless chrome. Container 820px (was 720). Navbar at 1100px with Docs + Product two-column dropdown.
+- **Per-platform marketing pages** at `/platforms/[slug]` × 8 — hero with status badge, code sample, content-type chips, demo placeholder, three-step how-it-works, features grid, gotcha callouts (Trial Access for Pinterest, MDP for LinkedIn, Pay Per Use for X, FBLB-not-/instagram for Instagram, etc.).
+- **Per-API marketing pages** at `/api/[slug]` × 3 — Publishing API, Media API, Webhooks. Hero, code sample (TS for publishing/webhooks, bash for media), feature grid.
+- **`/pricing`**: TBD content, four commitment principles, three-card tier preview (Free / Pro=TBD / Self-host), 5 FAQs.
+- **`/blog`**: scaffolded — `@astrojs/mdx` integration, content collection at `src/content/blog/` with strict Zod frontmatter (title, description, pubDate, updatedDate?, author, tags, heroImage?, draft, canonicalUrl?), `/blog` index sorts by pubDate desc and hides drafts in prod, `/blog/[...slug]` post page with Article JSON-LD + BreadcrumbList, `/rss.xml` auto-discovered feed. Sample seed post (`draft: true`) explains the publishing flow.
+- **Full SEO suite**: sitemap at `/sitemap-index.xml` with per-route priority/changefreq/lastmod (home 1.0 weekly; product 0.9 weekly; pricing 0.85 monthly; legal 0.3 yearly); `/sitemap.xml` convention alias; JSON-LD on every page (Organization + WebSite default, FAQPage on home, BreadcrumbList + SoftwareApplication on platform pages, BreadcrumbList on API pages, BlogPosting on posts); `twitter:site` + `twitter:creator` set to `@letmepostdotdev`; `og:type` per-page (`product` on platform/API pages, `article` on posts); robots.txt explicitly allows GPTBot, ChatGPT-User, OAI-SearchBot, ClaudeBot, Claude-Web, PerplexityBot, Perplexity-User, Google-Extended, anthropic-ai, cohere-ai, Applebot-Extended, Bytespider.
 
-**Ships in `apps/web` (Astro + Starlight + Scalar, single deploy):** Landing (hero + "fails loudly" positioning + live preflight-failure demo + platform matrix + pricing + OSS CTA); Docs in Starlight (getting started with cURL + TS + Python + Go tabs on every example; authentication; API keys; idempotency; errors; webhooks; OAuth lifecycle; **one page per error code** with reproduction + remediation; **one page per preflight rule** with upstream platform citation; per-platform guides; migration guides from Ayrshare / Postiz / Buffer); **Public API Version Tracker** consuming `/v1/platform-versions`; API Reference via Scalar; Changelog fed from Changesets; Lighthouse 100 enforced in CI; OG-image generation per doc page; structured-data JSON-LD; unified sitemap; blog with the 4 launch posts (LinkedIn version-churn piece is the flagship).
+**Still on the plate:**
+- **Blog content** — write the launch series. Targets: LinkedIn version-churn flagship; "fails loudly" thesis; OAuth lifecycle deep-dive; idempotency-keys vs retry-storms.
+- **Live preflight-failure demo** on the home page (currently the platform pages have "demo coming soon" placeholders).
+- **Per-platform live-connect demo** in the playground card on each platform page (the placeholder structure is there).
+- **Migration guides** from Ayrshare / Postiz / Buffer (drafts pending).
+- **Public API Version Tracker** UI rendering `GET /v1/platform-versions` (the API exists; the docs landing for it doesn't).
+- **Lighthouse 100** verification across all marketing + docs pages in CI.
+- **Per-page OG images** (currently all pages share `/og-image.png` — fine for v1, sharper for launch).
 
 **Problems solved:** All indirectly (this is where the narrative lives).
 **Principles served:** 5, 6, 7.
-**Depends on:** Phase 12 for the reference; narrative can start at week 3.
-**Effort:** 3 weeks of concentrated work + continuous background writing.
+**Effort spent:** ~2 weeks; remaining content + polish ~1 week.
 **Risks:** Writing quality is the bottleneck. Do not outsource. Pull content from the existing research corpus.
-**NOT in scope:** Community forum, interactive playground beyond the preflight demo, multilingual.
+**NOT in scope:** Community forum, multilingual, interactive sandbox beyond the preflight + per-platform demos.
 
 ## Phase 14 — Observability, Security, Launch Prep, Pricing Decision
 
@@ -342,12 +377,12 @@ Destructive actions (disconnect account, revoke key, delete endpoint, delete pro
 | 11 | **Phase 5.5: Profiles (retrofit)** | — |
 | 12–14 | **Phase 6: LinkedIn (3 wks)** | TS SDK skeleton stubbed in week 14 |
 | 15–16 | Phase 7: Dashboard | TS SDK continues |
-| 17 | **Phase 7.5: Media + S3 + Bluesky/Pinterest hardening (1 wk)** | — |
-| 18–20 | **Phase 8: Meta trio (3 wks, build during App Review)** | Py/Go generators; if Meta approval lands mid-phase the trailing build days flip to Live Mode same-day |
-| 21–22 | Phase 9: X/Twitter (gated on paid-tier signup) | If X signup hasn't happened, swap in Phase 11 extras + Phase 13 docs |
-| 23–25 | Phase 10: YouTube (build during CASA verification) | Same swap rule |
-| 26 | Phase 11: Pinterest extras (video pins, rich pins, board ACL preflight) | — |
-| 27–29 | **Phase 13: Site + docs polish (3 wks)** | Contract test cron stabilization |
+| 17 | **Phase 7.5: Media + S3 + Bluesky/Pinterest hardening — DONE** | — |
+| 18–20 | **Phase 8: Meta trio — CODE DONE** (awaiting App Review for Live Mode) | Py/Go generators; same-day deploy on approval |
+| 21–22 | **Phase 9: X/Twitter — CODE DONE** (awaiting Pay Per Use decision; PKCE state-embedding fix shipped) | — |
+| 23–25 | Phase 10: YouTube (build during CASA verification — not yet started) | — |
+| 26 | **Phase 11: Pinterest video pin — DONE.** Extras (rich pins, board ACL preflight) outstanding. Standard Access demo video pending. | — |
+| 27–29 | **Phase 13: Site + docs — STRUCTURE DONE** (Mintlify pivoted; landing redesigned; blog scaffolded; full SEO; per-platform/API pages; pricing). Content + Lighthouse 100 verification outstanding. | Contract test cron stabilization |
 | 30 | Phase 14: Obs + security + launch prep + pricing | — |
 | 31 | Phase 15: Launch | — |
 
@@ -357,6 +392,42 @@ Note: weeks 26–28 count as the *polish* window for docs, assuming the continuo
 **Can parallelize:** Phase 7 (dashboard) with Phase 9 (X) and Phase 12 (SDKs); Phase 8 Meta build runs concurrently with App Review since Tester-account publishes work in Dev Mode.
 **Calendar-gated:** 8 (Meta App Review — build proceeds against Tester accounts in Dev Mode, deploy flips to Live on approval), 10 (YouTube CASA verification).
 **Always-background:** Docs narrative (Phase 13).
+
+---
+
+## Added to plate (after the original plan)
+
+Tracked here so the work doesn't disappear into a phase that's marked done.
+
+**Code (small, mostly carried from session-end TODOs):**
+
+- `apps/api/src/platforms/twitter/provider.ts` — call `GET /2/users/me` on `completeConnect` to replace the synthetic `twitter-${uuid}` `platformAccountId` with the real X user id. One TODO marker; ~30 LOC.
+- `apps/api/src/routes/posts.ts` — `POST /v1/posts/validate` endpoint (preflight without publishing). Mentioned on the docs / preflight index page as "when it ships." Useful for CI integration patterns by users.
+- `apps/api/src/platforms/_shared/media.ts` — eviction / lifecycle policy for the S3 bucket once we have a real bandwidth bill. Not v1.
+- Test brittleness: 5 pre-existing failures in `tests/accounts.test.ts` + `tests/post-log.test.ts` (session-auth path). Not caused by recent work — pre-existing on baseline. Worth a focused fix slice when there's spare cycles.
+
+**Marketing site (`apps/web`):**
+
+- Live preflight-failure demo on home page (currently a static error sample).
+- Per-platform live-connect demo in the playground card on each `/platforms/[slug]` page (placeholder structure exists; backend endpoint needs a "demo connect" carve-out).
+- `/blog` content: launch series (LinkedIn version-churn flagship; "fails loudly" thesis; OAuth lifecycle; idempotency vs retry-storms).
+- Migration guides from Ayrshare / Postiz / Buffer (in `apps/web` blog or separate `/migrate/[from]` pages).
+- `/platform-versions` UI rendering `GET /v1/platform-versions`.
+- Per-page OG images (currently shared).
+- Lighthouse 100 enforcement in CI.
+
+**Mintlify docs (`docs/`):**
+
+- Optional preflight pages for the transport-failure rules left undocumented (`bluesky.video.upload_failed`, `bluesky.video.job_status_unavailable`, `pinterest.media.status_unavailable`, `pinterest.video.upload_unreachable`, `twitter.media.upload_unreachable`). Currently surfaced via `remediation` on the API response only. Low priority.
+- `/v1/media` upload-route validation rules (`media.content_type`, `media.empty_body`, `media.missing_file`, `media.parse_failed`, `media.single_file`, `media.size_max`) — better documented inline on the upload-media guide than as separate pages. Currently OK.
+
+**Approvals + deploys:**
+
+- Meta demo videos for App Review submission (per-scope).
+- Pinterest Standard Access demo video.
+- X Pay Per Use signup decision.
+- YouTube CASA verification kickoff.
+- Verify Twitter PKCE fix on Railway production once Pay Per Use signup completes (the codeVerifier-in-state fix was deployed; needs a real auth round-trip to confirm).
 
 ---
 

@@ -1,0 +1,220 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import CharacterCounter from "../../components/CharacterCounter.astro";
+import { Icon } from "astro-icon/components";
+
+// Order matters — shortest cap first so the eye lands on the tightest
+// constraint when scanning down the cards.
+const platforms = [
+  {
+    slug: "x",
+    name: "X (Twitter)",
+    limit: 280,
+    mode: "twitter-weighted" as const,
+    hint: "weighted count",
+  },
+  {
+    slug: "bluesky",
+    name: "Bluesky",
+    limit: 300,
+    byteLimit: 3000,
+    mode: "graphemes" as const,
+    hint: "graphemes + bytes",
+  },
+  {
+    slug: "threads",
+    name: "Threads",
+    limit: 500,
+    mode: "graphemes" as const,
+    hint: "single post",
+  },
+  {
+    slug: "instagram-caption",
+    name: "Instagram caption",
+    limit: 2200,
+    mode: "graphemes" as const,
+    hint: "feed + Reels",
+  },
+  {
+    slug: "linkedin",
+    name: "LinkedIn",
+    limit: 3000,
+    mode: "graphemes" as const,
+    hint: "main post",
+  },
+  {
+    slug: "facebook",
+    name: "Facebook page",
+    limit: 63206,
+    mode: "graphemes" as const,
+    hint: "but ~80 chars sees the most engagement",
+  },
+];
+
+const platformLinks = [
+  { slug: "linkedin-character-counter", label: "LinkedIn-only" },
+  { slug: "x-character-counter", label: "X-only" },
+  { slug: "bluesky-grapheme-counter", label: "Bluesky-only" },
+  { slug: "threads-character-counter", label: "Threads-only" },
+];
+---
+
+<BaseLayout
+  title="Social media character counter"
+  description="Free multi-platform character counter — Bluesky, X (Twitter), Threads, LinkedIn, Instagram, and Facebook. Each counted with the platform's actual rule."
+  jsonLd={[
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      name: "Multi-platform social media character counter",
+      applicationCategory: "DeveloperApplication",
+      operatingSystem: "Web",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      description:
+        "Free social media character counter that runs every major platform's rule simultaneously — Bluesky graphemes + bytes, X weighted, LinkedIn 3,000, Threads 500.",
+    },
+  ]}
+>
+  <section class="pt-22 pb-10 max-[640px]:pt-14 max-[640px]:pb-6">
+    <div class="container">
+      <div
+        class="inline-flex items-center gap-2 text-[0.72rem] uppercase tracking-[0.1em] mb-5 py-[0.3rem] px-[0.6rem] border border-border-strong"
+      >
+        <span
+          class="w-[7px] h-[7px] inline-block bg-accent"
+          aria-hidden="true"></span>
+        Tool · Free
+      </div>
+      <h1 class="!m-0">
+        One textarea.<br class="max-[640px]:hidden" />
+        <span class="text-accent">Every platform's rule.</span>
+      </h1>
+      <p
+        class="text-[1.05rem] leading-[1.6] max-w-[42rem] mt-4 mb-8 text-text-secondary"
+      >
+        Each platform counts differently — X uses weighted characters, Bluesky
+        uses graphemes <em>and</em> UTF-8 bytes, LinkedIn uses graphemes alone,
+        Threads at 500. This counter runs all of them at once.
+      </p>
+      <CharacterCounter
+        platforms={platforms}
+        placeholder="Type or paste your post — every cap updates as you type."
+      />
+    </div>
+  </section>
+
+  <section class="pt-4 pb-10">
+    <div class="container">
+      <h2 class="!mt-0">Why each platform counts differently.</h2>
+      <p class="text-text-muted">
+        There's no shared rule. The only safe thing is to enforce each
+        platform's published count locally before you hit the API. Otherwise
+        you find out at the wire — and most upstream errors don't tell you
+        which character was the problem.
+      </p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
+        <div class="border border-border p-4">
+          <div class="text-[0.72rem] uppercase tracking-[0.1em] text-accent mb-2">
+            X (Twitter)
+          </div>
+          <p class="m-0 text-[0.88rem] text-text-secondary">
+            Weighted count from twitter-text. Latin = 1, CJK / Arabic / Hebrew
+            / emoji = 2. URLs always count as 23 regardless of length (t.co
+            shortening).
+          </p>
+        </div>
+
+        <div class="border border-border p-4">
+          <div class="text-[0.72rem] uppercase tracking-[0.1em] text-accent mb-2">
+            Bluesky
+          </div>
+          <p class="m-0 text-[0.88rem] text-text-secondary">
+            300 graphemes <em>and</em> 3,000 UTF-8 bytes — whichever fills
+            first. A heavy-emoji post can hit the byte cap before the grapheme
+            cap.
+          </p>
+        </div>
+
+        <div class="border border-border p-4">
+          <div class="text-[0.72rem] uppercase tracking-[0.1em] text-accent mb-2">
+            LinkedIn
+          </div>
+          <p class="m-0 text-[0.88rem] text-text-secondary">
+            3,000 graphemes for the main share. Comments cap at 1,250.
+            Connection notes at 300 (free) or 1,900 (Premium).
+          </p>
+        </div>
+
+        <div class="border border-border p-4">
+          <div class="text-[0.72rem] uppercase tracking-[0.1em] text-accent mb-2">
+            Threads
+          </div>
+          <p class="m-0 text-[0.88rem] text-text-secondary">
+            500 graphemes per post. Chain up to 20 posts; each gets the full
+            500.
+          </p>
+        </div>
+
+        <div class="border border-border p-4">
+          <div class="text-[0.72rem] uppercase tracking-[0.1em] text-accent mb-2">
+            Instagram caption
+          </div>
+          <p class="m-0 text-[0.88rem] text-text-secondary">
+            2,200 graphemes for the caption (feed and Reels). 30 hashtags max.
+          </p>
+        </div>
+
+        <div class="border border-border p-4">
+          <div class="text-[0.72rem] uppercase tracking-[0.1em] text-accent mb-2">
+            Facebook page
+          </div>
+          <p class="m-0 text-[0.88rem] text-text-secondary">
+            63,206 characters technically allowed; ~80 characters is the
+            engagement sweet spot per Meta's own data.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="pt-6 pb-10">
+    <div class="container">
+      <h2 class="!mt-0">Need a single-platform version?</h2>
+      <ul class="list-none p-0 mt-3 grid grid-cols-2 gap-2">
+        {
+          platformLinks.map((p) => (
+            <li>
+              <a
+                href={`/tools/${p.slug}`}
+                class="block border border-border p-3 no-underline text-[0.88rem] hover:border-border-strong hover:text-accent"
+              >
+                {p.label} →
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section class="pt-6 pb-18 max-[640px]:pb-12">
+    <div class="container">
+      <h2 class="!mt-0">Or have us preflight it for you.</h2>
+      <p class="text-text-muted">
+        <code>letmepost.dev</code> runs every one of these rules on every post
+        you submit — and tells you exactly which one would have failed before
+        we hit the platform.
+      </p>
+      <div class="flex gap-[0.6rem] flex-wrap mt-6">
+        <a class="btn btn-primary" href="https://dashboard.letmepost.dev">
+          Try the API for free
+          <Icon name="ph:arrow-up-right" width={13} height={13} />
+        </a>
+        <a class="btn btn-secondary" href="https://docs.letmepost.dev/preflight"
+          >Read the preflight docs</a
+        >
+      </div>
+    </div>
+  </section>
+</BaseLayout>

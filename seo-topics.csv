@@ -154,3 +154,9 @@ tier,category,slug,working_title,target_query,status,notes
 3,tool,tools/youtube-quota-cost-calculator,YouTube API quota cost calculator,youtube api quota calculator,idea,
 3,tool,tools/oauth-scope-checker-linkedin,LinkedIn OAuth scope checker,linkedin oauth scope checker,idea,
 3,tool,tools/social-media-character-counter,Multi-platform character counter,social media character counter,idea,Unified — link target for all platform counters
+3,tool,tools/pkce-generator,PKCE generator (code_verifier + code_challenge),pkce generator,idea,Pairs with X OAuth flow
+3,tool,tools/x-oauth-scope-checker,X (Twitter) OAuth scope checker,x oauth scopes,idea,Twitter v2 scopes — restricted-scope flag for dm.*
+3,tool,tools/meta-oauth-scope-checker,Meta OAuth scope checker (Facebook + IG + Threads + WhatsApp),meta oauth scopes,idea,Covers 4 Meta surfaces — App Review flagged per scope
+3,tool,tools/linkedin-urn-encoder-decoder,LinkedIn URN encoder / decoder,linkedin urn,idea,Encode + decode urn:li:* with URL-encoded variants
+3,tool,tools/linkedin-api-version-tracker,LinkedIn API version tracker,linkedin api version tracker,idea,Live countdown — turns version-churn wedge into a tool
+3,tool,tools/cron-expression-builder,Cron expression builder + tester,cron expression builder,idea,Broadest backlink-magnet potential of the batch

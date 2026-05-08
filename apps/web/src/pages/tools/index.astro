@@ -39,6 +39,29 @@ const groups = [
     ],
   },
   {
+    label: "OAuth scope checkers",
+    tools: [
+      {
+        slug: "linkedin-oauth-scope-checker",
+        title: "LinkedIn",
+        body: "Pick what you want to do, get the minimum scope string. Includes the deprecated r_liteprofile / r_emailaddress mappings.",
+        icon: "linkedin-logo",
+      },
+      {
+        slug: "x-oauth-scope-checker",
+        title: "X (Twitter)",
+        body: "X v2 OAuth 2.0 scopes — tweet.write, dm.*, follows.*, offline.access. PKCE-aware example URL.",
+        icon: "x-logo",
+      },
+      {
+        slug: "meta-oauth-scope-checker",
+        title: "Meta (Facebook + IG + Threads + WhatsApp)",
+        body: "All four Meta surfaces in one place. App Review (Advanced Access) flagged on every scope.",
+        icon: "meta-logo",
+      },
+    ],
+  },
+  {
     label: "Generators",
     tools: [
       {
@@ -46,6 +69,29 @@ const groups = [
         title: "Idempotency key generator",
         body: "UUID v4, ULID, or nanoid — the three formats you actually want as an Idempotency-Key header.",
         icon: "key",
+      },
+      {
+        slug: "pkce-generator",
+        title: "PKCE generator",
+        body: "code_verifier + S256 code_challenge using Web Crypto. Required for X v2 OAuth and most modern flows.",
+        icon: "fingerprint",
+      },
+      {
+        slug: "cron-expression-builder",
+        title: "Cron expression builder",
+        body: "Type or pick a preset, get a plain-English description and the next 5 fire times. Respects the day-of-month / day-of-week OR quirk.",
+        icon: "clock-clockwise",
+      },
+    ],
+  },
+  {
+    label: "Decoders / parsers",
+    tools: [
+      {
+        slug: "linkedin-urn-encoder-decoder",
+        title: "LinkedIn URN encoder / decoder",
+        body: "Build urn:li:ugcPost:…, urn:li:organization:…, urn:li:person:… — and split URNs back into type + id.",
+        icon: "scan",
       },
     ],
   },
@@ -59,10 +105,10 @@ const groups = [
         icon: "youtube-logo",
       },
       {
-        slug: "linkedin-oauth-scope-checker",
-        title: "LinkedIn OAuth scope checker",
-        body: "Pick scopes, see what they actually unlock. Or pick an action and see the minimum scope set.",
-        icon: "shield-check",
+        slug: "linkedin-api-version-tracker",
+        title: "LinkedIn API version tracker",
+        body: "Live status for every LinkedIn API version. Days-until-sunset countdown so 410 Gone never surprises you.",
+        icon: "calendar-x",
       },
     ],
   },

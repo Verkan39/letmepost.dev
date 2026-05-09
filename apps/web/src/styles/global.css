@@ -155,16 +155,16 @@
   }
 
   /* h1 — display weight. Sized to land deliberately big without
-     overwhelming the page. Ceiling 4.25rem (68px) at 1280+ viewports;
-     scales down via 6vw on smaller screens. Letter-spacing tighter
-     at larger sizes (display type wants less air per character)
-     and line-height 1.08 keeps stacked headline lines from feeling
+     overwhelming the page. Ceiling 3.75rem (60px) at 1280+ viewports;
+     scales down via 5.5vw on smaller screens. Letter-spacing tighter
+     at larger sizes (display type wants less air per character) and
+     line-height 1.1 keeps stacked headline lines from feeling
      unrelated. */
   h1 {
-    font-size: clamp(2.4rem, 6vw, 4.25rem);
+    font-size: clamp(2.2rem, 5.5vw, 3.75rem);
     font-weight: 800;
     letter-spacing: -0.03em;
-    line-height: 1.08;
+    line-height: 1.1;
     margin: 0 0 1.25rem;
   }
 

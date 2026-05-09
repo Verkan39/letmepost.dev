@@ -49,7 +49,11 @@ const {
 } = Astro.props;
 
 const siteName = "letmepost.dev";
-const fullTitle = title === siteName ? title : `${title} — ${siteName}`;
+// Match the dashboard's title template: `<page> · letmepost.dev`. The
+// dashboard uses Next.js metadata's `template: "%s · letmepost.dev"`;
+// this is the Astro mirror of the same convention so a user moving
+// between marketing tabs and dashboard tabs sees identical formatting.
+const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
 const canonical = new URL(Astro.url.pathname, Astro.site).toString();
 const ogImageUrl = new URL(ogImage, Astro.site).toString();
 const siteUrl = Astro.site!.toString().replace(/\/$/, "");

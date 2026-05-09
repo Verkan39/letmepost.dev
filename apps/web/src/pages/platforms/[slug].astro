@@ -160,32 +160,36 @@ const softwareJsonLd = {
   <!-- Hero -->
   <section class="section-hero">
     <div class="container">
-      <a
-        href="/#platforms"
-        class="text-[0.78rem] uppercase tracking-[0.1em] text-text-muted no-underline hover:text-accent inline-flex items-center gap-[0.45rem] mb-7"
-      >
-        <Icon name="ph:arrow-left" width={12} height={12} />
-        All platforms
-      </a>
+      {/* Pre-headline meta line: status + tagline + back-link, all
+          tiny and quiet. The platform name + icon carry the page
+          via the h1 below. */}
+      <div class="flex flex-wrap items-center gap-3 mb-9 text-[0.85rem] text-text-muted">
+        <a
+          href="/#platforms"
+          class="inline-flex items-center gap-1.5 no-underline text-text-muted hover:text-accent transition-colors"
+        >
+          <Icon name="ph:arrow-left" width={11} height={11} />
+          All platforms
+        </a>
+        <span class="opacity-40">·</span>
+        <span class="inline-flex items-center gap-1.5">
+          <span
+            class="inline-block w-[7px] h-[7px]"
+            style={`background: ${status.color};`}
+            aria-hidden="true"
+          ></span>
+          {status.label}
+        </span>
+        <span class="opacity-40">·</span>
+        <span>{platform.tagline}</span>
+      </div>
 
-      <div class="flex items-center gap-4 mb-6">
-        <Icon name={`ph:${platform.icon}`} width={36} height={36} class="text-text" />
+      <div class="flex items-center gap-5 mb-2">
+        <Icon name={`ph:${platform.icon}`} width={48} height={48} class="text-text" />
         <h1 class="!m-0">{platform.name}</h1>
       </div>
 
-      <div class="status-pill mb-8">
-        <span
-          class="status-pill-dot"
-          style={`background: ${status.color};`}
-          aria-hidden="true"
-        ></span>
-        {status.label}
-        <span class="opacity-60 ml-1">· {platform.tagline}</span>
-      </div>
-
-      <p
-        class="text-[1.2rem] leading-[1.65] max-w-[44rem] mt-4 mb-10 text-text-secondary"
-      >
+      <p class="text-[1.2rem] leading-[1.65] mt-7 mb-10 text-text-secondary">
         {platform.pitch}
       </p>
 
@@ -199,7 +203,7 @@ const softwareJsonLd = {
         </a>
       </div>
 
-      <p class="text-[0.85rem] mt-5 text-text-muted">
+      <p class="text-[0.85rem] mt-6 text-text-muted">
         No credit card required · Free during alpha ·
         <a href="https://docs.letmepost.dev/api-reference" class="text-accent">API reference →</a>
       </p>

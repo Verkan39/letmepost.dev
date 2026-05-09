@@ -150,24 +150,39 @@ const faqJsonLd = {
   <!-- Hero -->
   <section class="section-hero">
     <div class="container">
-      <div class="status-pill text-text-muted mb-8">
-        <span
-          class="status-pill-dot bg-success"
-          style={liveGlyphShadow}></span>
-        open source · <span
-          class="text-accent font-bold text-[0.7rem] tracking-[0.06em]">[alpha]</span
+      {/* Pre-headline meta — deliberately quiet. The headline should
+          carry the page, not a chunky status pill. The arrow link
+          gives it just enough character to read as a designed
+          element instead of a stranded label. */}
+      <div class="flex items-center gap-3 mb-8 text-[0.85rem] text-text-muted">
+        <a
+          href="https://github.com/rosekamallove/letmepost.dev"
+          target="_blank"
+          rel="noopener"
+          class="inline-flex items-center gap-1.5 no-underline text-text hover:text-accent transition-colors"
         >
+          <span
+            class="inline-block w-[7px] h-[7px] bg-success"
+            style={liveGlyphShadow}
+            aria-hidden="true"
+          ></span>
+          v0 alpha is live
+          <Icon name="ph:arrow-up-right" width={11} height={11} />
+        </a>
+        <span class="opacity-50">·</span>
+        <span>open source from day one</span>
       </div>
+
       <h1>
         A publishing API that <span class="text-accent">fails loudly.</span>
       </h1>
-      <p
-        class="text-[1.2rem] leading-[1.65] mt-6 mb-11 text-text-secondary max-w-[40rem]"
-      >
+
+      <p class="text-[1.2rem] leading-[1.65] mt-7 mb-11 text-text-secondary">
         An open-source publishing API for developers and AI agents. When a
         post fails, you get the rule that failed, the raw platform response,
         and a remediation — never an empty body. No per-profile tax.
       </p>
+
       <div class="flex gap-[0.7rem] flex-wrap">
         <a
           class="btn btn-primary"
@@ -180,6 +195,11 @@ const faqJsonLd = {
           <Icon name="ph:arrow-down" width={13} height={13} />
         </a>
       </div>
+
+      <p class="text-[0.85rem] mt-6 text-text-muted">
+        No signup required to read · Free during alpha ·
+        <a href="https://docs.letmepost.dev/quickstart" class="text-accent">90-second quickstart →</a>
+      </p>
     </div>
   </section>
 

@@ -32,6 +32,25 @@ const docsLinks = [
   },
 ] as const;
 
+/**
+ * Resources dropdown — collects every navbar entry that isn't core
+ * product or core docs into one menu. Folding Blog / Tools / Status /
+ * Changelog out of the brand cluster takes us from 5 top-level items
+ * to 4; combined with Status moving out of the utility cluster, the
+ * navbar drops from 8 nav elements to 6 without removing any
+ * destination.
+ */
+const resourcesLinks = [
+  { label: "Blog", href: "/blog", icon: "ph:newspaper" },
+  { label: "Tools", href: "/tools", icon: "ph:wrench" },
+  { label: "Status", href: "/status", icon: "ph:pulse" },
+  {
+    label: "Changelog",
+    href: "https://docs.letmepost.dev/changelog",
+    icon: "ph:list-bullets",
+  },
+] as const;
+
 // Split the platforms across two columns balanced by row count so the
 // dropdown stays a fixed shape regardless of how many platforms ship.
 const half = Math.ceil(PLATFORMS.length / 2);
@@ -43,12 +62,14 @@ const platformsRight = PLATFORMS.slice(half);
   <div class="container-wide flex items-center h-[78px] gap-10">
     <Logo />
     {/* Brand-cluster nav — sits right next to the logo so the Docs /
-        Product / Pricing items feel like part of the wordmark rather
-        than a stranded right-rail group. Slightly larger font + wider
-        gap than utility nav so it reads as the primary cluster. */}
+        Product / Pricing / Resources items feel like part of the
+        wordmark rather than a stranded right-rail group. Slightly
+        larger font + wider gap than utility nav so it reads as the
+        primary cluster, but smaller than 1rem so it doesn't compete
+        with the wordmark. */}
     <nav
       aria-label="Primary"
-      class="flex items-center gap-8 text-[1rem]"
+      class="flex items-center gap-7 text-[0.9rem]"
     >
       {/* ─── Docs dropdown ─────────────────────────────────────── */}
       <div class="lmp-dropdown" data-dropdown>
@@ -179,28 +200,60 @@ const platformsRight = PLATFORMS.slice(half);
         class="no-underline text-text-muted transition-colors hover:text-accent max-[520px]:hidden"
         >Pricing</a
       >
-      <a
-        href="/tools"
-        class="no-underline text-text-muted transition-colors hover:text-accent max-[520px]:hidden"
-        >Tools</a
-      >
-      <a
-        href="/blog"
-        class="no-underline text-text-muted transition-colors hover:text-accent max-[520px]:hidden"
-        >Blog</a
-      >
+
+      {/* ─── Resources dropdown ───────────────────────────────────
+          Folds Blog, Tools, Status, Changelog out of the brand
+          cluster. The brand cluster used to carry 5 items (Docs,
+          Product, Pricing, Tools, Blog) which competed with the
+          headline for visual weight. */}
+      <div class="lmp-dropdown" data-dropdown>
+        <button
+          type="button"
+          class="lmp-dropdown-trigger inline-flex items-center gap-1 no-underline text-text-muted transition-colors hover:text-accent max-[640px]:hidden"
+          aria-haspopup="true"
+          aria-expanded="false"
+          data-dropdown-trigger
+        >
+          Resources
+          <Icon
+            name="ph:caret-down"
+            width={11}
+            height={11}
+            class="lmp-dropdown-caret transition-transform"
+          />
+        </button>
+        <div
+          class="lmp-dropdown-menu"
+          role="menu"
+          aria-label="Resources"
+          data-dropdown-menu
+        >
+          <ul class="lmp-dropdown-list">
+            {resourcesLinks.map((link) => (
+              <li>
+                <a
+                  href={link.href}
+                  class="lmp-dropdown-item"
+                  role="menuitem"
+                >
+                  <Icon name={link.icon} width={15} height={15} />
+                  <span>{link.label}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
     </nav>
     {/* Utility-cluster — pushed to the right via ml-auto so it sticks
-        to the far edge regardless of the brand cluster's width. */}
+        to the far edge regardless of the brand cluster's width.
+        Status moved into the Resources dropdown (it's an operational
+        concern, not a primary nav destination); the cluster drops to
+        just GitHub + theme. */}
     <nav
       aria-label="Utility"
-      class="ml-auto flex items-center gap-7 text-[0.95rem]"
+      class="ml-auto flex items-center gap-6 text-[0.88rem]"
     >
-      <a
-        href="/status"
-        class="no-underline text-text-muted transition-colors hover:text-accent max-[520px]:hidden"
-        >Status</a
-      >
       <a
         class="inline-flex items-center gap-1 no-underline text-text-muted transition-colors hover:text-accent"
         href="https://github.com/rosekamallove/letmepost.dev"

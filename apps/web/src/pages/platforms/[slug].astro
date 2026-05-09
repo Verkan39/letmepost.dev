@@ -158,26 +158,24 @@ const softwareJsonLd = {
   jsonLd={[breadcrumbJsonLd, softwareJsonLd]}
 >
   <!-- Hero -->
-  <section class="pt-22 pb-12 max-[640px]:pt-14 max-[640px]:pb-8">
+  <section class="section-hero">
     <div class="container">
       <a
         href="/#platforms"
-        class="text-[0.72rem] uppercase tracking-[0.1em] text-text-muted no-underline hover:text-accent inline-flex items-center gap-1 mb-5"
+        class="text-[0.78rem] uppercase tracking-[0.1em] text-text-muted no-underline hover:text-accent inline-flex items-center gap-[0.45rem] mb-7"
       >
-        <Icon name="ph:arrow-left" width={11} height={11} />
+        <Icon name="ph:arrow-left" width={12} height={12} />
         All platforms
       </a>
 
-      <div class="flex items-center gap-3 mb-5">
-        <Icon name={`ph:${platform.icon}`} width={32} height={32} class="text-text" />
+      <div class="flex items-center gap-4 mb-6">
+        <Icon name={`ph:${platform.icon}`} width={36} height={36} class="text-text" />
         <h1 class="!m-0">{platform.name}</h1>
       </div>
 
-      <div
-        class="inline-flex items-center gap-2 text-[0.72rem] uppercase tracking-[0.1em] mb-7 py-[0.3rem] px-[0.6rem] border border-border-strong"
-      >
+      <div class="status-pill mb-8">
         <span
-          class="w-[7px] h-[7px] inline-block"
+          class="status-pill-dot"
           style={`background: ${status.color};`}
           aria-hidden="true"
         ></span>
@@ -186,12 +184,12 @@ const softwareJsonLd = {
       </div>
 
       <p
-        class="text-[1.1rem] leading-[1.6] max-w-[42rem] mt-3 mb-8 text-text-secondary"
+        class="text-[1.2rem] leading-[1.65] max-w-[44rem] mt-4 mb-10 text-text-secondary"
       >
         {platform.pitch}
       </p>
 
-      <div class="flex gap-[0.6rem] flex-wrap">
+      <div class="flex gap-[0.7rem] flex-wrap">
         <a class="btn btn-primary" href="https://dashboard.letmepost.dev">
           Start building free
           <Icon name="ph:arrow-up-right" width={13} height={13} />
@@ -201,7 +199,7 @@ const softwareJsonLd = {
         </a>
       </div>
 
-      <p class="text-[0.78rem] mt-3 text-text-muted">
+      <p class="text-[0.85rem] mt-5 text-text-muted">
         No credit card required · Free during alpha ·
         <a href="https://docs.letmepost.dev/api-reference" class="text-accent">API reference →</a>
       </p>
@@ -209,16 +207,16 @@ const softwareJsonLd = {
   </section>
 
   <!-- Code sample -->
-  <section class="pt-8 pb-12">
+  <section class="section-tight">
     <div class="container">
-      <div class="border border-border bg-code-bg">
+      <div class="border border-border-strong bg-code-bg">
         <div
-          class="flex items-center gap-[0.45rem] py-[0.65rem] px-[0.9rem] border-b border-[hsl(24_10%_16%)] text-[0.7rem] text-code-muted tracking-[0.02em]"
+          class="flex items-center gap-[0.5rem] py-[0.75rem] px-[1rem] border-b border-[hsl(24_10%_16%)] text-[0.75rem] text-code-muted tracking-[0.02em]"
         >
           <span class="w-[11px] h-[11px] rounded-full inline-block shrink-0 bg-[#ff5f57]" aria-hidden="true"></span>
           <span class="w-[11px] h-[11px] rounded-full inline-block shrink-0 bg-[#febc2e]" aria-hidden="true"></span>
           <span class="w-[11px] h-[11px] rounded-full inline-block shrink-0 bg-[#28c840]" aria-hidden="true"></span>
-          <span class="ml-[0.6rem]">post-to-{platform.slug}.ts</span>
+          <span class="ml-[0.7rem]">post-to-{platform.slug}.ts</span>
         </div>
         <Code code={codeSample} lang="ts" theme="github-dark-dimmed" />
       </div>
@@ -226,7 +224,7 @@ const softwareJsonLd = {
   </section>
 
   <!-- Constraints + gotcha -->
-  <section class="pt-8 pb-12 max-[640px]:pt-6">
+  <section class="section">
     <div class="container">
       <h2 class="!mt-0">What ships on day one.</h2>
       <p class="text-text-muted">
@@ -235,31 +233,31 @@ const softwareJsonLd = {
 
       {platform.gotcha ? (
         <div
-          class="border-l-4 mt-6 py-3 px-4"
+          class="border-l-4 mt-7 py-4 px-5"
           style="border-color: var(--color-accent); background: var(--color-accent-soft);"
         >
-          <div class="text-[0.72rem] uppercase tracking-[0.1em] text-accent font-bold mb-1">Heads up</div>
-          <p class="m-0 text-[0.92rem] text-text-secondary">{platform.gotcha}</p>
+          <div class="text-[0.78rem] uppercase tracking-[0.1em] text-accent font-bold mb-2">Heads up</div>
+          <p class="m-0 text-[0.98rem] text-text-secondary">{platform.gotcha}</p>
         </div>
       ) : null}
     </div>
   </section>
 
   <!-- Demo placeholder -->
-  <section class="pt-8 pb-12">
+  <section class="section">
     <div class="container">
-      <div class="text-[0.72rem] uppercase tracking-[0.1em] text-text-muted mb-3 font-bold">Playground</div>
+      <div class="text-[0.78rem] uppercase tracking-[0.1em] text-text-muted mb-4 font-bold">Playground</div>
       <div
-        class="border border-dashed border-border-strong p-8 text-center"
+        class="border border-dashed border-border-strong p-10 text-center"
       >
         <Icon
           name="ph:play-circle"
-          width={32}
-          height={32}
-          class="mx-auto mb-3 text-text-muted"
+          width={36}
+          height={36}
+          class="mx-auto mb-4 text-text-muted"
         />
-        <h3 class="!mt-0 !mb-1 !text-base">Live {platform.name} demo coming soon</h3>
-        <p class="text-text-muted text-[0.9rem] m-0">
+        <h3 class="!mt-0 !mb-2 !text-[1.1rem]">Live {platform.name} demo coming soon</h3>
+        <p class="text-text-muted text-[0.95rem] m-0 max-w-[36rem] mx-auto">
           Connect an account and send a real post through the API — no signup form, no credit card. Watch this space.
         </p>
       </div>
@@ -267,46 +265,46 @@ const softwareJsonLd = {
   </section>
 
   <!-- Content types -->
-  <section class="pt-8 pb-12">
+  <section class="section">
     <div class="container">
-      <div class="text-[0.72rem] uppercase tracking-[0.1em] text-text-muted mb-3 font-bold">Content types</div>
-      <div class="flex gap-2 flex-wrap">
+      <div class="text-[0.78rem] uppercase tracking-[0.1em] text-text-muted mb-4 font-bold">Content types</div>
+      <div class="flex gap-[0.6rem] flex-wrap">
         {contentTypes.map((ct) => (
           <span
-            class={`inline-flex items-center gap-[0.45rem] py-[0.4rem] px-[0.7rem] text-[0.82rem] border ${
+            class={`inline-flex items-center gap-[0.55rem] py-[0.55rem] px-[0.95rem] text-[0.9rem] border ${
               ct.supported
                 ? "border-border-strong text-text"
                 : "border-border text-text-muted opacity-50 line-through"
             }`}
           >
-            <Icon name={`ph:${ct.icon}`} width={14} height={14} />
+            <Icon name={`ph:${ct.icon}`} width={15} height={15} />
             {ct.label}
           </span>
         ))}
       </div>
-      <p class="text-[0.78rem] mt-4 text-text-muted">
+      <p class="text-[0.85rem] mt-5 text-text-muted">
         Crossed-out types aren't supported on {platform.name} in v1 — see <a href="https://docs.letmepost.dev/preflight" class="text-accent">preflight rules</a> for the exact ceilings.
       </p>
     </div>
   </section>
 
   <!-- How it works -->
-  <section class="pt-8 pb-12">
+  <section class="section">
     <div class="container">
       <h2 class="!mt-0">How it works.</h2>
       <p class="text-text-muted">Three steps. Minutes, not days.</p>
 
-      <ol class="list-none p-0 mt-6 mb-4">
+      <ol class="list-none p-0 mt-8 mb-4">
         {howItWorks.map((step) => (
-          <li class="flex gap-[1.1rem] py-5">
-            <div class="text-accent font-extrabold text-[0.85rem] min-w-9 pt-[0.1rem] tracking-[0.04em]">
+          <li class="flex gap-[1.4rem] py-6 border-t border-border first:border-t-0">
+            <div class="text-accent font-extrabold text-[0.95rem] min-w-10 pt-[0.15rem] tracking-[0.04em]">
               {step.n}
             </div>
             <div>
-              <h3 class="!m-0 !mb-[0.35rem] !text-base !font-bold">
+              <h3 class="!m-0 !mb-[0.5rem] !text-[1.1rem] !font-bold">
                 {step.title}
               </h3>
-              <p class="text-text-muted m-0 text-[0.92rem]">{step.body}</p>
+              <p class="text-text-muted m-0 text-[1rem] leading-[1.65]">{step.body}</p>
             </div>
           </li>
         ))}
@@ -315,16 +313,16 @@ const softwareJsonLd = {
   </section>
 
   <!-- Features grid -->
-  <section class="pt-8 pb-12">
+  <section class="section">
     <div class="container">
       <h2 class="!mt-0">Why letmepost vs going direct.</h2>
 
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-8">
         {features.map((feat) => (
-          <div class="border border-border p-5">
-            <Icon name={`ph:${feat.icon}`} width={22} height={22} class="text-accent mb-3" />
-            <h3 class="!m-0 !mb-2 !text-[0.95rem] !font-bold">{feat.title}</h3>
-            <p class="text-text-muted m-0 text-[0.86rem]">{feat.body}</p>
+          <div class="border border-border-strong p-7">
+            <Icon name={`ph:${feat.icon}`} width={24} height={24} class="text-accent mb-4" />
+            <h3 class="!m-0 !mb-3 !text-[1rem] !font-bold">{feat.title}</h3>
+            <p class="text-text-muted m-0 text-[0.93rem] leading-[1.6]">{feat.body}</p>
           </div>
         ))}
       </div>
@@ -332,13 +330,13 @@ const softwareJsonLd = {
   </section>
 
   <!-- Final CTA -->
-  <section class="pt-8 pb-18 max-[640px]:pb-12">
+  <section class="section">
     <div class="container">
       <h2 class="!mt-0">Ready to ship?</h2>
       <p class="text-text-muted">
         Star the repo. Connect a {platform.name} account. Send your first post in under 90 seconds.
       </p>
-      <div class="flex gap-[0.6rem] flex-wrap">
+      <div class="flex gap-[0.7rem] flex-wrap mt-2">
         <a class="btn btn-primary" href="https://dashboard.letmepost.dev">
           Start building free
           <Icon name="ph:arrow-up-right" width={13} height={13} />

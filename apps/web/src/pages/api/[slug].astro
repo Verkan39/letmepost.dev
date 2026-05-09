@@ -181,39 +181,34 @@ const breadcrumbJsonLd = {
   jsonLd={[breadcrumbJsonLd]}
 >
   <!-- Hero -->
-  <section class="pt-22 pb-12 max-[640px]:pt-14 max-[640px]:pb-8">
+  <section class="section-hero">
     <div class="container">
       <a
         href="/"
-        class="text-[0.72rem] uppercase tracking-[0.1em] text-text-muted no-underline hover:text-accent inline-flex items-center gap-1 mb-5"
+        class="text-[0.78rem] uppercase tracking-[0.1em] text-text-muted no-underline hover:text-accent inline-flex items-center gap-[0.45rem] mb-7"
       >
-        <Icon name="ph:arrow-left" width={11} height={11} />
+        <Icon name="ph:arrow-left" width={12} height={12} />
         All APIs
       </a>
 
-      <div class="flex items-center gap-3 mb-5">
-        <Icon name={`ph:${api.icon}`} width={32} height={32} class="text-text" />
+      <div class="flex items-center gap-4 mb-6">
+        <Icon name={`ph:${api.icon}`} width={36} height={36} class="text-text" />
         <h1 class="!m-0">{api.name}</h1>
       </div>
 
-      <div
-        class="inline-flex items-center gap-2 text-[0.72rem] uppercase tracking-[0.1em] mb-7 py-[0.3rem] px-[0.6rem] border border-border-strong"
-      >
-        <span
-          class="w-[7px] h-[7px] inline-block bg-success"
-          aria-hidden="true"
-        ></span>
+      <div class="status-pill mb-8">
+        <span class="status-pill-dot bg-success" aria-hidden="true"></span>
         Live
         <span class="opacity-60 ml-1">· {api.tagline}</span>
       </div>
 
       <p
-        class="text-[1.1rem] leading-[1.6] max-w-[42rem] mt-3 mb-8 text-text-secondary"
+        class="text-[1.2rem] leading-[1.65] max-w-[44rem] mt-4 mb-10 text-text-secondary"
       >
         {api.pitch}
       </p>
 
-      <div class="flex gap-[0.6rem] flex-wrap">
+      <div class="flex gap-[0.7rem] flex-wrap">
         <a class="btn btn-primary" href="https://dashboard.letmepost.dev">
           Start building free
           <Icon name="ph:arrow-up-right" width={13} height={13} />
@@ -229,11 +224,11 @@ const breadcrumbJsonLd = {
   </section>
 
   <!-- Code sample -->
-  <section class="pt-8 pb-12">
+  <section class="section-tight">
     <div class="container">
-      <div class="border border-border bg-code-bg">
+      <div class="border border-border-strong bg-code-bg">
         <div
-          class="flex items-center gap-[0.45rem] py-[0.65rem] px-[0.9rem] border-b border-[hsl(24_10%_16%)] text-[0.7rem] text-code-muted tracking-[0.02em]"
+          class="flex items-center gap-[0.5rem] py-[0.75rem] px-[1rem] border-b border-[hsl(24_10%_16%)] text-[0.75rem] text-code-muted tracking-[0.02em]"
         >
           <span class="w-[11px] h-[11px] rounded-full inline-block shrink-0 bg-[#ff5f57]" aria-hidden="true"></span>
           <span class="w-[11px] h-[11px] rounded-full inline-block shrink-0 bg-[#febc2e]" aria-hidden="true"></span>
@@ -246,17 +241,17 @@ const breadcrumbJsonLd = {
   </section>
 
   <!-- What it does -->
-  <section class="pt-8 pb-12">
+  <section class="section">
     <div class="container">
       <h2 class="!mt-0">What's in the box.</h2>
       <p class="text-text-muted">{api.detail}</p>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-8">
         {featureList.map((feat) => (
-          <div class="border border-border p-5">
-            <Icon name={`ph:${feat.icon}`} width={22} height={22} class="text-accent mb-3" />
-            <h3 class="!m-0 !mb-2 !text-[0.95rem] !font-bold">{feat.title}</h3>
-            <p class="text-text-muted m-0 text-[0.86rem]">{feat.body}</p>
+          <div class="border border-border-strong p-7">
+            <Icon name={`ph:${feat.icon}`} width={24} height={24} class="text-accent mb-4" />
+            <h3 class="!m-0 !mb-3 !text-[1rem] !font-bold">{feat.title}</h3>
+            <p class="text-text-muted m-0 text-[0.93rem] leading-[1.6]">{feat.body}</p>
           </div>
         ))}
       </div>
@@ -264,13 +259,13 @@ const breadcrumbJsonLd = {
   </section>
 
   <!-- Final CTA -->
-  <section class="pt-8 pb-18 max-[640px]:pb-12">
+  <section class="section">
     <div class="container">
       <h2 class="!mt-0">Ship it.</h2>
       <p class="text-text-muted">
         Mint an API key. Send your first request. We're around if you hit anything weird.
       </p>
-      <div class="flex gap-[0.6rem] flex-wrap">
+      <div class="flex gap-[0.7rem] flex-wrap mt-2">
         <a class="btn btn-primary" href="https://dashboard.letmepost.dev">
           Get an API key
           <Icon name="ph:arrow-up-right" width={13} height={13} />

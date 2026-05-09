@@ -4,6 +4,12 @@ interface Props {
   size?: number;
 }
 
+// Logo size and wordmark size were both bumped in the May-2026 design
+// audit — the navbar grew taller (78px) and the body type scale moved
+// up to 16px / 2.25rem h2 / 3.5rem h1. The previous 32px square + 1.6rem
+// wordmark visually disappeared next to the new heading scale. Square
+// stays at 32px (it's a focal mark, not subordinate to text), but the
+// wordmark grows to 1.95rem to balance.
 const { wordmark = true, size = 32 } = Astro.props;
 ---
 
@@ -38,13 +44,13 @@ const { wordmark = true, size = 32 } = Astro.props;
   {
     wordmark && (
       <span class="inline-flex items-baseline">
-        <span class="font-serif italic font-normal text-[1.6rem] max-[480px]:text-[1.35rem] tracking-[-0.01em] leading-none text-text">
+        <span class="font-serif italic font-normal text-[1.95rem] max-[480px]:text-[1.5rem] tracking-[-0.01em] leading-none text-text">
           letmepost
         </span>
-        <span class="font-serif italic font-normal text-[1.6rem] max-[480px]:text-[1.35rem] tracking-[-0.01em] leading-none text-accent">
+        <span class="font-serif italic font-normal text-[1.95rem] max-[480px]:text-[1.5rem] tracking-[-0.01em] leading-none text-accent">
           .dev
         </span>
-        <span class="ml-[0.4rem] font-mono text-[0.54rem] font-semibold text-text-muted tracking-[0.04em] opacity-60 uppercase self-end pb-[0.15rem]">
+        <span class="ml-[0.5rem] font-mono text-[0.62rem] font-semibold text-text-muted tracking-[0.05em] opacity-60 uppercase self-end pb-[0.2rem]">
           [alpha]
         </span>
       </span>

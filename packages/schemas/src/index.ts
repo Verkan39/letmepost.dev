@@ -1,4 +1,5 @@
 export * from "./platforms.js";
+export * from "./platform-state.js";
 export * from "./post.js";
 export * from "./post-status.js";
 export * from "./errors.js";

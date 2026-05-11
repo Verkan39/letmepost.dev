@@ -6,6 +6,7 @@ export const ErrorCode = z.enum([
   "platform_auth_failed",
   "platform_rejected",
   "platform_unavailable",
+  "platform_not_enabled",
   "internal_error",
   "unauthenticated",
   "unauthorized",

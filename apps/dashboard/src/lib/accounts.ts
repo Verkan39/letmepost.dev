@@ -62,3 +62,11 @@ export const CONNECTABLE_PLATFORMS = [
   "twitter",
 ] as const;
 export type ConnectablePlatform = (typeof CONNECTABLE_PLATFORMS)[number];
+
+// Re-export the canonical PLATFORM_STATE + PlatformState from the
+// zod-free schemas subpath so the dashboard bundle stays clean. There's
+// exactly one definition of these values across the monorepo.
+export {
+  PLATFORM_STATE,
+  type PlatformState,
+} from "@letmepost/schemas/platform-state";

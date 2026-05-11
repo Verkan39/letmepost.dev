@@ -13,6 +13,10 @@ import { decodeOAuthState, encodeOAuthState } from "../oauth/state.js";
 import { getProvider } from "../platforms/index.js";
 import { PinterestClient } from "../platforms/pinterest/client.js";
 import type { PinterestTokenMetadata } from "../platforms/pinterest/provider.js";
+import {
+  assertPlatformEnabled,
+  platformState,
+} from "../platforms/_shared/platform-state.js";
 import { computeRefreshDelayMs } from "../platforms/_shared/refresh.js";
 import { DrizzlePlatformAccountsRepository } from "../repositories/platform-accounts.js";
 import { DrizzleProfilesRepository } from "../repositories/profiles.js";
@@ -154,6 +158,10 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
     }),
     async (c) => {
       const { platform } = c.req.valid("param");
+      // Gate: reject `pending` platforms with a transparent
+      // `platform_not_enabled` error. `trial` falls through (the
+      // dashboard badges the tile separately).
+      assertPlatformEnabled(platform);
       const provider = getProvider(platform);
       const { organizationId } = c.var.session;
 
@@ -187,7 +195,11 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
         oauthState,
         oauthStatePayload,
       });
-      return c.json({ platform, descriptor });
+      return c.json({
+        platform,
+        state: platformState(platform),
+        descriptor,
+      });
     },
   );
 
@@ -208,6 +220,11 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
     }),
     async (c) => {
       const { platform } = c.req.valid("param");
+      // Gate /complete as well — a determined caller could try to POST
+      // here directly with hand-crafted credentials even if /connect
+      // was blocked. Keeps the rejection consistent across both halves
+      // of the handshake.
+      assertPlatformEnabled(platform);
       const provider = getProvider(platform);
       const { organizationId } = c.var.session;
 

@@ -15,7 +15,9 @@ import { pinterestPublisher } from "../pinterest/publisher.js";
 import type { PinterestTokenMetadata } from "../pinterest/provider.js";
 import { threadsPublisher } from "../threads/publisher.js";
 import type { ThreadsTokenMetadata } from "../threads/provider.js";
+import { assertTwitterLaunchCap } from "../twitter/launch-cap.js";
 import { twitterPublisher } from "../twitter/publisher.js";
+import type { DrizzleClient } from "../../db/index.js";
 import type { MediaResolverContext } from "./media.js";
 
 /**
@@ -52,9 +54,21 @@ export type PublishInput = {
   twitter?: TwitterPostOverrides;
 };
 
+/**
+ * Execution context for the dispatch layer. Required by pre-publish
+ * gates (X launch cap, etc.) that need DB access — making `db` required
+ * means a future caller can't accidentally skip the cost guard. Tests
+ * that legitimately can't provide a DB connection set `skipGates: true`
+ * to opt out explicitly, which is grep-able and reviewable.
+ */
+export type PublishContext =
+  | { db: DrizzleClient; skipGates?: false }
+  | { skipGates: true; db?: DrizzleClient };
+
 export async function publishForAccount(
   account: DecryptedPlatformAccount,
   input: PublishInput,
+  ctx: PublishContext,
 ): Promise<CreatePostResponse> {
   switch (account.platform) {
     case "bluesky": {
@@ -94,6 +108,12 @@ export async function publishForAccount(
       );
     }
     case "twitter":
+      // Launch-window cost cap on X. PPU billing means an uncapped
+      // worker loop = real money out the door. Gate runs unless the
+      // caller explicitly opted out via `skipGates: true`.
+      if (!ctx.skipGates) {
+        await assertTwitterLaunchCap(ctx.db!, account.id);
+      }
       return twitterPublisher.publish(
         {
           accessToken: account.token,

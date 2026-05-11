@@ -205,19 +205,23 @@ posts.post(
     }
 
     try {
-      const result = await publishForAccount(account, {
-        text,
-        ...(media !== undefined ? { media } : {}),
-        ...(firstComment !== undefined ? { firstComment } : {}),
-        ...(pinterest !== undefined ? { pinterest } : {}),
-        ...(threads !== undefined ? { threads } : {}),
-        ...(twitter !== undefined ? { twitter } : {}),
-        mediaContext: {
-          db: c.var.db,
-          organizationId,
-          profileId: account.profileId,
+      const result = await publishForAccount(
+        account,
+        {
+          text,
+          ...(media !== undefined ? { media } : {}),
+          ...(firstComment !== undefined ? { firstComment } : {}),
+          ...(pinterest !== undefined ? { pinterest } : {}),
+          ...(threads !== undefined ? { threads } : {}),
+          ...(twitter !== undefined ? { twitter } : {}),
+          mediaContext: {
+            db: c.var.db,
+            organizationId,
+            profileId: account.profileId,
+          },
         },
-      });
+        { db: c.var.db },
+      );
 
       const publishedAt = new Date();
       await c.var.db

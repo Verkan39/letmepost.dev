@@ -79,7 +79,31 @@ const publishWorker = new Worker<PublishJobData>(
     }
 
     try {
-      const result = await publishForAccount(account, { text: post.text });
+      // Wire persisted media through to the publisher. Per-platform
+      // overrides (`pinterest.boardId`, `threads.replyToId`, etc.) are
+      // not yet stored on the posts row — scheduled posts currently
+      // degrade to platform defaults for those. Adding columns +
+      // back-fill is a Phase-7.5 follow-up; tracked in plan.md.
+      const persistedMedia = Array.isArray(post.mediaRefs)
+        ? (post.mediaRefs as Parameters<typeof publishForAccount>[1]["media"])
+        : undefined;
+      const result = await publishForAccount(
+        account,
+        {
+          text: post.text,
+          ...(persistedMedia && persistedMedia.length > 0
+            ? {
+                media: persistedMedia,
+                mediaContext: {
+                  db,
+                  organizationId,
+                  profileId: account.profileId,
+                },
+              }
+            : {}),
+        },
+        { db },
+      );
 
       const publishedAt = new Date();
       await db

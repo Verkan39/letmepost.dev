@@ -33,6 +33,7 @@ Every error a caller sees is a `LetmepostError` (`apps/api/src/errors.ts`) seria
 - Always preserve the raw upstream body in `platformResponse`. Never drop it. The integrator needs it to debug.
 - Zod parse failures get coerced into `LetmepostError(code: "validation_failed")` inside `zValidator` callbacks. The `rule` is the dotted path of the failing field.
 - The two boundary helpers in `platforms/_shared/errors.ts` — `authFailed()` and `rejected()` — are how upstream client code constructs errors. Use them. Don't hand-roll.
+- **Config parsing follows the same rule.** Env-var typos that gate connectivity (e.g. `PLATFORM_STATE_OVERRIDES=pinterest:Live`) must throw at parse time. Silent fallback to a default state is the same failure mode this section exists to prevent.
 
 ---
 
@@ -49,7 +50,8 @@ The `apps/api/src` layout reflects strict layering. Cross-talking is forbidden:
 | `platforms/<name>/publisher.ts` | Preflight + bytes resolution + client orchestration; produces a `CreatePostResponse` | DB |
 | `platforms/<name>/preflight.ts` | Pure validators only — no network, no DB | Anything else |
 | `platforms/<name>/provider.ts` | Implements `AccountProvider` (describeConnect / completeConnect / refreshToken) | The publisher (deliberately decoupled) |
-| `platforms/_shared/*` | Patterns shared across platforms (dispatch, media, http, errors, scopes) | Specific platform code |
+| `platforms/<name>/<gate>.ts` | Pre-publish gates (cost cap, audit-state, etc.) — see §3.5 | Routes (gates run from dispatch) |
+| `platforms/_shared/*` | Patterns shared across platforms (dispatch, media, http, errors, scopes, platform-state) | Specific platform code |
 
 **Do not** import a route from a publisher. **Do not** call a client directly from a route — go through the publisher. **Do not** put Zod parsing in middleware. If you find yourself wanting to break a layer, write it down here as a counter-rule and we'll discuss.
 
@@ -67,6 +69,20 @@ There's one entry point that needs to know about a new platform:
 6. Tests: `tests/posts-<name>.test.ts`, `tests/preflight-<name>.test.ts`, `tests/provider-<name>.test.ts`. See §5.
 
 If you're touching `routes/posts.ts` or `queue/worker.ts` to add a platform, **stop** — that's a sign the dispatch refactor regressed. Open `_shared/dispatch.ts` instead.
+
+---
+
+## 3.5 Pre-publish gates
+
+A gate is a check that must run *before* the publisher fires and may need DB access — examples: the X PPU cost cap (`platforms/twitter/launch-cap.ts`), Pinterest sandbox checks, TikTok audit-state warnings, an org-level quota lookup. They share a shape:
+
+- Pure function, named for the check (`assertTwitterLaunchCap`, `assertPinterestAudit`, etc.). Throws `LetmepostError` — never returns a boolean.
+- Lives in `platforms/<name>/<gate>.ts` (platform-specific) or `_shared/<gate>.ts` (cross-platform).
+- Called from `_shared/dispatch.ts` inside the platform's `case` block, *before* the `publisher.publish()` call. Not from the route layer — routes don't know per-platform billing.
+- Reads DB via `PublishContext.db` — the field is **required**, not optional. Tests that legitimately can't provide a DB connection set `skipGates: true`, which is grep-able and reviewable.
+- Same error contract as everything else: `code`, `rule`, `platform`, populated `platformResponse` with structured detail (cap, window, retry-after) so callers can react programmatically.
+
+The `connect/:platform` gate (`assertPlatformEnabled`) is a different shape — it gates *connection*, not publishing — and lives in `_shared/platform-state.ts` invoked from the route. Same throw-don't-return rule.
 
 ---
 
@@ -146,12 +162,16 @@ Rules:
 
 | You're adding… | Goes in… |
 |---|---|
-| A new error code | `apps/api/src/errors.ts` (`ErrorCode` union) + a docs page (Phase 13) |
+| A new error code | `packages/schemas/src/errors.ts` (`ErrorCode` enum) + a docs page (Phase 13) |
 | A new endpoint | `apps/api/src/routes/<resource>.ts` mounted from `app.ts` |
 | A new DB table | `apps/api/src/db/schema/<name>.ts`, exported from `schema/index.ts` |
 | A new public schema | `packages/schemas/src/<name>.ts`, exported from `index.ts` |
+| A new cross-app constant (shared values, not zod) | `packages/schemas/src/<name>.ts` — and add a subpath export to `packages/schemas/package.json` if client bundles consume it (e.g. `@letmepost/schemas/platform-state`) |
 | A new platform | See §3 |
+| A new pre-publish gate | See §3.5 |
+| A new platform launch-state value | `packages/schemas/src/platform-state.ts` (`PlatformState`); add a row to `PLATFORM_STATE` for the platform |
 | A new shared platform helper | `apps/api/src/platforms/_shared/<name>.ts` |
+| A new env override that gates behavior | Parse + validate in the helper; throw on bad tokens at parse time. See §1's loud-failure rule. |
 | A new test | `apps/api/tests/<topic>.test.ts` — flat layout, no nesting |
 | A new dashboard component | `apps/dashboard/src/components/app/<name>.tsx` (app-specific) or `components/ui/*` (shadcn primitive) |
 | A new dashboard analytics event | Add a variant to `DashboardEvent` in `apps/dashboard/src/lib/analytics.ts`; fire via `track()` |
@@ -166,7 +186,7 @@ Rules:
 - **Per-platform `if`-soup at the route layer** — every cross-platform branch belongs in `_shared/*`.
 - **Comments that describe the what** — the code already says what. Comments are for the *why* (a non-obvious constraint, a workaround, a hidden invariant). Concrete example: `capture_pageview: false` in `posthog-provider.tsx` earns a comment because removing it would silently double-count pageviews; the line itself doesn't reveal why.
 - **File-header docstrings that summarize the module** — paragraph-long "this file's three responsibilities" blocks don't earn their keep. One-line whys do.
-- **Duplicated/shadowed unions kept in sync by comment** — import the canonical type or extend it. A comment is not a substitute for `import`.
+- **Duplicated/shadowed unions kept in sync by comment** — import the canonical type or extend it. A comment is not a substitute for `import`. Cross-app constants live in `@letmepost/schemas`; if a client bundle's zod budget is the concern, fix it structurally — split a subpath export, export the constant without zod — not by duplicating + commenting.
 - **Backwards-compatibility shims for unused code** — delete it; we're pre-launch. After launch this rule flips.
 
 ---

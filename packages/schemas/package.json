@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./platform-state": {
+      "types": "./dist/platform-state.d.ts",
+      "default": "./dist/platform-state.js"
     }
   },
   "files": [

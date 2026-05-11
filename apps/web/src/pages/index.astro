@@ -3,21 +3,23 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 import { Code } from "astro:components";
 import { Icon } from "astro-icon/components";
 import PlatformIcon from "../components/PlatformIcon.astro";
+import { PLATFORMS } from "../data/platforms.ts";
 
-const platforms = [
-  { name: "Bluesky", slug: "bluesky", status: "live" },
-  { name: "Pinterest", slug: "pinterest", status: "under_review" },
-  { name: "Twitter / X", slug: "x", status: "under_review" },
-  { name: "LinkedIn", slug: "linkedin", status: "under_review" },
-  { name: "Instagram", slug: "instagram", status: "under_review" },
-  { name: "Facebook", slug: "facebook", status: "under_review" },
-  { name: "Threads", slug: "threads", status: "under_review" },
-  { name: "YouTube", slug: "youtube", status: "under_review" },
-] as const;
+// Pull only the fields the platform-support strip needs from the
+// single source of truth in data/platforms.ts. `slug` matches the
+// backend Platform enum except for the navbar's "x" alias — kept
+// in lockstep with the data file via the import above.
+const platforms = PLATFORMS.map((p) => ({
+  name: p.name,
+  slug: p.slug,
+  status: p.status,
+}));
 
 const statusLabel: Record<string, string> = {
   live: "live",
-  under_review: "under review",
+  trial: "trial",
+  pending: "pending platform review",
+  planned: "planned",
 };
 
 const codeSample = `// Idempotency keys make retries safe.
@@ -116,7 +118,8 @@ const faqs = [
 
 function glyphClasses(status: string): string {
   if (status === "live") return "bg-success opacity-100";
-  if (status === "under_review") return "bg-accent opacity-100";
+  if (status === "trial") return "bg-accent opacity-100";
+  if (status === "pending") return "bg-accent opacity-60";
   return "bg-text-muted opacity-50";
 }
 

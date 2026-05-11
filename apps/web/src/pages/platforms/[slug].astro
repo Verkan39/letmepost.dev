@@ -19,7 +19,8 @@ const { platform } = Astro.props;
 
 const STATUS_COPY: Record<Platform["status"], { label: string; color: string }> = {
   live: { label: "Live", color: "var(--color-success, var(--color-accent))" },
-  under_review: { label: "Under review", color: "var(--color-accent)" },
+  trial: { label: "Trial", color: "var(--color-accent)" },
+  pending: { label: "Pending platform review", color: "var(--color-accent)" },
   planned: { label: "Planned", color: "var(--color-text-muted)" },
 };
 const status = STATUS_COPY[platform.status];

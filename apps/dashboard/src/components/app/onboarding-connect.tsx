@@ -6,9 +6,11 @@ import { ArrowLeft } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import {
+  PLATFORM_STATE,
   type ConnectablePlatform,
   type ConnectDescriptor,
   type ConnectResponse,
+  type PlatformState,
 } from "@/lib/accounts";
 import { useActiveProfile } from "@/lib/profiles";
 import { PLATFORM_BRANDS } from "@/components/app/platform-icons";
@@ -277,28 +279,46 @@ export function OnboardingConnect({
             className="grid grid-cols-2 gap-2 sm:grid-cols-4"
           >
             {PLATFORM_BRANDS.map((b) => {
+              const state: PlatformState = PLATFORM_STATE[b.id] ?? "pending";
+              const pending = state === "pending";
               const active = picked === b.id && busy;
               const dim = busy && picked !== b.id;
               return (
                 <button
                   key={b.id}
                   type="button"
-                  onClick={() => handlePick(b.id)}
-                  disabled={busy}
+                  onClick={() => !pending && handlePick(b.id)}
+                  disabled={busy || pending}
                   aria-busy={active}
+                  aria-disabled={pending}
+                  title={
+                    pending
+                      ? `${b.label} is pending platform approval — coming soon.`
+                      : undefined
+                  }
                   className={cn(
-                    "group flex flex-col items-center gap-2 px-3 py-5 ring-1 ring-foreground/10 bg-card transition-[box-shadow,opacity] duration-200",
-                    !busy && "hover:ring-foreground/40 hover:bg-muted/40",
+                    "group relative flex flex-col items-center gap-2 px-3 py-5 ring-1 ring-foreground/10 bg-card transition-[box-shadow,opacity] duration-200",
+                    !busy && !pending && "hover:ring-foreground/40 hover:bg-muted/40",
                     active && "ring-primary",
                     dim && "opacity-40 pointer-events-none",
+                    pending && "opacity-50 cursor-not-allowed",
                   )}
                 >
+                  {state === "trial" ? (
+                    <span
+                      className="absolute top-1 right-1 text-[9px] uppercase tracking-wider px-1 py-px ring-1 ring-foreground/20 text-muted-foreground"
+                      aria-label="Trial — limited access"
+                    >
+                      trial
+                    </span>
+                  ) : null}
                   <span
                     className={cn(
                       "size-10 transition-[filter,opacity] duration-200",
                       "grayscale opacity-55",
-                      "group-hover:grayscale-0 group-hover:opacity-100",
+                      !pending && "group-hover:grayscale-0 group-hover:opacity-100",
                       active && "grayscale-0 opacity-100",
+                      pending && "opacity-30",
                     )}
                     style={{ color: b.color }}
                   >
@@ -307,11 +327,11 @@ export function OnboardingConnect({
                   <span
                     className={cn(
                       "text-xs font-medium text-muted-foreground transition-colors",
-                      "group-hover:text-foreground",
+                      !pending && "group-hover:text-foreground",
                       active && "text-foreground",
                     )}
                   >
-                    {active ? "Opening…" : b.label}
+                    {pending ? "Coming soon" : active ? "Opening…" : b.label}
                   </span>
                 </button>
               );

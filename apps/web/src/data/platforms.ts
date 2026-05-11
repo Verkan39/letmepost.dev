@@ -1,19 +1,21 @@
+import {
+  PLATFORM_STATE,
+  type PlatformState,
+} from "@letmepost/schemas/platform-state";
+
 /**
  * Source-of-truth list of platforms surfaced on the landing site —
- * navbar, /platforms cards, and the dynamic /platforms/[slug] pages
- * all key off this. Adding a platform here scaffolds:
+ * navbar, /platforms cards, the dynamic /platforms/[slug] pages, and
+ * the index landing's platform-support strip all read from this file.
  *
- *   1. A new entry under the navbar's PLATFORMS column
- *   2. A new /platforms/<slug> page generated from the shared shell
- *   3. A row on the index landing's platform-status list
- *
- * Keep this in sync with `packages/schemas/src/platforms.ts` and the
- * provider registry in `apps/api/src/platforms/index.ts`. When real-API
- * status flips (under_review → live), update `status` here in the same
- * commit that ships the launch.
+ * Status is computed from the canonical `PLATFORM_STATE` in
+ * `@letmepost/schemas` so this list cannot drift from the backend
+ * connect gate. The marketing-only `planned` status is for platforms
+ * we haven't built a publisher for yet (e.g. YouTube) — they're not
+ * in the backend Platform enum, so they have no gate to drift from.
  */
 
-export type PlatformStatus = "live" | "under_review" | "planned";
+export type PlatformStatus = PlatformState | "planned";
 
 export type Platform = {
   /** URL slug — `/platforms/<slug>`. */
@@ -22,7 +24,7 @@ export type Platform = {
   name: string;
   /** Phosphor icon id (without the `ph:` prefix). */
   icon: string;
-  /** Live-launch status; drives the colored dot + the page hero copy. */
+  /** Live-launch status — derived from PLATFORM_STATE, never inlined. */
   status: PlatformStatus;
   /** One-liner shown under the card on /platforms-overview. */
   tagline: string;
@@ -38,12 +40,22 @@ export type Platform = {
   gotcha?: string;
 };
 
-export const PLATFORMS: readonly Platform[] = [
+/** Marketing-only slugs that aren't in the backend Platform enum. */
+const PLANNED_PLATFORMS: ReadonlySet<string> = new Set(["youtube"]);
+
+function statusFor(slug: string): PlatformStatus {
+  if (PLANNED_PLATFORMS.has(slug)) return "planned";
+  const fromState = (PLATFORM_STATE as Record<string, PlatformState>)[slug];
+  return fromState ?? "planned";
+}
+
+type PlatformBase = Omit<Platform, "status">;
+
+const PLATFORMS_BASE: readonly PlatformBase[] = [
   {
     slug: "bluesky",
     name: "Bluesky",
     icon: "butterfly",
-    status: "live",
     tagline: "AT Proto · live for everyone today",
     pitch:
       "App-password connect, no OAuth review, no app gates. The AT Proto stack ships v1's most permissive on-ramp — sign in with an app password and the API is live.",
@@ -56,7 +68,6 @@ export const PLATFORMS: readonly Platform[] = [
     slug: "twitter",
     name: "Twitter / X",
     icon: "x-logo",
-    status: "under_review",
     tagline: "v2 API + chunked video upload",
     pitch:
       "OAuth 2.0 PKCE handled server-side. Up to four images, an MP4 video via chunked upload, reply chains, quote tweets — one POST surface for all of it.",
@@ -71,7 +82,6 @@ export const PLATFORMS: readonly Platform[] = [
     slug: "linkedin",
     name: "LinkedIn",
     icon: "linkedin-logo",
-    status: "under_review",
     tagline: "Versioned REST · the wedge platform",
     pitch:
       "LinkedIn sunset five API versions in six months from 2024–25. We pin the version header, monitor sunsets, and upgrade internally — your code keeps working when LinkedIn ships a breaking change at 2 a.m.",
@@ -86,7 +96,6 @@ export const PLATFORMS: readonly Platform[] = [
     slug: "pinterest",
     name: "Pinterest",
     icon: "pinterest-logo",
-    status: "under_review",
     tagline: "v5 API · image + video pins",
     pitch:
       "Image pins go through `media_source.url` directly — single round-trip and the pin is live. Video pins run register-media → S3 multipart → poll → createPin transparently.",
@@ -101,7 +110,6 @@ export const PLATFORMS: readonly Platform[] = [
     slug: "threads",
     name: "Threads",
     icon: "threads-logo",
-    status: "under_review",
     tagline: "Meta Threads Graph API · 2–20 carousels",
     pitch:
       "Standalone OAuth at threads.net (not Facebook Login). Text, single image, single video, or a 2–20-child mixed-media carousel — Threads's two-step async publish is hidden from the caller.",
@@ -114,7 +122,6 @@ export const PLATFORMS: readonly Platform[] = [
     slug: "instagram",
     name: "Instagram",
     icon: "instagram-logo",
-    status: "under_review",
     tagline: "Meta Graph · IG Business via FB Login",
     pitch:
       "One Facebook OAuth grants both Pages and IG Business access. Single-image, single-video (Reels), or 2–10 mixed-media carousels. URL reachability — the canonical `OAuthException 2207052` — caught locally before upstream.",
@@ -129,7 +136,6 @@ export const PLATFORMS: readonly Platform[] = [
     slug: "facebook",
     name: "Facebook Pages",
     icon: "facebook-logo",
-    status: "under_review",
     tagline: "Meta Graph · Pages + IG fan-out",
     pitch:
       "Facebook Login for Business. Text-only, single photo, multi-photo, or video posts to your Pages. The same OAuth grant lights up linked IG Business accounts in one step.",
@@ -142,7 +148,6 @@ export const PLATFORMS: readonly Platform[] = [
     slug: "youtube",
     name: "YouTube",
     icon: "youtube-logo",
-    status: "planned",
     tagline: "Data API v3 · CASA verification gate",
     pitch:
       "YouTube uploads via Data API v3 are gated by Google's CASA security review (typically 6–12 weeks). letmepost ships the publisher and waits on review; flip-the-switch is one config change once Google clears the audit.",
@@ -153,7 +158,12 @@ export const PLATFORMS: readonly Platform[] = [
     gotcha:
       "Awaiting CASA verification approval. Self-host users with their own Google project + CASA cert can use it today.",
   },
-] as const;
+];
+
+export const PLATFORMS: readonly Platform[] = PLATFORMS_BASE.map((p) => ({
+  ...p,
+  status: statusFor(p.slug),
+}));
 
 export type ApiSurface = {
   slug: string;
@@ -204,4 +214,4 @@ export const APIS: readonly ApiSurface[] = [
     detail:
       "POST /v1/webhook-endpoints · 8 event types · HMAC-SHA256 · exponential backoff · dead-letter inspection",
   },
-] as const;
+];

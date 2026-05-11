@@ -1,36 +1,28 @@
 # letmepost.dev
 
-> A publishing API that fails loudly.
+> **An open-source social media publishing API that fails loudly.**
+> One `POST /v1/posts` across every platform. Stable error codes, the rule that failed, the raw platform body, and a remediation — on every failure. Never an empty `{ body: {} }`. No per-profile tax.
 
-Open-source social media publishing API for developers and AI-agent builders. Every failure response carries the rule that failed, the raw platform body, and a remediation — never an empty `{ body: {} }`. No per-profile tax.
+An alternative to: **Ayrshare**, **Postiz**, **Buffer**, **Hootsuite**, **Hypefury**.
 
-**Status — alpha.** Bluesky works end-to-end. LinkedIn next. Meta and YouTube are review-gated by the platforms (3–12 weeks). See [`plan.md`](./plan.md).
+[![License](https://img.shields.io/badge/License-Apache_2.0-2D7A4D.svg?style=flat-square)](https://opensource.org/license/apache-2-0) [![Stars](https://img.shields.io/github/stars/rosekamallove/letmepost.dev?style=flat-square&color=2D7A4D)](https://github.com/rosekamallove/letmepost.dev/stargazers) [![Issues](https://img.shields.io/github/issues/rosekamallove/letmepost.dev?style=flat-square&color=2D7A4D)](https://github.com/rosekamallove/letmepost.dev/issues) [![Docs](https://img.shields.io/badge/docs-letmepost.dev-2D7A4D.svg?style=flat-square)](https://docs.letmepost.dev)
 
-[letmepost.dev](https://letmepost.dev) · [`PRODUCT.md`](./PRODUCT.md) · [`TECH.md`](./TECH.md) · [`plan.md`](./plan.md)
+**[Website](https://letmepost.dev)** · **[Docs](https://docs.letmepost.dev)** · **[Quickstart](https://docs.letmepost.dev/quickstart)** · **[Dashboard](https://dashboard.letmepost.dev)** · **[API Reference](https://docs.letmepost.dev/api-reference)**
+
+Supports: Bluesky · LinkedIn · X · Threads · Instagram · Facebook · Pinterest · YouTube
 
 ---
 
-## Why this exists
+## The four guarantees on every request
 
-Four things developers hit every week with incumbent social-media APIs:
+1. **Preflight, not postflight.** Character counts, media formats, URN patterns, audit states, OAuth scope mismatches, YouTube quota — all validated locally **before** the upstream call.
+2. **Transparent errors.** Stable letmepost code + the specific rule that failed + the raw platform body + a remediation hint. Always.
+3. **Pinned platform versions.** We pin the header, track deprecations, upgrade internally. Your workflow doesn't break at 2 a.m. when LinkedIn sunsets v202412.
+4. **Idempotency by default.** Every write accepts an `Idempotency-Key`. Retries are safe — no double-posting loops when a worker restarts mid-publish.
 
-1. **Silent failures.** Posts report success then never appear. Error bodies come back as `{}`.
-2. **API version churn.** LinkedIn sunset five API versions in six months; every sunset broke n8n, Zapier, Make, Pabbly, and Postiz.
-3. **Async media rejections.** YouTube's restricted-scope mismatches surfacing as generic `forbidden`, Threads' `OAuthException 2207052`, Instagram Reels rejecting Google Drive URLs — all catchable client-side.
-4. **Per-profile pricing.** $6–12 per channel, per month, forever.
+## What it looks like
 
-letmepost.dev addresses all four, in one API.
-
-## Four guarantees on every request
-
-1. **Preflight, not postflight.** Character counts, media formats, URN patterns, audit states — all validated locally before the upstream call.
-2. **Transparent errors.** Stable code + the rule that failed + the raw platform body + a remediation hint. Always.
-3. **Pinned platform versions.** We pin the header, track deprecations, upgrade internally. Your workflow doesn't break at 2 a.m.
-4. **Idempotency by default.** Every write accepts an `Idempotency-Key`. Retries are safe.
-
-## The shape
-
-Request:
+**Request:**
 
 ```bash
 curl -X POST https://api.letmepost.dev/v1/posts \
@@ -43,7 +35,7 @@ curl -X POST https://api.letmepost.dev/v1/posts \
   }'
 ```
 
-Failure:
+**Failure:**
 
 ```json
 {
@@ -59,63 +51,125 @@ Failure:
 }
 ```
 
-Same shape, every time.
+Same shape across every platform. Same shape on every error class — `preflight_failed`, `platform_auth_failed`, `platform_rejected`, `platform_unavailable`, `rate_limited`. The dashboard renders these directly. Your error handler doesn't need a per-platform branch.
 
-## Running locally
+## Why this exists
 
-**Prerequisites**
+Four things developers hit every week with incumbent social-media APIs:
 
-- Node `>=24` (see [`.nvmrc`](./.nvmrc))
-- pnpm `10.33.0+` (`corepack enable` if you don't have it)
+1. **Silent failures.** Posts report success then never appear. Error bodies come back as `{}`. Postiz [#1321](https://github.com/gitroomhq/postiz-app/issues/1321) was an infinite double-post loop; Ayrshare's error 138 masks half a dozen distinct upstream causes.
+2. **API version churn.** LinkedIn sunset **five API versions in six months** in 2024–2025; every sunset broke n8n Cloud, Zapier, Make, Pabbly, and Postiz. The fix in every case was a one-header swap.
+3. **Async media rejections.** YouTube's restricted-scope mismatches surfacing as generic `forbidden`, Threads's `OAuthException 2207052`, Instagram Reels rejecting Google Drive URLs — all catchable client-side, all unhandled by the incumbents.
+4. **Per-profile pricing.** $6–$12 per channel, per month, forever. Universally hated; nobody has built around it. We don't charge it.
 
-**Install and run**
+letmepost.dev addresses all four, in one API.
+
+## Platform support
+
+| Platform | Status | Notes |
+|---|---|---|
+| **Bluesky** | live | App-password auth, video via dedicated transcoder, 300-grapheme preflight |
+| **X / Twitter** | trial | OAuth 2.0 PKCE, 280 graphemes (t.co-aware), 4 images OR 1 video, threads & quote tweets |
+| **Pinterest** | trial | v5 API, image + video pins, board-required preflight |
+| **LinkedIn** | pending | Versioned REST, 3,000-grapheme commentary, MDP-gated for org posts |
+| **Threads** | pending | Standalone OAuth at threads.net, 500-char, 2–20 mixed-media carousels |
+| **Instagram** | pending | Meta Graph, Reels + carousels, FB Login fan-out |
+| **Facebook Pages** | pending | Meta Graph, single video OR 10 photos |
+| **YouTube** | planned | Data API v3, CASA-gated for production verification |
+
+**`live`** = production-ready end-to-end. **`trial`** = connect works but rate-limited or sandboxed (X on Pay-Per-Use, Pinterest on Trial Access). **`pending`** = approval in flight; the publisher is built and ships the moment review clears. **`planned`** = built into the schema, publisher pending.
+
+TikTok is deferred to v2 — schemas + DB enum keep it reserved so the v2 add is additive. Reddit, Telegram, Discord, Snapchat, Google Business, and WhatsApp are deliberately cut from v1. Reasoning in [`PRODUCT.md`](./PRODUCT.md).
+
+## Quickstart
+
+```bash
+# 1. Sign up + grab a key
+open https://dashboard.letmepost.dev
+
+# 2. Connect Bluesky (or any other platform via OAuth)
+curl -X POST https://api.letmepost.dev/v1/accounts/connect/bluesky \
+  -H "Authorization: Bearer lmp_live_…"
+
+# 3. Publish
+curl -X POST https://api.letmepost.dev/v1/posts \
+  -H "Authorization: Bearer lmp_live_…" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{ "account": { "platform": "bluesky", "id": "acc_…" }, "text": "Hello, world" }'
+```
+
+90-second walkthrough at [docs.letmepost.dev/quickstart](https://docs.letmepost.dev/quickstart).
+
+## Self-host
+
+Apache 2.0 from day 0. Same code runs the hosted SaaS and the self-host Docker Compose — no feature gate, no open-core trick.
+
+```bash
+git clone https://github.com/rosekamallove/letmepost.dev
+cd letmepost.dev
+cp apps/api/.env.example apps/api/.env  # fill in your platform OAuth credentials
+docker compose up
+```
+
+BYO Postgres (or Neon), BYO Redis (or Upstash), BYO platform credentials. Hosted is permanently optional.
+
+## Running locally (development)
+
+**Prerequisites:** Node `>=24`, pnpm `10.33.0+` (`corepack enable`).
 
 ```bash
 pnpm install
-pnpm dev            # API + web in watch mode (turbo)
+pnpm dev            # API + web + dashboard in watch mode (turbo)
 pnpm test           # vitest across the workspace
 pnpm typecheck
 pnpm build
 ```
 
-**Individual apps**
+**Individual apps:**
 
 ```bash
-pnpm --filter @letmepost/api dev     # API only → http://localhost:3000
-pnpm --filter @letmepost/web dev     # Landing site → http://localhost:4321
+pnpm --filter @letmepost/api dev        # API → http://localhost:3000
+pnpm --filter @letmepost/dashboard dev  # Dashboard → http://localhost:3001
+pnpm --filter @letmepost/web dev        # Landing → http://localhost:4321
 ```
 
 ## Repo layout
 
 ```
 apps/
-  api/                 # Hono HTTP API — core product
+  api/                 # Hono HTTP API + BullMQ workers — the core product
+  dashboard/           # Next.js operator surface (dashboard.letmepost.dev)
   web/                 # Astro landing site (letmepost.dev)
 packages/
   schemas/             # Zod — single source of truth for validation, types, OpenAPI
   config-tsconfig/
-  config-eslint/
 ```
 
-Landing later as the stack grows: `apps/dashboard/` (Next.js), `packages/openapi/` (generated 3.1 spec), `packages/sdk-ts/` (published to npm), plus sibling repos `letmepost/sdk-python` and `letmepost/sdk-go` auto-generated from the spec. See [`TECH.md`](./TECH.md) for the full target tree.
+Landing as the stack grows: `packages/openapi/` (generated 3.1 spec), `packages/sdk-ts/` (npm), plus sibling repos `letmepost/sdk-python` and `letmepost/sdk-go` auto-generated from the spec. See [`TECH.md`](./TECH.md) for the full target tree.
 
-## Platform support
+## Tech stack
 
-| Platform | Status |
-|---|---|
-| Bluesky | live |
-| LinkedIn | next (~3 weeks) |
-| Twitter / X | soon |
-| Instagram · Facebook · Threads | soon (Meta review starts day 0) |
-| YouTube | later (CASA verification starts day 0) |
-| Pinterest | later |
+Hono · BullMQ · Drizzle · PostgreSQL (Neon) · Redis (Upstash) · better-auth · Zod · Next.js · Astro · TypeScript · Turborepo · pnpm.
 
-TikTok is deferred to v2 — schemas + DB enum keep it reserved so the v2 add is additive. Deliberately cut from v1: Reddit, Telegram, Discord, Snapchat, Google Business, WhatsApp. Reasoning in [`PRODUCT.md`](./PRODUCT.md).
+API contract details in [`TECH.md`](./TECH.md). Product principles in [`PRODUCT.md`](./PRODUCT.md). Roadmap in [`plan.md`](./plan.md).
 
 ## Contributing
 
-Building in the open. [File an issue](https://github.com/rosekamallove/letmepost.dev/issues) when something's weird; read [`PRODUCT.md`](./PRODUCT.md) before PRs that touch product surface area and [`TECH.md`](./TECH.md) for implementation decisions.
+Building in the open. [File an issue](https://github.com/rosekamallove/letmepost.dev/issues) when something's weird. Read [`PRODUCT.md`](./PRODUCT.md) before PRs that touch product surface area, [`TECH.md`](./TECH.md) for implementation decisions, and [`CONTRIBUTING.md`](./CONTRIBUTING.md) for layering rules + the error contract.
+
+## Compliance
+
+- letmepost.dev is an open-source, self-hosted-capable social media publishing API.
+- The hosted service uses **official, platform-approved OAuth flows** for every platform (Bluesky app-password is the documented Bluesky-supported alternative; everything else is OAuth 2.0 or OAuth 2.0 + PKCE).
+- letmepost.dev **does not scrape** content from social media platforms — every read or write is through the platform's documented API.
+- letmepost.dev **does not collect, store, or proxy** API keys or access tokens belonging to the integrating developer's end-users. Users authenticate directly with the social platform; tokens are AES-256-GCM encrypted at rest with per-row data keys.
+- letmepost.dev **never asks users to paste API keys** into the hosted product UI.
+- Self-host users supply their own platform credentials; no telemetry, no license check, no phone-home.
+
+## Star history
+
+[![Star History Chart](https://api.star-history.com/svg?repos=rosekamallove/letmepost.dev&type=Date)](https://www.star-history.com/#rosekamallove/letmepost.dev&Date)
 
 ## License
 
-Apache 2.0. Same code runs the hosted SaaS and the self-host Docker Compose — no feature gate, no open-core trick.
+[Apache 2.0](./LICENSE). Permissive by design — you can build a commercial product on top of letmepost.dev without copyleft contagion. Same code in hosted and self-host.

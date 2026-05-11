@@ -63,10 +63,59 @@ export const CONNECTABLE_PLATFORMS = [
 ] as const;
 export type ConnectablePlatform = (typeof CONNECTABLE_PLATFORMS)[number];
 
-// Re-export the canonical PLATFORM_STATE + PlatformState from the
-// zod-free schemas subpath so the dashboard bundle stays clean. There's
-// exactly one definition of these values across the monorepo.
-export {
-  PLATFORM_STATE,
+// Canonical PLATFORM_STATE comes from the zod-free schemas subpath so
+// the dashboard bundle stays clean. `NEXT_PUBLIC_PLATFORM_STATE_OVERRIDES`
+// lets us temporarily flip a platform's UI state without a code change —
+// e.g. set `facebook:live,instagram:live,threads:live` during Meta App
+// Review video recording so the tiles aren't greyed out. Mirrors the API's
+// `PLATFORM_STATE_OVERRIDES` parser; the two env vars MUST stay in sync or
+// the dashboard will offer a tile the backend rejects.
+import {
+  PLATFORM_STATE as CANONICAL_STATE,
   type PlatformState,
 } from "@letmepost/schemas/platform-state";
+
+export type { PlatformState };
+
+function parseEnvOverrides(
+  raw: string | undefined,
+): Partial<Record<ConnectablePlatform, PlatformState>> {
+  if (!raw) return {};
+  const out: Partial<Record<ConnectablePlatform, PlatformState>> = {};
+  const validPlatforms = new Set<string>(CONNECTABLE_PLATFORMS);
+  const validStates = new Set<string>(["live", "trial", "pending"]);
+  for (const pair of raw.split(",")) {
+    const trimmed = pair.trim();
+    if (!trimmed) continue;
+    const [k, v] = trimmed.split(":").map((s) => s.trim());
+    if (!k || !v) {
+      console.warn(
+        `[platform-state] malformed override "${trimmed}" — expected "platform:state".`,
+      );
+      continue;
+    }
+    if (!validPlatforms.has(k)) {
+      console.warn(
+        `[platform-state] unknown platform "${k}" in NEXT_PUBLIC_PLATFORM_STATE_OVERRIDES.`,
+      );
+      continue;
+    }
+    if (!validStates.has(v)) {
+      console.warn(
+        `[platform-state] invalid state "${v}" for ${k}. Valid: live, trial, pending.`,
+      );
+      continue;
+    }
+    out[k as ConnectablePlatform] = v as PlatformState;
+  }
+  return out;
+}
+
+const ENV_OVERRIDES = parseEnvOverrides(
+  process.env.NEXT_PUBLIC_PLATFORM_STATE_OVERRIDES,
+);
+
+export const PLATFORM_STATE: Record<ConnectablePlatform, PlatformState> = {
+  ...(CANONICAL_STATE as Record<ConnectablePlatform, PlatformState>),
+  ...ENV_OVERRIDES,
+};

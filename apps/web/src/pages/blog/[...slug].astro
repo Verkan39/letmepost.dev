@@ -1,7 +1,7 @@
 ---
 import { getCollection, render } from "astro:content";
 import type { CollectionEntry } from "astro:content";
-import BaseLayout from "../../layouts/BaseLayout.astro";
+import BaseLayout, { type JsonLdGraph } from "../../layouts/BaseLayout.astro";
 import { Icon } from "astro-icon/components";
 
 /**
@@ -44,7 +44,7 @@ const siteUrl = Astro.site!.toString().replace(/\/$/, "");
  * the content matches a topic Google's tracking. Image URL is absolute
  * (Google rejects relative paths in JSON-LD).
  */
-const articleJsonLd: Record<string, unknown> = {
+const articleJsonLd: JsonLdGraph = {
   "@context": "https://schema.org",
   "@type": "BlogPosting",
   headline: post.data.title,

@@ -22,7 +22,7 @@ import Analytics from "../components/Analytics.astro";
  * Each entry renders as its own <script type="application/ld+json">
  * tag — Google parses each block independently.
  */
-interface JsonLdGraph {
+export interface JsonLdGraph {
   "@context"?: string;
   "@type": string;
   [key: string]: unknown;
@@ -185,7 +185,7 @@ const allGraphs: JsonLdGraph[] = [...defaultGraphs, ...jsonLd];
       independently — broken JSON in one doesn't taint the rest.
     */}
     {allGraphs.map((graph) => (
-      <script type="application/ld+json" set:html={JSON.stringify(graph)} />
+      <script is:inline type="application/ld+json" set:html={JSON.stringify(graph)} />
     ))}
 
     <ClientRouter />

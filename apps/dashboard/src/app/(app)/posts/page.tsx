@@ -58,6 +58,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { FadeIn } from "@/components/app/motion";
 import { PostsTable } from "@/components/app/posts-table";
+import { track } from "@/lib/analytics";
 
 /**
  * Post Log — the operator's "where did my post go?" screen.
@@ -186,8 +187,15 @@ export default function PostsPage() {
   function toggleErrorCode(code: PostErrorCode) {
     setErrorCodes((prev) => {
       const next = new Set(prev);
-      if (next.has(code)) next.delete(code);
-      else next.add(code);
+      if (next.has(code)) {
+        next.delete(code);
+      } else {
+        next.add(code);
+        track({
+          name: "post_log.filtered",
+          properties: { filter_field: "error_code", filter_value: code },
+        });
+      }
       return next;
     });
     resetCursor();
@@ -251,6 +259,12 @@ export default function PostsPage() {
           value={platform || "all"}
           onValueChange={(v) => {
             setPlatform(v === "all" ? "" : v);
+            if (v !== "all") {
+              track({
+                name: "post_log.filtered",
+                properties: { filter_field: "platform", filter_value: v },
+              });
+            }
             resetCursor();
           }}
         >
@@ -271,6 +285,12 @@ export default function PostsPage() {
           value={status || "all"}
           onValueChange={(v) => {
             setStatus(v === "all" ? "" : v);
+            if (v !== "all") {
+              track({
+                name: "post_log.filtered",
+                properties: { filter_field: "status", filter_value: v },
+              });
+            }
             resetCursor();
           }}
         >

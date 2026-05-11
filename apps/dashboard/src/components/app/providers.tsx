@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { ThemeProvider } from "next-themes";
 import { makeQueryClient } from "@/lib/query-client";
+import { PostHogProvider } from "@/components/app/posthog-provider";
 
 /**
  * Client-side providers root. The QueryClient is created lazily inside a
@@ -25,7 +26,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
       disableTransitionOnChange
     >
       <QueryClientProvider client={client}>
-        {children}
+        {/* `useSearchParams()` inside PostHogProvider triggers Next's
+            App Router CSR bailout if not wrapped in Suspense — without
+            this boundary, every page using this provider gets bailed
+            out of static optimization. */}
+        <Suspense fallback={null}>
+          <PostHogProvider>{children}</PostHogProvider>
+        </Suspense>
         <ReactQueryDevtools
           initialIsOpen={false}
           buttonPosition="bottom-right"

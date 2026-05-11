@@ -23,6 +23,7 @@ import { ConnectAccountDrawer } from "@/components/app/connect-account-drawer";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
 import { PinterestDefaultBoard } from "@/components/app/pinterest-default-board";
 import { PLATFORM_BRANDS } from "@/components/app/platform-icons";
+import { track, asAnalyticsPlatform } from "@/lib/analytics";
 
 // Brand lookup keyed by platform id. Falls back to a neutral grey block
 // if a future platform adds an account row before its brand entry lands.
@@ -54,9 +55,27 @@ export default function AccountsListPage() {
     const platform = searchParams.get("platform");
     if (!connected && !error) return;
     if (connected) {
+      const p = asAnalyticsPlatform(connected);
+      if (p) {
+        track({
+          name: "connect.oauth_returned",
+          properties: { platform: p, outcome: "success" },
+        });
+      }
       toast.success(`Connected ${connected}.`);
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
     } else if (error) {
+      const p = asAnalyticsPlatform(platform);
+      if (p) {
+        track({
+          name: "connect.oauth_returned",
+          properties: {
+            platform: p,
+            outcome: error === "user_denied" ? "denied" : "error",
+            error_code: error,
+          },
+        });
+      }
       toast.error(
         platform
           ? `${platform} connect failed: ${error.replaceAll("_", " ")}`
@@ -93,9 +112,18 @@ export default function AccountsListPage() {
     : null;
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiFetch<{ id: string }>(`/v1/accounts/${id}`, { method: "DELETE" }),
-    onSuccess: () => {
+    mutationFn: (acc: Account) =>
+      apiFetch<{ id: string }>(`/v1/accounts/${acc.id}`, { method: "DELETE" }).then(
+        (res) => ({ ...res, _platform: acc.platform }),
+      ),
+    onSuccess: (res) => {
+      const p = asAnalyticsPlatform(res._platform);
+      if (p) {
+        track({
+          name: "account.disconnected",
+          properties: { platform: p },
+        });
+      }
       toast.success("Account disconnected.");
       queryClient.invalidateQueries({ queryKey: queryKeys.accounts.list() });
     },
@@ -121,7 +149,15 @@ export default function AccountsListPage() {
               : "Connected social platform accounts. Tokens are encrypted at rest."}
           </p>
         </div>
-        <Button onClick={() => setConnectOpen(true)}>
+        <Button
+          onClick={() => {
+            track({
+              name: "connect.drawer_opened",
+              properties: { entry_point: "accounts-page" },
+            });
+            setConnectOpen(true);
+          }}
+        >
           <Plus className="size-4" />
           Connect account
         </Button>
@@ -154,7 +190,15 @@ export default function AccountsListPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => setConnectOpen(true)}>
+            <Button
+              onClick={() => {
+                track({
+                  name: "connect.drawer_opened",
+                  properties: { entry_point: "empty-state" },
+                });
+                setConnectOpen(true);
+              }}
+            >
               Connect account
             </Button>
           </CardContent>
@@ -217,7 +261,13 @@ export default function AccountsListPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setConnectOpen(true)}
+                            onClick={() => {
+                              track({
+                                name: "connect.drawer_opened",
+                                properties: { entry_point: "accounts-page" },
+                              });
+                              setConnectOpen(true);
+                            }}
                           >
                             <Plug className="size-4" />
                             Reconnect
@@ -269,7 +319,7 @@ export default function AccountsListPage() {
         variant="destructive"
         onConfirm={async () => {
           if (pendingDisconnect)
-            await deleteMutation.mutateAsync(pendingDisconnect.id);
+            await deleteMutation.mutateAsync(pendingDisconnect);
         }}
       />
     </div>

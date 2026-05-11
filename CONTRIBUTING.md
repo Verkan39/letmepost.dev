@@ -154,6 +154,9 @@ Rules:
 | A new shared platform helper | `apps/api/src/platforms/_shared/<name>.ts` |
 | A new test | `apps/api/tests/<topic>.test.ts` — flat layout, no nesting |
 | A new dashboard component | `apps/dashboard/src/components/app/<name>.tsx` (app-specific) or `components/ui/*` (shadcn primitive) |
+| A new dashboard analytics event | Add a variant to `DashboardEvent` in `apps/dashboard/src/lib/analytics.ts`; fire via `track()` |
+| A new marketing analytics event | Add a variant to `WebEvent` in `apps/web/src/lib/analytics.ts`; fire via `track()` or `data-analytics-event` |
+| A new PostHog identify/group call | `apps/dashboard/src/components/app/posthog-provider.tsx` — nowhere else |
 
 ---
 
@@ -161,8 +164,25 @@ Rules:
 
 - **Per-profile billing** — explicitly rejected. Profiles are an org-structure primitive; pricing stays flat.
 - **Per-platform `if`-soup at the route layer** — every cross-platform branch belongs in `_shared/*`.
-- **Comments that describe the what** — the code already says what. Comments are for the *why* (a non-obvious constraint, a workaround, a hidden invariant).
+- **Comments that describe the what** — the code already says what. Comments are for the *why* (a non-obvious constraint, a workaround, a hidden invariant). Concrete example: `capture_pageview: false` in `posthog-provider.tsx` earns a comment because removing it would silently double-count pageviews; the line itself doesn't reveal why.
+- **File-header docstrings that summarize the module** — paragraph-long "this file's three responsibilities" blocks don't earn their keep. One-line whys do.
+- **Duplicated/shadowed unions kept in sync by comment** — import the canonical type or extend it. A comment is not a substitute for `import`.
 - **Backwards-compatibility shims for unused code** — delete it; we're pre-launch. After launch this rule flips.
+
+---
+
+## 11. Analytics events
+
+Both apps emit PostHog events through a typed `track()` helper. The wiring is intentionally narrow.
+
+- **Types live in one place per app.** `apps/dashboard/src/lib/analytics.ts` and `apps/web/src/lib/analytics.ts` each export a discriminated union of every event their app fires. Never re-declare `Platform`, `OnboardingStep`, or any other narrow alias inline at a callsite — import the type, or extend the union. Drift = events get dropped silently.
+- **Fire through `track()`.** No `as any` / `as never` to make a callsite compile — fix the union or narrow at the boundary (`asAnalyticsPlatform()`, `asOnboardingStep()` already exist for this).
+- **PostHog stays optional.** `track()` no-ops when `NEXT_PUBLIC_POSTHOG_KEY` / `PUBLIC_POSTHOG_KEY` is unset, so local dev is quiet by default. Don't add guards at callsites — `track()` already has the right one.
+- **Event names follow `noun.verb_past`.** Same convention as the webhook event catalog (`post.queued`, `account.connected`, `version.deprecated`) so client and server events compose without collision.
+- **Ordering matters.** `*.started` / `*.sent` fire **before** the awaited call; `*.completed` / `*.succeeded` fire **after**. Don't count work that hasn't happened — a failed `authClient.signOut()` shouldn't appear in PostHog as a successful sign-out.
+- **Marketing site declarative form.** `data-analytics-event="<name>"` + `data-analytics-props='{...}'` on `<a>`/`<button>` is fine — no React tree to wire props through. The strings on both sides must match a `WebEvent` union member; that's the typed boundary.
+- **One identify site.** `posthog.identify()` and `posthog.group()` calls live in `apps/dashboard/src/components/app/posthog-provider.tsx` only. Don't sprinkle them across components.
+- **Commit-trailer rule applies.** §8: analytics changes touching `apps/web` or `apps/dashboard` keep the `Co-Authored-By` trailer; an analytics change that also touches `apps/api` drops it (backend rule wins on cross-cutting commits — easier than splitting).
 
 ---
 

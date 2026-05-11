@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CaretDown, CheckCircle, Circle } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
+import { track, asOnboardingStep } from "@/lib/analytics";
 
 const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -33,11 +34,23 @@ export function OnboardingChecklist({ steps }: { steps: ChecklistStep[] }) {
   const prevDone = useRef<Record<string, boolean>>(
     Object.fromEntries(steps.map((s) => [s.id, s.done])),
   );
+  const stepStartTimes = useRef<Record<string, number>>({});
   const doneKey = steps.map((s) => `${s.id}:${s.done}`).join("|");
   useEffect(() => {
     for (const s of steps) {
       const was = prevDone.current[s.id];
       if (was === false && s.done) {
+        const known = asOnboardingStep(s.id);
+        if (known) {
+          const startedAt = stepStartTimes.current[s.id];
+          track({
+            name: "onboarding.step_completed",
+            properties: {
+              step: known,
+              time_to_complete_ms: startedAt ? Date.now() - startedAt : undefined,
+            },
+          });
+        }
         const idx = steps.findIndex((x) => x.id === s.id);
         const next = steps.slice(idx + 1).find((x) => !x.done);
         setOpen(next ? next.id : "");
@@ -47,6 +60,27 @@ export function OnboardingChecklist({ steps }: { steps: ChecklistStep[] }) {
     prevDone.current = Object.fromEntries(steps.map((s) => [s.id, s.done]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doneKey]);
+
+  // Fire `onboarding.step_viewed` whenever the open step changes to a
+  // not-yet-completed step. The position is the 1-indexed step number,
+  // which keeps the funnel readable in PostHog ("most users drop off
+  // between position 2 and 3").
+  const lastViewedRef = useRef<string>("");
+  useEffect(() => {
+    if (!open || open === lastViewedRef.current) return;
+    const step = steps.find((s) => s.id === open);
+    if (!step || step.done) return;
+    const known = asOnboardingStep(open);
+    if (!known) return;
+    lastViewedRef.current = open;
+    const position = steps.findIndex((s) => s.id === open) + 1;
+    stepStartTimes.current[open] = Date.now();
+    track({
+      name: "onboarding.step_viewed",
+      properties: { step: known, position },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, doneKey]);
 
   const completed = steps.filter((s) => s.done).length;
   const total = steps.length;

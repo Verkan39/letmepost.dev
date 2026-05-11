@@ -38,6 +38,7 @@ import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
 import { useActiveProfile } from "@/lib/profiles";
 import { formatRelative } from "@/lib/posts";
+import { track } from "@/lib/analytics";
 
 type ApiKey = {
   id: string;
@@ -89,6 +90,13 @@ export default function ApiKeysPage() {
         },
       }),
     onSuccess: (res) => {
+      track({
+        name: "api_key.created",
+        properties: {
+          environment: res.prefix === "lmp_live_" ? "live" : "test",
+          name_provided: res.name.trim().length > 0,
+        },
+      });
       setPlaintext(res);
       setName("");
       setScope("");
@@ -107,9 +115,18 @@ export default function ApiKeysPage() {
   const creating = createMutation.isPending;
 
   const revokeMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiFetch(`/v1/api-keys/${id}`, { method: "DELETE" }),
-    onSuccess: () => {
+    mutationFn: (key: ApiKey) =>
+      apiFetch(`/v1/api-keys/${key.id}`, { method: "DELETE" }).then(
+        () => key,
+      ),
+    onSuccess: (key) => {
+      const ageMs = Date.now() - new Date(key.createdAt).getTime();
+      track({
+        name: "api_key.revoked",
+        properties: {
+          key_age_days: Math.max(0, Math.round(ageMs / 86400000)),
+        },
+      });
       toast.success("Key revoked.");
       queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.list() });
     },
@@ -133,6 +150,12 @@ export default function ApiKeysPage() {
     if (!plaintext) return;
     try {
       await navigator.clipboard.writeText(plaintext.key);
+      track({
+        name: "api_key.copied",
+        properties: {
+          environment: plaintext.prefix === "lmp_live_" ? "live" : "test",
+        },
+      });
       toast.success("Copied to clipboard.");
     } catch {
       toast.error("Clipboard access denied.");
@@ -340,7 +363,7 @@ export default function ApiKeysPage() {
         confirmLabel="Revoke key"
         variant="destructive"
         onConfirm={async () => {
-          if (pendingRevoke) await revokeMutation.mutateAsync(pendingRevoke.id);
+          if (pendingRevoke) await revokeMutation.mutateAsync(pendingRevoke);
         }}
       />
     </div>

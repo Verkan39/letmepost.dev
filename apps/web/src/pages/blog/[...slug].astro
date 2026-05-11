@@ -111,6 +111,15 @@ const ogImage = post.data.heroImage ?? "/og-image.png";
       of the post when applicable. The schema canonical lives in the
       JSON-LD `mainEntityOfPage` already. */}
 
+  {/* Analytics data attributes — picked up by the central pageview
+      script in Analytics.astro so we don't duplicate the tag/date
+      resolver per page. Hidden marker so layout is unaffected. */}
+  <span
+    data-blog-tags={post.data.tags.join(",")}
+    data-blog-published-at={post.data.pubDate.toISOString()}
+    hidden
+  ></span>
+
   <article class="pt-18 pb-18 max-[640px]:pt-12">
     <div class="container">
       <a
@@ -182,7 +191,12 @@ const ogImage = post.data.heroImage ?? "/og-image.png";
       <hr class="my-12 border-border" />
 
       <div class="flex flex-wrap gap-3 items-center">
-        <a class="btn btn-primary" href="https://dashboard.letmepost.dev">
+        <a
+          class="btn btn-primary"
+          href="https://dashboard.letmepost.dev"
+          data-analytics-event="cta.clicked"
+          data-analytics-props='{"location":"blog-cta","target":"dashboard","page":"blog-post","label":"Try letmepost free"}'
+        >
           Try letmepost free
           <Icon name="ph:arrow-up-right" width={13} height={13} />
         </a>
@@ -190,6 +204,8 @@ const ogImage = post.data.heroImage ?? "/og-image.png";
         <a
           class="text-[0.85rem] text-text-muted hover:text-accent ml-auto"
           href="/rss.xml"
+          data-analytics-event="rss.subscribed"
+          data-analytics-props='{"from_page":"blog-post"}'
         >
           RSS
         </a>

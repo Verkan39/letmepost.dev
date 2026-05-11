@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { authClient } from "@/lib/auth-client";
+import { track } from "@/lib/analytics";
 
 /**
  * Silent recovery for sessions without an `activeOrganizationId`. The
@@ -80,6 +81,10 @@ export default function OnboardingPage() {
           ranRef.current = false;
           return;
         }
+        track({
+          name: "org.created",
+          properties: { is_first_org: true, org_id: data.id },
+        });
         await authClient.organization.setActive({ organizationId: data.id });
         router.replace("/");
       } catch (err) {

@@ -22,6 +22,7 @@
     "@tailwindcss/vite": "^4.2.4",
     "astro": "^5.1.0",
     "astro-icon": "^1.1.5",
+    "posthog-js": "^1.372.10",
     "tailwindcss": "^4.2.4"
   },
   "devDependencies": {

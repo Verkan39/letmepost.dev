@@ -259,6 +259,8 @@ const platformsRight = PLATFORMS.slice(half);
         href="https://github.com/rosekamallove/letmepost.dev"
         rel="noopener noreferrer"
         target="_blank"
+        data-analytics-event="external.github_clicked"
+        data-analytics-props='{"location":"nav"}'
       >
         GitHub
         <Icon name="ph:arrow-up-right" width={12} height={12} />
@@ -395,6 +397,8 @@ const platformsRight = PLATFORMS.slice(half);
 </style>
 
 <script>
+  import { track } from "../lib/analytics";
+
   // Click-to-toggle for keyboard + mobile users. CSS hover handles
   // mouse users on desktop. Click anywhere outside to close.
   function setupDropdowns() {
@@ -405,6 +409,15 @@ const platformsRight = PLATFORMS.slice(half);
       );
       if (!trigger) return;
 
+      // Resolve the dropdown's name once. The label is the trigger
+      // button's leading text, lowercased — matches the WebEvent
+      // union ("resources" | "platforms" | "api").
+      const labelText = (trigger.textContent ?? "").trim().toLowerCase();
+      let dropdownKey: "resources" | "platforms" | "api" | null = null;
+      if (labelText.startsWith("resources")) dropdownKey = "resources";
+      else if (labelText.startsWith("product")) dropdownKey = "platforms";
+      else if (labelText.startsWith("docs")) dropdownKey = "api";
+
       trigger.addEventListener("click", (e) => {
         e.preventDefault();
         const open = dropdown.hasAttribute("data-open");
@@ -413,9 +426,33 @@ const platformsRight = PLATFORMS.slice(half);
         if (!open) {
           dropdown.setAttribute("data-open", "");
           trigger.setAttribute("aria-expanded", "true");
+          if (dropdownKey) {
+            track({
+              name: "nav.dropdown_opened",
+              properties: { dropdown: dropdownKey },
+            });
+          }
         } else {
           trigger.setAttribute("aria-expanded", "false");
         }
+      });
+
+      // Mouse users open dropdowns via :hover (CSS) without ever
+      // clicking the trigger — fire the open event once per hover
+      // session so the funnel still sees them.
+      let hoverFired = false;
+      dropdown.addEventListener("mouseenter", () => {
+        if (hoverFired) return;
+        hoverFired = true;
+        if (dropdownKey) {
+          track({
+            name: "nav.dropdown_opened",
+            properties: { dropdown: dropdownKey },
+          });
+        }
+      });
+      dropdown.addEventListener("mouseleave", () => {
+        hoverFired = false;
       });
     });
 

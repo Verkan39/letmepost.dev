@@ -210,13 +210,20 @@ const breadcrumbJsonLd = {
       </p>
 
       <div class="flex gap-[0.7rem] flex-wrap">
-        <a class="btn btn-primary" href="https://dashboard.letmepost.dev">
+        <a
+          class="btn btn-primary"
+          href="https://dashboard.letmepost.dev"
+          data-analytics-event="cta.clicked"
+          data-analytics-props='{"location":"hero","target":"dashboard","page":"api-detail","label":"Start building free"}'
+        >
           Start building free
           <Icon name="ph:arrow-up-right" width={13} height={13} />
         </a>
         <a
           class="btn btn-secondary"
           href="https://docs.letmepost.dev/api-reference"
+          data-analytics-event="docs.link_clicked"
+          data-analytics-props='{"from_page":"api-detail","to_section":"api-reference"}'
         >
           API reference
         </a>
@@ -224,7 +231,12 @@ const breadcrumbJsonLd = {
 
       <p class="text-[0.85rem] mt-6 text-text-muted">
         No credit card required · Free during alpha ·
-        <a href="https://docs.letmepost.dev/api-reference" class="text-accent">API reference →</a>
+        <a
+          href="https://docs.letmepost.dev/api-reference"
+          class="text-accent"
+          data-analytics-event="docs.link_clicked"
+          data-analytics-props='{"from_page":"api-detail","to_section":"api-reference"}'
+        >API reference →</a>
       </p>
     </div>
   </section>
@@ -272,11 +284,21 @@ const breadcrumbJsonLd = {
         Mint an API key. Send your first request. We're around if you hit anything weird.
       </p>
       <div class="flex gap-[0.7rem] flex-wrap mt-2">
-        <a class="btn btn-primary" href="https://dashboard.letmepost.dev">
+        <a
+          class="btn btn-primary"
+          href="https://dashboard.letmepost.dev"
+          data-analytics-event="cta.clicked"
+          data-analytics-props='{"location":"api-page","target":"dashboard","page":"api-detail","label":"Get an API key"}'
+        >
           Get an API key
           <Icon name="ph:arrow-up-right" width={13} height={13} />
         </a>
-        <a class="btn btn-secondary" href="https://docs.letmepost.dev/api-reference">
+        <a
+          class="btn btn-secondary"
+          href="https://docs.letmepost.dev/api-reference"
+          data-analytics-event="docs.link_clicked"
+          data-analytics-props='{"from_page":"api-detail","to_section":"api-reference"}'
+        >
           Read the API reference
         </a>
       </div>

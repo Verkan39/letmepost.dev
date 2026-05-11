@@ -23,6 +23,7 @@ import {
 } from "@phosphor-icons/react";
 
 import { authClient } from "@/lib/auth-client";
+import { track } from "@/lib/analytics";
 import { NewOrgDialog } from "@/components/app/new-org-dialog";
 import { LogoMark } from "@/components/app/logo";
 import { useActiveProfile } from "@/lib/profiles";
@@ -82,12 +83,18 @@ export function AppSidebar() {
 
   async function handleSignOut() {
     await authClient.signOut();
+    track({ name: "signout.completed", properties: {} });
     router.push("/sign-in");
   }
 
   async function switchOrg(id: string) {
     try {
+      const fromOrgId = activeOrg?.id ?? null;
       await authClient.organization.setActive({ organizationId: id });
+      track({
+        name: "org.switched",
+        properties: { from_org_id: fromOrgId, to_org_id: id },
+      });
       // Force a refresh so server components / API calls pick up the new active org.
       router.refresh();
     } catch (err) {
@@ -278,7 +285,16 @@ function ThemeRadioGroup() {
     return <div aria-hidden className="h-[84px]" />;
   }
   return (
-    <DropdownMenuRadioGroup value={theme ?? "system"} onValueChange={setTheme}>
+    <DropdownMenuRadioGroup
+      value={theme ?? "system"}
+      onValueChange={(next) => {
+        track({
+          name: "theme.changed",
+          properties: { from: theme ?? "system", to: next },
+        });
+        setTheme(next);
+      }}
+    >
       <DropdownMenuRadioItem value="light">
         <Sun className="size-4" />
         <span>Light</span>

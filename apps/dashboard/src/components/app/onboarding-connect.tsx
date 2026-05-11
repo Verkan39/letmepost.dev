@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 
 const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -67,6 +68,10 @@ export function OnboardingConnect({
     setPicked(platform);
     setBusy(true);
     setError(null);
+    track({
+      name: "connect.platform_selected",
+      properties: { platform: platform as never },
+    });
     try {
       const res = await apiFetch<ConnectResponse>(
         `/v1/accounts/connect/${platform}`,
@@ -79,6 +84,10 @@ export function OnboardingConnect({
         },
       );
       if (res.descriptor.kind === "oauth") {
+        track({
+          name: "connect.oauth_started",
+          properties: { platform, scopes_requested: [] },
+        });
         // Full-page redirect — the OAuth callback finishes server-side.
         window.location.href = res.descriptor.authorizationUrl;
         return;
@@ -120,6 +129,14 @@ export function OnboardingConnect({
         body: {
           ...trimmed,
           ...(effectiveProfileId ? { profileId: effectiveProfileId } : {}),
+        },
+      });
+      track({
+        name: "account.connected",
+        properties: {
+          platform: picked,
+          account_type: "personal",
+          scopes_granted: [],
         },
       });
       toast.success("Account connected.");

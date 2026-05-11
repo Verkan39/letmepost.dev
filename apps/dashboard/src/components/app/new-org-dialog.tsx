@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
+import { track } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -56,6 +57,10 @@ export function NewOrgDialog({
         toast.error(error?.message ?? "Couldn't create the organization.");
         return;
       }
+      track({
+        name: "org.created",
+        properties: { is_first_org: false, org_id: data.id },
+      });
       await authClient.organization.setActive({ organizationId: data.id });
       toast.success(`Switched to ${data.name}.`);
       onOpenChange(false);

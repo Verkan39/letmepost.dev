@@ -32,6 +32,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 
 type Endpoint = {
   id: string;
@@ -94,6 +95,10 @@ export default function WebhooksPage() {
         },
       }),
     onSuccess: (res) => {
+      track({
+        name: "webhook.endpoint_created",
+        properties: { event_count: res.events.length },
+      });
       setSecretReveal(res);
       setUrl("");
       setDescription("");
@@ -113,9 +118,18 @@ export default function WebhooksPage() {
   const creating = createMutation.isPending;
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiFetch(`/v1/webhook-endpoints/${id}`, { method: "DELETE" }),
-    onSuccess: () => {
+    mutationFn: (endpoint: Endpoint) =>
+      apiFetch(`/v1/webhook-endpoints/${endpoint.id}`, { method: "DELETE" }).then(
+        () => endpoint,
+      ),
+    onSuccess: (endpoint) => {
+      const ageMs = Date.now() - new Date(endpoint.createdAt).getTime();
+      track({
+        name: "webhook.endpoint_deleted",
+        properties: {
+          endpoint_age_days: Math.max(0, Math.round(ageMs / 86400000)),
+        },
+      });
       toast.success("Endpoint deleted.");
       queryClient.invalidateQueries({ queryKey: queryKeys.webhooks.list() });
     },
@@ -367,7 +381,7 @@ export default function WebhooksPage() {
         confirmLabel="Delete endpoint"
         variant="destructive"
         onConfirm={async () => {
-          if (pendingDelete) await deleteMutation.mutateAsync(pendingDelete.id);
+          if (pendingDelete) await deleteMutation.mutateAsync(pendingDelete);
         }}
       />
     </div>

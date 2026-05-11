@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
+import { track } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -32,6 +33,7 @@ export default function SignInPage() {
         toast.error(error.message ?? "Sign-in failed.");
         return;
       }
+      track({ name: "signin.completed", properties: { provider: "email" } });
       router.push("/");
     } catch (err) {
       toast.error(

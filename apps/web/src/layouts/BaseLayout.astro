@@ -8,6 +8,7 @@ import "../styles/global.css";
 import { ClientRouter } from "astro:transitions";
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
+import Analytics from "../components/Analytics.astro";
 
 /**
  * `jsonLd` lets a page contribute additional structured-data graphs on
@@ -188,6 +189,7 @@ const allGraphs: JsonLdGraph[] = [...defaultGraphs, ...jsonLd];
     ))}
 
     <ClientRouter />
+    <Analytics />
   </head>
   <body>
     <Header />

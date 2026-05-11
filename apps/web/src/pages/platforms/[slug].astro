@@ -157,6 +157,14 @@ const softwareJsonLd = {
   ogType="product"
   jsonLd={[breadcrumbJsonLd, softwareJsonLd]}
 >
+  {/* Status marker — read by the central Analytics script so the
+      `platform_page.viewed` event can attach the correct status without
+      duplicating the resolver in two places. */}
+  <span
+    data-platform-status={platform.status === "live" ? "live" : "coming-soon"}
+    hidden
+  ></span>
+
   <!-- Hero -->
   <section class="section-hero">
     <div class="container">
@@ -194,18 +202,44 @@ const softwareJsonLd = {
       </p>
 
       <div class="flex gap-[0.7rem] flex-wrap">
-        <a class="btn btn-primary" href="https://dashboard.letmepost.dev">
+        <a
+          class="btn btn-primary"
+          href="https://dashboard.letmepost.dev"
+          data-analytics-event="cta.clicked"
+          data-analytics-props={JSON.stringify({
+            location: "hero",
+            target: "dashboard",
+            page: "platform-detail",
+            label: `Start building free — ${platform.name}`,
+          })}
+        >
           Start building free
           <Icon name="ph:arrow-up-right" width={13} height={13} />
         </a>
-        <a class="btn btn-secondary" href="https://docs.letmepost.dev/quickstart">
+        <a
+          class="btn btn-secondary"
+          href="https://docs.letmepost.dev/quickstart"
+          data-analytics-event="docs.link_clicked"
+          data-analytics-props={JSON.stringify({
+            from_page: "platform-detail",
+            to_section: "quickstart",
+          })}
+        >
           Quickstart
         </a>
       </div>
 
       <p class="text-[0.85rem] mt-6 text-text-muted">
         No credit card required · Free during alpha ·
-        <a href="https://docs.letmepost.dev/api-reference" class="text-accent">API reference →</a>
+        <a
+          href="https://docs.letmepost.dev/api-reference"
+          class="text-accent"
+          data-analytics-event="docs.link_clicked"
+          data-analytics-props={JSON.stringify({
+            from_page: "platform-detail",
+            to_section: "api-reference",
+          })}
+        >API reference →</a>
       </p>
     </div>
   </section>
@@ -341,13 +375,28 @@ const softwareJsonLd = {
         Star the repo. Connect a {platform.name} account. Send your first post in under 90 seconds.
       </p>
       <div class="flex gap-[0.7rem] flex-wrap mt-2">
-        <a class="btn btn-primary" href="https://dashboard.letmepost.dev">
+        <a
+          class="btn btn-primary"
+          href="https://dashboard.letmepost.dev"
+          data-analytics-event="cta.clicked"
+          data-analytics-props={JSON.stringify({
+            location: "platform-page",
+            target: "dashboard",
+            page: "platform-detail",
+            label: `Start building free — ${platform.name} final`,
+          })}
+        >
           Start building free
           <Icon name="ph:arrow-up-right" width={13} height={13} />
         </a>
         <a
           class="btn btn-secondary"
           href={`https://docs.letmepost.dev/platforms/${platform.slug === "facebook" ? "facebook" : platform.slug}`}
+          data-analytics-event="docs.link_clicked"
+          data-analytics-props={JSON.stringify({
+            from_page: "platform-detail",
+            to_section: `platforms/${platform.slug}`,
+          })}
         >
           {platform.name} docs
         </a>

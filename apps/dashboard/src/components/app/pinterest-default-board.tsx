@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Plus } from "@phosphor-icons/react";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
+import { track } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -67,6 +68,14 @@ export function PinterestDefaultBoard({ accountId }: { accountId: string }) {
         },
       ),
     onSuccess: (data) => {
+      track({
+        name: "pinterest.default_board_set",
+        properties: {
+          board_count: queryClient
+            .getQueryData<BoardsResponse>(queryKeys.accounts.pinterestBoards(accountId))
+            ?.data.length ?? 0,
+        },
+      });
       toast.success(`Default board: ${data.defaultBoardName}`);
       queryClient.invalidateQueries({
         queryKey: queryKeys.accounts.pinterestBoards(accountId),

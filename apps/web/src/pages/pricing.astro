@@ -78,11 +78,21 @@ const faqs = [
       </p>
 
       <div class="flex gap-[0.6rem] flex-wrap">
-        <a class="btn btn-primary" href="https://dashboard.letmepost.dev">
+        <a
+          class="btn btn-primary"
+          href="https://dashboard.letmepost.dev"
+          data-analytics-event="cta.clicked"
+          data-analytics-props='{"location":"hero","target":"dashboard","page":"pricing","label":"Start building free"}'
+        >
           Start building free
           <Icon name="ph:arrow-up-right" width={13} height={13} />
         </a>
-        <a class="btn btn-secondary" href="/contact">Email us when pricing lands</a>
+        <a
+          class="btn btn-secondary"
+          href="/contact"
+          data-analytics-event="cta.clicked"
+          data-analytics-props='{"location":"hero-secondary","target":"contact","page":"pricing","label":"Email us when pricing lands"}'
+        >Email us when pricing lands</a>
       </div>
     </div>
   </section>
@@ -191,7 +201,12 @@ const faqs = [
         Alpha access is free, complete, and not a trial. The pricing page will fill in over time — meanwhile, you're not gated on anything.
       </p>
       <div class="flex gap-[0.6rem] flex-wrap">
-        <a class="btn btn-primary" href="https://dashboard.letmepost.dev">
+        <a
+          class="btn btn-primary"
+          href="https://dashboard.letmepost.dev"
+          data-analytics-event="cta.clicked"
+          data-analytics-props='{"location":"pricing-final","target":"dashboard","page":"pricing","label":"Start building free"}'
+        >
           Start building free
           <Icon name="ph:arrow-up-right" width={13} height={13} />
         </a>
@@ -200,10 +215,13 @@ const faqs = [
           href="https://github.com/rosekamallove/letmepost.dev"
           target="_blank"
           rel="noopener"
+          data-analytics-event="external.github_clicked"
+          data-analytics-props='{"from_page":"pricing","location":"pricing-final"}'
         >
           Self-host on GitHub
         </a>
       </div>
     </div>
   </section>
+
 </BaseLayout>

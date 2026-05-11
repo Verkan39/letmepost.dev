@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 
 type TestResult = {
   delivered: boolean;
@@ -167,6 +168,10 @@ export function WebhookTestDialog({
     setJsonError(null);
     setSending(true);
     setResult(null);
+    track({
+      name: "webhook.test_sent",
+      properties: { event_type: type },
+    });
     try {
       const res = await apiFetch<TestResult>(
         `/v1/webhook-endpoints/${endpointId}/test`,
@@ -174,8 +179,20 @@ export function WebhookTestDialog({
       );
       setResult(res);
       if (res.delivered) {
+        track({
+          name: "webhook.test_succeeded",
+          properties: { event_type: type, latency_ms: res.durationMs },
+        });
         toast.success(`Consumer replied ${res.status} in ${res.durationMs}ms.`);
       } else {
+        track({
+          name: "webhook.test_failed",
+          properties: {
+            event_type: type,
+            status_code: res.status === 0 ? undefined : res.status,
+            error_code: res.errorName ?? undefined,
+          },
+        });
         toast.warning(
           res.status === 0
             ? `Network error (${res.errorName ?? "unknown"})`

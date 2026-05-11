@@ -160,6 +160,8 @@ const faqJsonLd = {
           target="_blank"
           rel="noopener"
           class="inline-flex items-center gap-1.5 no-underline text-text hover:text-accent transition-colors"
+          data-analytics-event="external.github_clicked"
+          data-analytics-props='{"from_page":"home","location":"hero-meta"}'
         >
           <span
             class="inline-block w-[7px] h-[7px] bg-success"
@@ -185,11 +187,21 @@ const faqJsonLd = {
       </p>
 
       <div class="flex gap-[0.7rem] flex-wrap">
-        <a class="btn btn-primary" href="https://dashboard.letmepost.dev">
+        <a
+          class="btn btn-primary"
+          href="https://dashboard.letmepost.dev"
+          data-analytics-event="cta.clicked"
+          data-analytics-props='{"location":"hero","target":"dashboard","page":"home","label":"Start building free"}'
+        >
           Start building free
           <Icon name="ph:arrow-up-right" width={13} height={13} />
         </a>
-        <a class="btn btn-secondary" href="#request">
+        <a
+          class="btn btn-secondary"
+          href="#request"
+          data-analytics-event="cta.clicked"
+          data-analytics-props='{"location":"hero-secondary","target":"docs","page":"home","label":"See the request"}'
+        >
           See the request
           <Icon name="ph:arrow-down" width={13} height={13} />
         </a>
@@ -197,7 +209,12 @@ const faqJsonLd = {
 
       <p class="text-[0.85rem] mt-6 text-text-muted">
         No credit card · Free during alpha · Self-host stays free forever ·
-        <a href="https://docs.letmepost.dev/quickstart" class="text-accent">90-second quickstart →</a>
+        <a
+          href="https://docs.letmepost.dev/quickstart"
+          class="text-accent"
+          data-analytics-event="docs.link_clicked"
+          data-analytics-props='{"from_page":"home","to_section":"quickstart"}'
+        >90-second quickstart →</a>
       </p>
     </div>
   </section>
@@ -521,9 +538,16 @@ const faqJsonLd = {
           class="btn btn-primary"
           href="https://github.com/rosekamallove/letmepost.dev"
           target="_blank"
-          rel="noopener">Star on GitHub <Icon name="ph:arrow-up-right" width={13} height={13} /></a
-        >
-        <a class="btn btn-secondary" href="/contact">Get in touch</a>
+          rel="noopener"
+          data-analytics-event="external.github_clicked"
+          data-analytics-props='{"from_page":"home","location":"home-final"}'
+        >Star on GitHub <Icon name="ph:arrow-up-right" width={13} height={13} /></a>
+        <a
+          class="btn btn-secondary"
+          href="/contact"
+          data-analytics-event="cta.clicked"
+          data-analytics-props='{"location":"home-final","target":"contact","page":"home","label":"Get in touch"}'
+        >Get in touch</a>
       </div>
     </div>
   </section>

@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { track } from "@/lib/analytics";
 
 /**
  * Post detail — the full error contract, raw upstream response, and the
@@ -43,6 +44,18 @@ export default function PostDetailPage() {
     enabled: !!id,
   });
   const post = query.data ?? null;
+
+  // Fire `post_detail.viewed` once per post id load. The query cache
+  // means navigating away and back doesn't refire, but a hard reload
+  // does — same semantics as PostHog's `$pageview`.
+  useEffect(() => {
+    if (!post) return;
+    track({
+      name: "post_detail.viewed",
+      properties: { status: post.status },
+    });
+  }, [post?.id, post?.status]);
+
   const error = query.error
     ? query.error instanceof ApiRequestError
       ? query.error.payload.message

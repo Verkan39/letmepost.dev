@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
+import { track } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -58,6 +59,7 @@ export default function SignUpPage() {
         toast.error(signUpError.message ?? "Sign-up failed.");
         return;
       }
+      track({ name: "signup.completed", properties: { provider: "email" } });
 
       const slug = deriveSlug(orgName);
       const { data: org, error: orgError } =
@@ -69,6 +71,10 @@ export default function SignUpPage() {
         router.push("/onboarding");
         return;
       }
+      track({
+        name: "org.created",
+        properties: { is_first_org: true, org_id: org.id },
+      });
 
       try {
         await authClient.organization.setActive({ organizationId: org.id });
@@ -88,8 +94,24 @@ export default function SignUpPage() {
     }
   }
 
+  // `signup.started` fires on the first interaction with the form
+  // (focus on any field). One-shot via a ref-style flag so subsequent
+  // focuses don't multiply the count. Kept inline because it's the
+  // only piece of telemetry that benefits from the form-focus signal.
+  function onFirstFocus(e: React.FocusEvent<HTMLFormElement>) {
+    if (e.currentTarget.dataset.tracked === "1") return;
+    e.currentTarget.dataset.tracked = "1";
+    track({
+      name: "signup.started",
+      properties: {
+        provider: "email",
+        referrer: typeof document !== "undefined" ? document.referrer : undefined,
+      },
+    });
+  }
+
   return (
-    <form onSubmit={onSubmit}>
+    <form onSubmit={onSubmit} onFocus={onFirstFocus}>
       <Card className="py-6 gap-6">
         <CardHeader className="gap-1.5 px-6">
           <CardTitle className="text-base font-semibold">

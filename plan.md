@@ -4,6 +4,12 @@
 
 **Status (May 2026):** Phases 1–7.5 landed in code; **Phase 8 Meta trio shipped (awaiting App Review)**; **Phase 9 X/Twitter shipped (incl. chunked video upload, multi-image, reply chains, quote tweets, PKCE fix — awaiting Pay Per Use signup decision)**; **Phase 11 Pinterest extras shipped (video pin via register-media → S3 → poll)**; **Phase 13 marketing + docs site shipped** (Mintlify-pivoted docs at `docs.letmepost.dev` with full preflight/error/webhook/platform coverage, Astro landing with Docs+Product navbar dropdowns, dynamic per-platform + per-API pages, /pricing page, /blog scaffolded MDX+RSS, full SEO suite — sitemap priorities, JSON-LD Organization/WebSite/FAQPage/BreadcrumbList/SoftwareApplication/BlogPosting, AI-crawler robots.txt, twitter:site, /sitemap.xml alias). **All 8 v1 platforms publish in code.** **341+ API tests passing** (5 unrelated session-auth tests are pre-existing baseline failures). Bluesky live end-to-end; everything else awaiting approvals.
 
+**Launch-week additions (May 2026):**
+- **PostHog product analytics** wired across `apps/web` (Astro) and `apps/dashboard` (Next.js). Typed `track()` helper per app with a discriminated `WebEvent`/`DashboardEvent` union; ~30 events instrumented covering marketing CTAs, signup → first-publish funnel, OAuth lifecycle, post lifecycle (preflight failures, retries, raw-response expand), api-keys, webhooks, theme/org. Person identification via better-auth session with the active org wired as a PostHog group. CONTRIBUTING.md §11 documents the conventions (naming, ordering, single identify site).
+- **Platform launch-state gate.** Canonical `PLATFORM_STATE: Record<Platform, "live"|"trial"|"pending">` in `@letmepost/schemas/platform-state` (zod-free subpath so client bundles can consume it without weight). Backend gate at `/v1/accounts/connect/:platform` rejects `pending` with new `platform_not_enabled` error code; `PLATFORM_STATE_OVERRIDES` env can flip a platform without a redeploy (validated loudly — typos throw at parse time). Dashboard connect drawer greys out pending tiles and badges trial tiles. Marketing site reads from the same canonical map. Launch config: bluesky=live, pinterest=trial, twitter=trial, rest=pending; youtube=planned (marketing-only, not in backend enum).
+- **X per-account cost cap.** `apps/api/src/platforms/twitter/launch-cap.ts` — 50 billable posts (`published`/`rejected`/`failed`) per X account per rolling 30 days, enforced from `_shared/dispatch.ts` via the new required `PublishContext { db }`. Returns `rate_limited` 429 with `Retry-After` computed from the oldest billable post in the window. Tunable via `TWITTER_LAUNCH_CAP_PER_ACCOUNT`. Tests opt out of all dispatch gates via `{ skipGates: true }`.
+- **Pre-publish gate pattern** documented in CONTRIBUTING §3.5 (gates throw `LetmepostError`, live in `platforms/<name>/<gate>.ts`, called from `_shared/dispatch.ts`, required-not-optional `db` on `PublishContext`).
+
 **Production live:** API at `https://api.letmepost.dev` (Railway), dashboard at `https://dashboard.letmepost.dev`, landing at `https://letmepost.dev`, docs at `https://docs.letmepost.dev` (Mintlify). NeonDB Postgres + Upstash Redis. Cross-subdomain cookies via `COOKIE_DOMAIN=.letmepost.dev`. OAuth state HMAC-signed (10-min TTL); Twitter PKCE `codeVerifier` rides the same signed state envelope so the dashboard never has to stash it across the redirect.
 
 **Approvals in flight (May 2026):**
@@ -404,7 +410,8 @@ Tracked here so the work doesn't disappear into a phase that's marked done.
 - `apps/api/src/platforms/twitter/provider.ts` — call `GET /2/users/me` on `completeConnect` to replace the synthetic `twitter-${uuid}` `platformAccountId` with the real X user id. One TODO marker; ~30 LOC.
 - `apps/api/src/routes/posts.ts` — `POST /v1/posts/validate` endpoint (preflight without publishing). Mentioned on the docs / preflight index page as "when it ships." Useful for CI integration patterns by users.
 - `apps/api/src/platforms/_shared/media.ts` — eviction / lifecycle policy for the S3 bucket once we have a real bandwidth bill. Not v1.
-- Test brittleness: 5 pre-existing failures in `tests/accounts.test.ts` + `tests/post-log.test.ts` (session-auth path). Not caused by recent work — pre-existing on baseline. Worth a focused fix slice when there's spare cycles.
+- **Scheduled-post per-platform overrides not persisted.** Worker now wires `mediaRefs` through to publishers (fixed alongside the X launch cap), but Pinterest `boardId` / Threads `replyToId` / Twitter `replyToTweetId,quoteTweetId` aren't stored on the `posts` row — scheduled posts degrade to platform defaults. Adding columns + back-fill is a phase-7.5-followup.
+- Test brittleness: 5 pre-existing failures in `tests/accounts.test.ts` + `tests/post-log.test.ts` (session-auth path). Not caused by recent work — pre-existing on baseline. Worth a focused fix slice when there's spare cycles. Tests for the new `assertPlatformEnabled` + X launch-cap paths are also pending — preflight-style, no real DB; should land before public launch.
 
 **Marketing site (`apps/web`):**
 
@@ -427,6 +434,8 @@ Tracked here so the work doesn't disappear into a phase that's marked done.
 - Pinterest Standard Access demo video.
 - X Pay Per Use signup decision.
 - YouTube CASA verification kickoff.
+- **PostHog project keys** in Vercel for prod web + dashboard (`PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_KEY`). Same project key recommended across both apps for funnel stitching; separate dev/preview project if you want to keep preview traffic out of prod analytics.
+- **Smoke-test the launch gate in production-like env** — connect drawer should grey out pending tiles + badge Pinterest/X as trial; a curl against `POST /v1/accounts/connect/linkedin` should 403 with `platform_not_enabled`.
 - Verify Twitter PKCE fix on Railway production once Pay Per Use signup completes (the codeVerifier-in-state fix was deployed; needs a real auth round-trip to confirm).
 
 ---

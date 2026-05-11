@@ -3,7 +3,7 @@ import {
   isPlatformState,
 } from "@letmepost/schemas/platform-state";
 import type { Platform, PlatformState } from "@letmepost/schemas";
-import { LetmepostError } from "../../errors";
+import { LetmepostError } from "../../errors.js";
 
 /**
  * Resolve a platform's launch state with an env-override layer so a

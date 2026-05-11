@@ -19,6 +19,7 @@ import {
 import { apiKeyRoutes } from "./routes/api-keys.js";
 import { authRoutes } from "./routes/auth.js";
 import { dataDeletion } from "./routes/data-deletion.js";
+import { deauth } from "./routes/deauth.js";
 import { health } from "./routes/health.js";
 import { media } from "./routes/media.js";
 import { posts } from "./routes/posts.js";
@@ -150,10 +151,11 @@ export function createApp(options: AppOptions = {}) {
   app.route("/posts", posts);
   app.route("/v1/posts", posts);
   app.route("/v1/media", media);
-  // Public, unauthenticated platform-callback endpoint. Not /v1-prefixed —
-  // Meta calls it externally and we don't want to force a Meta config update
-  // every time the customer-facing API version bumps.
+  // Public, unauthenticated platform-callback endpoints. Not /v1-prefixed —
+  // Meta calls these externally and we don't want to force a Meta config
+  // update every time the customer-facing API version bumps.
   app.route("/data-deletion", dataDeletion);
+  app.route("/deauth", deauth);
   app.onError(onError);
   return app;
 }

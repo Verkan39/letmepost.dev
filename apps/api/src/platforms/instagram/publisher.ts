@@ -30,10 +30,19 @@ import {
  */
 
 export type InstagramCredentials = {
-  /** Page Access Token (linked Page); IG Business publishing keys off this. */
+  /**
+   * Either a Page Access Token (from FB-Login fan-out) or an IG user
+   * token (from Instagram Login). The graphBase tells the publisher
+   * which upstream host the token is valid against.
+   */
   accessToken: string;
   /** IG Business user id — `platformAccountId` on the row. */
   igUserId: string;
+  /**
+   * Override the Graph API base. Defaults to `graph.facebook.com` for
+   * Page-token rows. Set to `graph.instagram.com` for IG-Login rows.
+   */
+  graphBase?: string;
 };
 
 export type InstagramPublishInput = {
@@ -215,7 +224,11 @@ export const instagramPublisher: Publisher<
       }),
     );
 
-    const client = new InstagramClient(creds.accessToken, creds.igUserId);
+    const client = new InstagramClient(
+      creds.accessToken,
+      creds.igUserId,
+      creds.graphBase,
+    );
     const shape = classifyInstagramPost(resolved.map((r) => ({ kind: r.kind })));
 
     // ─── Single image / single video ─────────────────────────────────────

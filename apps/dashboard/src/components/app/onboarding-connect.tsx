@@ -72,7 +72,7 @@ export function OnboardingConnect({
     setError(null);
     track({
       name: "connect.platform_selected",
-      properties: { platform: platform as never },
+      properties: { platform },
     });
     try {
       const res = await apiFetch<ConnectResponse>(

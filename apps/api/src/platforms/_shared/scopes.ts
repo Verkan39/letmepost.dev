@@ -99,12 +99,21 @@ const SCOPES: Record<Platform, PlatformScopeSet> = {
   },
   instagram: {
     kind: "oauth",
-    // IG Business is connected via the Facebook OAuth flow above — the
-    // 'instagram' platform doesn't have its own connect endpoint. Listed
-    // here for parity (the route /v1/accounts/connect/instagram is
-    // disabled at the dispatcher; users connect via 'meta' / 'facebook').
-    write: ["instagram_basic", "instagram_content_publish"],
-    extended: ["instagram_manage_comments", "instagram_manage_insights"],
+    // Instagram API with Instagram Login — standalone OAuth path (Meta's
+    // 2024 product). Users sign in with their Instagram account directly,
+    // no Facebook Page required. Different scope namespace from the
+    // FB-Login fan-out: `instagram_business_*` vs `instagram_*`.
+    //
+    // The FB-Login fan-out still creates instagram rows for users who DO
+    // have a linked FB Page (see `facebook` scope set above). Both paths
+    // produce instagram rows with the same platformAccountId, so an
+    // upsert merges them.
+    write: ["instagram_business_basic", "instagram_business_content_publish"],
+    extended: [
+      "instagram_business_manage_comments",
+      "instagram_business_manage_messages",
+      "instagram_business_manage_insights",
+    ],
   },
   threads: {
     kind: "oauth",

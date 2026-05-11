@@ -147,11 +147,22 @@ export async function publishForAccount(
             : {}),
         },
       );
-    case "instagram":
+    case "instagram": {
+      // Two paths produce instagram rows; the publisher hits a different
+      // upstream host depending on which one provisioned this token:
+      //   - FB Login fan-out (Page Access Token)  → graph.facebook.com
+      //   - Instagram Login (IG user token)        → graph.instagram.com
+      // Distinguished via tokenMetadata.kind, set by each provider on connect.
+      const igMeta = (account.tokenMetadata ?? {}) as { kind?: string };
+      const igGraphBase =
+        igMeta.kind === "ig-login"
+          ? process.env.INSTAGRAM_GRAPH_BASE ?? "https://graph.instagram.com"
+          : undefined; // publisher default = META_GRAPH_BASE
       return instagramPublisher.publish(
         {
           accessToken: account.token,
           igUserId: account.platformAccountId,
+          ...(igGraphBase ? { graphBase: igGraphBase } : {}),
         },
         {
           text: input.text,
@@ -161,6 +172,7 @@ export async function publishForAccount(
             : {}),
         },
       );
+    }
     case "threads": {
       const meta = (account.tokenMetadata ?? {}) as ThreadsTokenMetadata;
       // The Threads userId is pinned as platformAccountId at connect-time, but

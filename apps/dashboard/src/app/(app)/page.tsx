@@ -517,7 +517,6 @@ function QuickStartBody({
   );
 }
 
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
@@ -557,13 +556,7 @@ function NeedsAttentionSection({ accounts }: { accounts: Account[] }) {
   const failureCount = failures.length;
   const showsMore = failureCount === 10;
 
-  const expiring = accounts.filter((a) => {
-    if (!a.tokenExpiresAt) return false;
-    const ms = new Date(a.tokenExpiresAt).getTime() - Date.now();
-    return ms > 0 && ms < SEVEN_DAYS_MS;
-  });
-
-  if (failureCount === 0 && expiring.length === 0) return null;
+  if (failureCount === 0) return null;
 
   return (
     <Card>
@@ -594,44 +587,6 @@ function NeedsAttentionSection({ accounts }: { accounts: Account[] }) {
           </Link>
         ) : null}
 
-        {expiring.length > 0 ? (
-          <div className="space-y-2">
-            <div className="text-xs text-muted-foreground">
-              Tokens expiring soon
-            </div>
-            {expiring.map((acc) => {
-              const ms =
-                new Date(acc.tokenExpiresAt as string).getTime() - Date.now();
-              const days = Math.max(0, Math.ceil(ms / ONE_DAY_MS));
-              return (
-                <div
-                  key={acc.id}
-                  className="flex items-center justify-between gap-3 px-3 py-2 ring-1 ring-foreground/10"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Badge variant="outline" className="uppercase tracking-wide">
-                      {acc.platform}
-                    </Badge>
-                    <span className="text-sm truncate">
-                      {acc.displayName ?? acc.handle ?? acc.id}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {days === 0
-                        ? "expires today"
-                        : `expires in ${days}d`}
-                    </span>
-                  </div>
-                  <Button asChild variant="outline" size="sm">
-                    <Link href="/accounts">
-                      <Plug className="size-3" />
-                      Reconnect
-                    </Link>
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
       </CardContent>
     </Card>
   );

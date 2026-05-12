@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Copy, Plug, Plus, Trash } from "@phosphor-icons/react";
+import { Copy, Plus, Trash } from "@phosphor-icons/react";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import type { Account } from "@/lib/accounts";
 import { useActiveProfile } from "@/lib/profiles";
@@ -142,7 +142,8 @@ export default function AccountsListPage() {
         });
       }
       toast.success("Account disconnected.");
-      queryClient.invalidateQueries({ queryKey: queryKeys.accounts.list() });
+      // Prefix match — the list query is keyed by `["accounts", profileId]`.
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
     },
     onError: (err: unknown) => {
       toast.error(
@@ -272,24 +273,10 @@ export default function AccountsListPage() {
                       <PinterestDefaultBoard accountId={acc.id} />
                     ) : null}
                     <div className="mt-auto flex items-center justify-between gap-2">
-                      <ExpiryLine acc={acc} />
+                      <span className="text-xs text-muted-foreground">
+                        Token refresh managed
+                      </span>
                       <div className="flex items-center gap-1 shrink-0">
-                        {needsReconnect(acc) ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              track({
-                                name: "connect.drawer_opened",
-                                properties: { entry_point: "accounts-page" },
-                              });
-                              setConnectOpen(true);
-                            }}
-                          >
-                            <Plug className="size-4" />
-                            Reconnect
-                          </Button>
-                        ) : null}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -343,50 +330,3 @@ export default function AccountsListPage() {
   );
 }
 
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
-/** Whether the account's token expires within 7 days (or has already). */
-function needsReconnect(acc: Account): boolean {
-  if (!acc.tokenExpiresAt) return false;
-  const ms = new Date(acc.tokenExpiresAt).getTime() - Date.now();
-  return ms < SEVEN_DAYS_MS;
-}
-
-/**
- * Token-expiry copy. Three cases:
- *   - no expiry on file → "Token refresh managed" (Bluesky-style auth)
- *   - expired or <7d    → destructive-tone, relative ("expires in 3d", "expired")
- *   - >7d              → muted, relative
- */
-function ExpiryLine({ acc }: { acc: Account }) {
-  if (!acc.tokenExpiresAt) {
-    return (
-      <span className="text-xs text-muted-foreground">
-        Token refresh managed
-      </span>
-    );
-  }
-  const ms = new Date(acc.tokenExpiresAt).getTime() - Date.now();
-  const days = Math.ceil(ms / ONE_DAY_MS);
-  const expired = ms <= 0;
-  const soon = !expired && ms < SEVEN_DAYS_MS;
-  const label = expired
-    ? "Token expired"
-    : days === 0
-      ? "Token expires today"
-      : days === 1
-        ? "Token expires in 1d"
-        : `Token expires in ${days}d`;
-  return (
-    <span
-      className={
-        expired || soon
-          ? "text-xs text-destructive"
-          : "text-xs text-muted-foreground"
-      }
-    >
-      {label}
-    </span>
-  );
-}

@@ -67,35 +67,23 @@ const SCOPES: Record<Platform, PlatformScopeSet> = {
   },
   facebook: {
     kind: "oauth",
-    // Facebook Login for Business scopes. The single connect grants both
-    // FB Page publish AND linked Instagram Business publish — Pages are
-    // discovered via `GET /me/accounts`, IG Business via the Page's
-    // `instagram_business_account` field. Same OAuth, two letmepost
-    // platforms (`facebook` + `instagram`) get rows from one connect.
+    // Facebook Login for Business — Pages-only scope set. We do NOT
+    // request `instagram_*` scopes here even though FBLB can grant them;
+    // Instagram has its own dedicated OAuth (see `instagram` below) for
+    // a clean one-tile-per-platform UX and a smaller App Review surface.
     //
     //   pages_show_list             — list the Pages the user manages.
     //   pages_manage_posts          — create posts on Pages.
-    //   pages_read_engagement       — required pre-req for posts on some apps.
+    //   pages_read_engagement       — required pre-req for post publishing.
     //   business_management         — needed for Pages connected via Business.
-    //   instagram_basic             — read IG Business account info per Page.
-    //   instagram_content_publish   — two-step container publish on IG.
     write: [
       "pages_show_list",
       "pages_manage_posts",
       "pages_read_engagement",
       "business_management",
-      "instagram_basic",
-      "instagram_content_publish",
     ],
-    // Insights / messaging are big extended sets we don't request by
-    // default. Listed individually so the docs page can render the full
-    // surface without having to enumerate Meta's catalog.
-    extended: [
-      "pages_read_user_content",
-      "pages_manage_engagement",
-      "instagram_manage_comments",
-      "instagram_manage_insights",
-    ],
+    // Insights / messaging are extended sets we don't request by default.
+    extended: ["pages_read_user_content", "pages_manage_engagement"],
   },
   instagram: {
     kind: "oauth",

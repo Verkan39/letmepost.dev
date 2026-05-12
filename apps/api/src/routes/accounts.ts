@@ -13,6 +13,7 @@ import { decodeOAuthState, encodeOAuthState } from "../oauth/state.js";
 import { getProvider } from "../platforms/index.js";
 import { PinterestClient } from "../platforms/pinterest/client.js";
 import type { PinterestTokenMetadata } from "../platforms/pinterest/provider.js";
+import type { InstagramAccountMetadataIgLogin } from "../platforms/instagram/provider.js";
 import {
   assertPlatformEnabled,
   platformState,
@@ -74,6 +75,26 @@ function publicView(account: {
       pinterest: {
         defaultBoardId: meta.defaultBoardId ?? null,
         defaultBoardName: meta.defaultBoardName ?? null,
+      },
+    };
+  }
+  if (account.platform === "instagram") {
+    // Surface the non-secret IG metadata so the dashboard (and lmp-test) can
+    // diagnose connect-vs-publish mismatches without dumping tokens. The
+    // common failure mode is "OAuth completes but publish fails" — usually
+    // because the user unticked `instagram_business_content_publish` at the
+    // consent screen, or because the account type isn't a Professional one.
+    // `grantedScopes` is what Meta actually echoed back; `accountType` is
+    // what Meta reports on `GET /me`. Neither is sensitive.
+    const meta = (account.tokenMetadata ?? {}) as Partial<
+      InstagramAccountMetadataIgLogin & { kind?: string }
+    >;
+    return {
+      ...base,
+      instagram: {
+        kind: meta.kind ?? null,
+        accountType: meta.accountType ?? null,
+        grantedScopes: meta.grantedScopes ?? null,
       },
     };
   }

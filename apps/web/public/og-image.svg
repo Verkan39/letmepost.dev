@@ -1,74 +1,39 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
-  <!-- Warm paper background -->
   <rect width="1200" height="630" fill="#F2EDE3"/>
 
-  <!-- Subtle framing border -->
-  <rect x="28" y="28" width="1144" height="574" fill="none" stroke="#B3A99B" stroke-width="1.5"/>
+  <!-- Header: logo + wordmark left, license right -->
+  <g transform="translate(70, 70)">
+    <circle cx="22" cy="22" r="22" fill="#2D7652"/>
+    <rect x="9" y="9" width="26" height="26" fill="#F2EDE3" transform="rotate(16 22 22)"/>
+    <text
+      x="62"
+      y="34"
+      font-family="'Instrument Serif', Georgia, serif"
+      font-style="italic"
+      font-size="34"
+      fill="#141417"
+    >letmepost<tspan fill="#2D7652">.dev</tspan></text>
+  </g>
 
-  <!-- Stamp mark + wordmark, horizontally aligned -->
-  <!-- Stamp: 150 circle radius, centered at (200, 240) -->
-  <circle cx="200" cy="240" r="80" fill="#2D7652"/>
-  <rect x="145" y="185" width="110" height="110" fill="#F2EDE3" transform="rotate(16 200 240)"/>
-
-  <!-- Wordmark — Instrument Serif italic (fallback to system serif if unavailable) -->
   <text
-    x="320"
-    y="278"
-    font-family="'Instrument Serif', 'Iowan Old Style', Georgia, 'Times New Roman', serif"
-    font-style="italic"
-    font-weight="400"
-    font-size="132"
-    fill="#141417"
-  >letmepost<tspan fill="#2D7652">.dev</tspan></text>
-
-  <!-- Tagline -->
-  <text
-    x="90"
-    y="420"
-    font-family="'Commit Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
-    font-size="40"
-    font-weight="600"
-    fill="#141417"
-  >Social media publishing</text>
-  <text
-    x="90"
-    y="472"
-    font-family="'Commit Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
-    font-size="40"
-    font-weight="700"
-    fill="#2D7652"
-  >that fails loudly.</text>
-
-  <!-- Subdescription -->
-  <text
-    x="90"
-    y="528"
-    font-family="'Commit Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
-    font-size="22"
-    fill="#524E4A"
-    font-weight="500"
-  >Open-source API for developers and AI agents.</text>
-
-  <!-- Footer divider -->
-  <line x1="90" y1="568" x2="1110" y2="568" stroke="#B3A99B" stroke-width="1"/>
-
-  <!-- Footer text -->
-  <text
-    x="90"
-    y="598"
-    font-family="'Commit Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
-    font-size="18"
-    fill="#6B6B70"
-    letter-spacing="1.8"
-    font-weight="500"
-  >LETMEPOST.DEV</text>
-  <text
-    x="1110"
-    y="598"
+    x="1130"
+    y="92"
     text-anchor="end"
     font-family="'Commit Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
-    font-size="18"
+    font-size="15"
     fill="#6B6B70"
     letter-spacing="1.8"
+    font-weight="500"
   >OPEN SOURCE · APACHE-2.0</text>
+
+  <!-- Headline — same line as the landing page hero -->
+  <g
+    font-family="'Instrument Serif', Georgia, serif"
+    font-style="italic"
+    font-size="96"
+    font-weight="400"
+  >
+    <text x="70" y="320" fill="#141417">Eight social platforms.</text>
+    <text x="70" y="520" fill="#2D7652">One API.</text>
+  </g>
 </svg>

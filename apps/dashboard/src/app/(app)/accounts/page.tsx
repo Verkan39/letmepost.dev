@@ -65,6 +65,9 @@ export default function AccountsListPage() {
       toast.success(`Connected ${connected}.`);
       queryClient.invalidateQueries({ queryKey: ["accounts"] });
     } else if (error) {
+      const rule = searchParams.get("connect_rule");
+      const message = searchParams.get("connect_message");
+      const remediation = searchParams.get("connect_remediation");
       const p = asAnalyticsPlatform(platform);
       if (p) {
         track({
@@ -73,14 +76,28 @@ export default function AccountsListPage() {
             platform: p,
             outcome: error === "user_denied" ? "denied" : "error",
             error_code: error,
+            ...(rule ? { error_rule: rule } : {}),
           },
         });
       }
-      toast.error(
-        platform
-          ? `${platform} connect failed: ${error.replaceAll("_", " ")}`
-          : `Connect failed: ${error.replaceAll("_", " ")}`,
-      );
+      // When the API forwarded a real message + remediation, render it as a
+      // persistent toast (duration: Infinity) so the user has time to read
+      // multi-step instructions like "open IG app → Settings → switch account
+      // type." The fallback path keeps the old generic "X connect failed: Y"
+      // shape so codes without a paired rule still surface something.
+      if (message) {
+        toast.error(message, {
+          description: remediation ?? undefined,
+          duration: Infinity,
+          closeButton: true,
+        });
+      } else {
+        toast.error(
+          platform
+            ? `${platform} connect failed: ${error.replaceAll("_", " ")}`
+            : `Connect failed: ${error.replaceAll("_", " ")}`,
+        );
+      }
     }
     // Strip the params without scrolling.
     router.replace("/accounts", { scroll: false });

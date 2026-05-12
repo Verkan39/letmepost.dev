@@ -151,7 +151,20 @@ export class InstagramProvider implements AccountProvider {
     }
 
     const shortLived = tokenRes.body.access_token;
-    const userId = String(tokenRes.body.user_id);
+    // The token-exchange response returns a `user_id`, but that is NOT the
+    // identifier the Content Publishing API expects in `/{ig-user-id}/media`.
+    // Meta's IG Login flow exposes two distinct numeric IDs for the same
+    // account:
+    //   - `user_id` from /oauth/access_token (app-facing, often different)
+    //   - `id`      from GET /me on graph.instagram.com (Instagram-scoped;
+    //                                                    the one the
+    //                                                    Content Publishing
+    //                                                    API endpoints want)
+    //
+    // Sending the token-response `user_id` to /{ig-user-id}/media returns
+    // `OAuthException code:2 is_transient:true` with no useful detail —
+    // Meta's documented "unknown resource" behavior. We resolve the real ID
+    // from /me below before we persist the row.
     const grantedScopes = tokenRes.body.permissions;
 
     // 2. Swap short-lived (1h) → long-lived (60d).
@@ -185,13 +198,17 @@ export class InstagramProvider implements AccountProvider {
     const expiresIn = longRes.body.expires_in ?? 60 * 24 * 60 * 60; // ~60d fallback
     const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000);
 
-    // 3. Fetch the user's profile to populate displayName + account_type.
+    // 3. Resolve the real Instagram-scoped user id via /me, plus username
+    //    and account_type for diagnostics. `id` (not `user_id`) is the
+    //    identifier the Content Publishing API endpoints expect — see the
+    //    comment above the token exchange block.
     const meUrl = new URL(
       `${this.config.graphBase ?? INSTAGRAM_GRAPH_BASE}/me`,
     );
-    meUrl.searchParams.set("fields", "user_id,username,account_type");
+    meUrl.searchParams.set("fields", "id,user_id,username,account_type");
     meUrl.searchParams.set("access_token", longToken);
     const meRes = await platformFetch<{
+      id?: string;
       user_id?: string;
       username?: string;
       account_type?: string;
@@ -200,7 +217,7 @@ export class InstagramProvider implements AccountProvider {
       url: meUrl.toString(),
       platform: PLATFORM,
     });
-    if (!meRes.ok) {
+    if (!meRes.ok || !meRes.body?.id) {
       throw new LetmepostError({
         code: "platform_auth_failed",
         status: 502,
@@ -210,8 +227,28 @@ export class InstagramProvider implements AccountProvider {
         platformResponse: meRes.body,
       });
     }
+    const igScopedUserId = meRes.body.id;
     const username = meRes.body?.username;
     const accountType = meRes.body?.account_type;
+
+    // Reject only PERSONAL accounts at connect time. BUSINESS and
+    // MEDIA_CREATOR can both publish via the Content Publishing API once
+    // the IG-scoped user id from /me is used (the token-response user_id
+    // was a regression that produced the false "MEDIA_CREATOR can't
+    // publish" signal during testing).
+    if (accountType === "PERSONAL") {
+      throw new LetmepostError({
+        code: "platform_rejected",
+        status: 400,
+        platform: PLATFORM,
+        message:
+          "Instagram Personal accounts can't publish via the Content Publishing API. Switch to a Business or Creator account to continue.",
+        rule: "instagram.account_type.requires_professional",
+        platformResponse: { accountType: accountType ?? null, username },
+        remediation:
+          "On Instagram: open the app → Profile → menu (≡) → Settings and privacy → Account type and tools → Switch to professional account. The change is instant. Then try Connect again.",
+      });
+    }
 
     const metadata: InstagramAccountMetadataIgLogin = { kind: "ig-login" };
     if (username) metadata.username = username;
@@ -221,7 +258,7 @@ export class InstagramProvider implements AccountProvider {
     return [
       {
         platform: PLATFORM,
-        platformAccountId: userId,
+        platformAccountId: igScopedUserId,
         displayName: username ?? null,
         token: longToken,
         tokenMetadata: metadata as unknown as Record<string, unknown>,

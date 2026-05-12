@@ -681,8 +681,27 @@ export function createAccountRoutes(options: AccountRoutesOptions = {}) {
             : err instanceof Error
               ? "exchange_failed"
               : "exchange_failed";
+        // Forward `rule` + `message` so the dashboard can render the actual
+        // remediation instead of a generic "platform rejected" toast. Without
+        // these the user sees a useless code and has no idea what to do —
+        // exactly the silent-failure pattern this product exists to kill.
+        const extras: string[] = [];
+        if (err instanceof LetmepostError) {
+          if (err.rule) {
+            extras.push(`connect_rule=${encodeURIComponent(err.rule)}`);
+          }
+          if (err.message) {
+            extras.push(`connect_message=${encodeURIComponent(err.message)}`);
+          }
+          if (err.remediation) {
+            extras.push(
+              `connect_remediation=${encodeURIComponent(err.remediation)}`,
+            );
+          }
+        }
+        const suffix = extras.length > 0 ? `&${extras.join("&")}` : "";
         return redirect(
-          `connect_error=${encodeURIComponent(reason)}&platform=${platform}`,
+          `connect_error=${encodeURIComponent(reason)}&platform=${platform}${suffix}`,
         );
       }
 

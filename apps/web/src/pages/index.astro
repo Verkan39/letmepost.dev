@@ -257,6 +257,55 @@ const faqJsonLd = {
     </div>
   </section>
 
+  <!-- Platforms -->
+  <section
+    id="platforms"
+    class="section"
+  >
+    <div class="container">
+      <h2 class="!mt-0">Platform support.</h2>
+      <p class="text-text-muted">
+        Bluesky is live. Everything else is either built and waiting on
+        platform approval, or being built while approval is in flight. Each
+        row flips to live the moment review clears.
+      </p>
+
+      <ul class="list-none p-0 mt-6 mb-5">
+        {
+          platforms.map((p) => (
+            <li class="group flex items-center gap-3 py-2 text-[0.95rem]">
+              <span class="inline-flex items-center gap-[0.55rem] text-text">
+                <PlatformIcon
+                  platform={p.slug}
+                  class="group-hover:text-text"
+                />
+                <span class="font-semibold whitespace-nowrap">{p.name}</span>
+              </span>
+              <span
+                class="flex-1 self-center h-0 border-b border-dotted border-border-strong"
+                aria-hidden="true"
+              />
+              <span class="text-[0.72rem] uppercase tracking-[0.08em] text-text-muted whitespace-nowrap inline-flex items-center gap-[0.4rem]">
+                <span
+                  class={`inline-block w-[6px] h-[6px] ${glyphClasses(p.status)}`}
+                  style={p.status === "live" ? liveGlyphShadow : ""}
+                  aria-hidden="true"
+                />
+                {statusLabel[p.status]}
+              </span>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="text-[0.8rem] mt-4 text-text-muted">
+        TikTok is deferred to v2. The DB enum and schemas keep it reserved
+        for a later add. Reddit, Telegram, Discord, Snapchat, Google
+        Business, and WhatsApp are cut from v1. See the roadmap for the
+        reasoning.
+      </p>
+    </div>
+  </section>
+
   <!-- Error -->
   <section
     class="section"
@@ -452,54 +501,6 @@ const faqJsonLd = {
     </div>
   </section>
 
-  <!-- Platforms -->
-  <section
-    id="platforms"
-    class="section"
-  >
-    <div class="container">
-      <h2 class="!mt-0">Platform support.</h2>
-      <p class="text-text-muted">
-        Bluesky is live. Everything else is either built and waiting on
-        platform approval, or being built while approval is in flight. Each
-        row flips to live the moment review clears.
-      </p>
-
-      <ul class="list-none p-0 mt-6 mb-5">
-        {
-          platforms.map((p) => (
-            <li class="group flex items-center gap-3 py-2 text-[0.95rem]">
-              <span class="inline-flex items-center gap-[0.55rem] text-text">
-                <PlatformIcon
-                  platform={p.slug}
-                  class="group-hover:text-text"
-                />
-                <span class="font-semibold whitespace-nowrap">{p.name}</span>
-              </span>
-              <span
-                class="flex-1 self-center h-0 border-b border-dotted border-border-strong"
-                aria-hidden="true"
-              />
-              <span class="text-[0.72rem] uppercase tracking-[0.08em] text-text-muted whitespace-nowrap inline-flex items-center gap-[0.4rem]">
-                <span
-                  class={`inline-block w-[6px] h-[6px] ${glyphClasses(p.status)}`}
-                  style={p.status === "live" ? liveGlyphShadow : ""}
-                  aria-hidden="true"
-                />
-                {statusLabel[p.status]}
-              </span>
-            </li>
-          ))
-        }
-      </ul>
-      <p class="text-[0.8rem] mt-4 text-text-muted">
-        TikTok is deferred to v2. The DB enum and schemas keep it reserved
-        for a later add. Reddit, Telegram, Discord, Snapchat, Google
-        Business, and WhatsApp are cut from v1. See the roadmap for the
-        reasoning.
-      </p>
-    </div>
-  </section>
 
   <!-- FAQs -->
   <section

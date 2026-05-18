@@ -10,7 +10,34 @@ The MCP server is a thin wrapper over the REST API. Same auth, same idempotency,
 
 ## Install
 
-The fastest path is `npx`. Set your API key and the server boots over stdio.
+Two install paths. The hosted URL needs zero local setup. The npx path is a one-line local install.
+
+### Hosted (zero install)
+
+Point your MCP client at `https://mcp.letmepost.dev/mcp` with your API key as a Bearer token. Works with any client that supports the Streamable HTTP transport.
+
+<CodeGroup>
+
+```bash Claude Code
+claude mcp add --transport http letmepost https://mcp.letmepost.dev/mcp --header "Authorization: Bearer lmp_live_..."
+```
+
+```json Cursor / Cline / Claude Desktop
+{
+  "mcpServers": {
+    "letmepost": {
+      "url": "https://mcp.letmepost.dev/mcp",
+      "headers": { "Authorization": "Bearer lmp_live_..." }
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+### Local (npx)
+
+Useful when you self-host and want the MCP server pointed at your own deployment, or just want everything running locally.
 
 <CodeGroup>
 
@@ -39,6 +66,8 @@ LMP_API_KEY=lmp_live_... npx @letmepost/mcp
 Generate an API key at [dashboard.letmepost.dev](https://dashboard.letmepost.dev). The key inherits the profile scope it was minted with so the agent can't see accounts outside that profile.
 
 ## Configuration
+
+Hosted MCP needs no configuration beyond the Bearer header. Local (`npx`) install reads two env vars:
 
 | Variable        | Required | Default                     | Description                                       |
 | --------------- | -------- | --------------------------- | ------------------------------------------------- |
@@ -126,6 +155,7 @@ See [self-host quick-start](/self-host/quick-start) for the full deployment walk
 ## What's not in the MCP server yet
 
 - `get_post` and `list_posts` (read-side endpoints) are on the roadmap. The REST API exposes them today.
-- Hosted MCP at `mcp.letmepost.dev/mcp` (HTTP transport, OAuth instead of API key) is planned. For now the local `npx` install with stdio is the supported path.
+- Auto-generated tool surface from the OpenAPI spec (opt-in via `LMP_MCP_TOOLS=full`) ships in v0.2. Today's default is a curated 2-tool set covering the common publishing path.
+- OAuth 2.1 flow for the hosted MCP (browser-redirect connect instead of paste-the-key) is planned. Today the hosted endpoint uses the standard API-key Bearer header.
 
 File issues or feature requests at [github.com/letmepost/letmepost.dev](https://github.com/letmepost/letmepost.dev).

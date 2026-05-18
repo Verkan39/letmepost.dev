@@ -22,6 +22,7 @@ import { authRoutes } from "./routes/auth.js";
 import { dataDeletion } from "./routes/data-deletion.js";
 import { deauth } from "./routes/deauth.js";
 import { health } from "./routes/health.js";
+import { mcp } from "./routes/mcp.js";
 import { media } from "./routes/media.js";
 import { posts } from "./routes/posts.js";
 import {
@@ -157,6 +158,10 @@ export function createApp(options: AppOptions = {}) {
   app.route("/posts", posts);
   app.route("/v1/posts", posts);
   app.route("/v1/media", media);
+  // Hosted MCP endpoint. Streamable HTTP transport, stateless mode, gated
+  // by the same API-key auth as /v1/*. Custom domain mcp.letmepost.dev
+  // points at this Railway service via CNAME.
+  app.route("/mcp", mcp);
   // Public, unauthenticated platform-callback endpoints. Not /v1-prefixed —
   // Meta calls these externally and we don't want to force a Meta config
   // update every time the customer-facing API version bumps.

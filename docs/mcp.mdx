@@ -14,19 +14,19 @@ Two install paths. The hosted URL needs zero local setup. The npx path is a one-
 
 ### Hosted (zero install)
 
-Point your MCP client at `https://mcp.letmepost.dev/mcp` with your API key as a Bearer token. Works with any client that supports the Streamable HTTP transport.
+Point your MCP client at `https://api.letmepost.dev/mcp` with your API key as a Bearer token. Works with any client that supports the Streamable HTTP transport. A vanity `mcp.letmepost.dev` alias is coming.
 
 <CodeGroup>
 
 ```bash Claude Code
-claude mcp add --transport http letmepost https://mcp.letmepost.dev/mcp --header "Authorization: Bearer lmp_live_..."
+claude mcp add --transport http letmepost https://api.letmepost.dev/mcp --header "Authorization: Bearer lmp_live_..."
 ```
 
 ```json Cursor / Cline / Claude Desktop
 {
   "mcpServers": {
     "letmepost": {
-      "url": "https://mcp.letmepost.dev/mcp",
+      "url": "https://api.letmepost.dev/mcp",
       "headers": { "Authorization": "Bearer lmp_live_..." }
     }
   }

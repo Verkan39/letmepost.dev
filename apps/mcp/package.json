@@ -1,0 +1,48 @@
+{
+  "name": "@letmepost/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for letmepost.dev. Lets AI agents publish to Bluesky, X, LinkedIn, Threads, Instagram, Facebook, Pinterest through a single tool call.",
+  "type": "module",
+  "bin": {
+    "letmepost-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "letmepost",
+    "social-media",
+    "publishing-api",
+    "agents"
+  ],
+  "license": "Apache-2.0",
+  "homepage": "https://docs.letmepost.dev/mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/letmepost/letmepost.dev.git",
+    "directory": "apps/mcp"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.24.1"
+  },
+  "devDependencies": {
+    "@letmepost/config-tsconfig": "workspace:*",
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

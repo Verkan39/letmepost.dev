@@ -1,0 +1,48 @@
+{
+  "name": "@letmepost/cli",
+  "version": "0.1.0",
+  "description": "Command-line interface for letmepost.dev. Publish posts, manage connected accounts, inspect the post log from your terminal or from agent shells.",
+  "type": "module",
+  "bin": {
+    "lmp": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "cli",
+    "letmepost",
+    "social-media",
+    "publishing-api",
+    "agents"
+  ],
+  "license": "Apache-2.0",
+  "homepage": "https://docs.letmepost.dev/cli",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/letmepost/letmepost.dev.git",
+    "directory": "apps/cli"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "kleur": "^4.1.5",
+    "open": "^10.1.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@letmepost/config-tsconfig": "workspace:*",
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

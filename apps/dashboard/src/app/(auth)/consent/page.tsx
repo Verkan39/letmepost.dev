@@ -43,15 +43,24 @@ export default function ConsentPage() {
   async function submit(accept: boolean) {
     setSubmitting(accept ? "accept" : "deny");
     try {
-      // Pass the full signed query so the AS resolves the right authorize
-      // request. The body carries the decision + the scopes the user
-      // approved (which may be a subset of what was requested).
-      const consentUrl = `${API_URL}/api/auth/oauth2/consent?${search?.toString() ?? ""}`;
+      // better-auth's oauth-provider has a `before` hook that matches on
+      // `body.oauth_query` — it verifies the signature, populates the
+      // request-scoped oAuthState, and the consent endpoint reads the query
+      // from there. Without it the consent handler throws
+      // `{ error: "invalid_request", error_description: "missing oauth query" }`.
+      // The signed query lives in the URL search params (better-auth put it
+      // there when it redirected here from /oauth2/authorize); we just
+      // forward the whole thing back as the oauth_query field.
+      const consentUrl = `${API_URL}/api/auth/oauth2/consent`;
       const res = await fetch(consentUrl, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accept, scope: scope || undefined }),
+        body: JSON.stringify({
+          accept,
+          scope: scope || undefined,
+          oauth_query: search?.toString() ?? "",
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));

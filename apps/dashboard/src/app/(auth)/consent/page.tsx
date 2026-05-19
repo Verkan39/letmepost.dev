@@ -67,18 +67,25 @@ export default function ConsentPage() {
         toast.error(body?.error_description ?? body?.error ?? "Consent failed");
         return;
       }
-      // better-auth either returns a redirect URL in the body or follows the
-      // redirect itself; handle both.
-      const body = await res.json().catch(() => null);
-      if (body?.redirect_url) {
-        window.location.href = body.redirect_url;
+      // better-auth's oauth-provider returns `{ redirect: true, url }` where
+      // `url` is the loopback callback the OAuth client (Claude Code, Cursor,
+      // …) is listening on. The browser must navigate there for the client to
+      // receive the code; if we don't do this nav the client stalls on the
+      // "waiting for browser callback" screen forever.
+      const body = (await res.json().catch(() => null)) as
+        | { redirect?: boolean; url?: string }
+        | null;
+      if (body?.url) {
+        window.location.href = body.url;
         return;
       }
+      // Last-resort fallback: if better-auth followed the redirect itself we
+      // can pick the final URL off the Response. If neither path is set we
+      // send the user back to the dashboard so they aren't stranded.
       if (res.redirected) {
         window.location.href = res.url;
         return;
       }
-      // Fallback: send the user back to the dashboard.
       window.location.href = "/";
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Consent request failed.");

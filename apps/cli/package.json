@@ -24,7 +24,7 @@
     "agents"
   ],
   "license": "Apache-2.0",
-  "homepage": "https://docs.letmepost.dev/cli",
+  "homepage": "https://docs.letmepost.dev/agents/cli",
   "repository": {
     "type": "git",
     "url": "https://github.com/letmepost/letmepost.dev.git",

@@ -41,7 +41,11 @@
         "groups": [
           {
             "group": "Get started",
-            "pages": ["quickstart", "authentication", "mcp", "idempotency", "errors/index", "preflight/index"]
+            "pages": ["quickstart", "authentication", "idempotency", "errors/index", "preflight/index"]
+          },
+          {
+            "group": "Agents",
+            "pages": ["agents/mcp", "agents/cli"]
           },
           {
             "group": "Guides",

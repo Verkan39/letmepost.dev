@@ -21,7 +21,6 @@ node_modules
 **/.env.local
 **/.env.*.local
 apps/api/tests
-apps/api/scripts
 apps/web/dist
 apps/dashboard/.next
 README.md

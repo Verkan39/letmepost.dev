@@ -21,6 +21,7 @@ WORKDIR /app
 FROM base AS deps
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc* ./
 COPY apps/api/package.json apps/api/
+COPY apps/mcp/package.json apps/mcp/
 COPY packages/schemas/package.json packages/schemas/
 COPY packages/config-tsconfig/package.json packages/config-tsconfig/
 RUN pnpm install --frozen-lockfile
@@ -29,11 +30,18 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS build
 # turbo.json lives at the repo root and declares `build` with
 # `dependsOn: ["^build"]` — so building the API also builds @letmepost/schemas
-# (which it imports at runtime as compiled dist/, not TS source).
+# (which it imports at runtime as compiled dist/, not TS source) and
+# @letmepost/mcp (the api's /mcp route imports the autogen tool surface
+# from there at runtime).
 COPY turbo.json ./
 COPY packages/config-tsconfig packages/config-tsconfig
 COPY packages/schemas packages/schemas
+COPY apps/mcp apps/mcp
 COPY apps/api apps/api
+# The api's prebuild hook reads the canonical OpenAPI spec from docs/ and
+# fans it out into dist/routes/openapi.json so the hosted /mcp route can
+# load it at runtime. Same source feeds apps/mcp's build hook.
+COPY docs/api-reference docs/api-reference
 RUN pnpm turbo run build --filter=@letmepost/api
 
 # ─── 4. runner ──────────────────────────────────────────────────────────────
@@ -45,6 +53,7 @@ ENV PORT=3000
 # in CMD without re-resolving the universe.
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc* ./
 COPY apps/api/package.json apps/api/
+COPY apps/mcp/package.json apps/mcp/
 COPY packages/schemas/package.json packages/schemas/
 COPY packages/config-tsconfig/package.json packages/config-tsconfig/
 
@@ -53,10 +62,12 @@ COPY packages/config-tsconfig/package.json packages/config-tsconfig/
 # the workspace root; pnpm prunes it otherwise. Tweak if image size matters.
 RUN pnpm install --frozen-lockfile --prod
 
-# Compiled output for both the API and the schemas package — runtime imports
-# go through @letmepost/schemas → packages/schemas/dist/index.js.
+# Compiled output for the API, schemas, and the MCP autogen module. Runtime
+# imports route through @letmepost/schemas → packages/schemas/dist and
+# @letmepost/mcp/autogen → apps/mcp/dist/autogen.js.
 COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/packages/schemas/dist packages/schemas/dist
+COPY --from=build /app/apps/mcp/dist apps/mcp/dist
 
 # Migrations are read at runtime by `dist/db/migrate.js`.
 COPY apps/api/drizzle apps/api/drizzle

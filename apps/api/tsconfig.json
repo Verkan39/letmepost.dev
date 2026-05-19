@@ -5,7 +5,9 @@
     "moduleResolution": "Bundler",
     "types": ["node"],
     "rootDir": ".",
-    "noEmit": true
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false
   },
   "include": ["src", "tests", "vitest.config.ts"]
 }

@@ -1,0 +1,202 @@
+-- OAuth 2.1 authorization-server tables. Powers /api/auth/oauth2/* via the
+-- better-auth oauth-provider plugin so MCP clients (Claude Desktop, Cursor)
+-- can obtain bearer tokens through browser-redirect OAuth instead of pasting
+-- `lmp_live_…` API keys.
+--
+-- Tables:
+--   oauth_client          — registered clients (RFC 7591 dynamic registration)
+--   oauth_refresh_token   — refresh tokens granted via `offline_access`
+--   oauth_access_token    — opaque access tokens (JWT-mode tokens not persisted)
+--   oauth_consent         — per-(user, client) consent records
+--   jwks                  — JWK keypair store for signing access tokens
+--
+-- Idempotent (IF NOT EXISTS, conditional ALTER) so a partial re-run on the
+-- same DB self-heals. Matches the style of 0004_media_table.sql.
+
+CREATE TABLE IF NOT EXISTS "jwks" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"public_key" text NOT NULL,
+	"private_key" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"expires_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "oauth_client" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"client_id" text NOT NULL,
+	"client_secret" text,
+	"disabled" boolean DEFAULT false NOT NULL,
+	"skip_consent" boolean,
+	"enable_end_session" boolean,
+	"subject_type" text,
+	"scopes" text[],
+	"user_id" uuid,
+	"name" text,
+	"uri" text,
+	"icon" text,
+	"contacts" text[],
+	"tos" text,
+	"policy" text,
+	"software_id" text,
+	"software_version" text,
+	"software_statement" text,
+	"redirect_uris" text[] NOT NULL,
+	"post_logout_redirect_uris" text[],
+	"token_endpoint_auth_method" text,
+	"grant_types" text[],
+	"response_types" text[],
+	"public" boolean,
+	"type" text,
+	"require_pkce" boolean,
+	"reference_id" text,
+	"metadata" jsonb,
+	"created_at" timestamp with time zone,
+	"updated_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "oauth_refresh_token" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"token" text NOT NULL,
+	"client_id" text NOT NULL,
+	"session_id" uuid,
+	"user_id" uuid NOT NULL,
+	"reference_id" text,
+	"expires_at" timestamp with time zone,
+	"created_at" timestamp with time zone,
+	"revoked" timestamp with time zone,
+	"auth_time" timestamp with time zone,
+	"scopes" text[] NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "oauth_access_token" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"token" text,
+	"client_id" text NOT NULL,
+	"session_id" uuid,
+	"user_id" uuid,
+	"reference_id" text,
+	"refresh_id" uuid,
+	"expires_at" timestamp with time zone,
+	"created_at" timestamp with time zone,
+	"scopes" text[] NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "oauth_consent" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"client_id" text NOT NULL,
+	"user_id" uuid,
+	"reference_id" text,
+	"scopes" text[] NOT NULL,
+	"created_at" timestamp with time zone,
+	"updated_at" timestamp with time zone
+);
+--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'oauth_client_user_id_user_id_fk'
+  ) THEN
+    ALTER TABLE "oauth_client" ADD CONSTRAINT "oauth_client_user_id_user_id_fk"
+      FOREIGN KEY ("user_id") REFERENCES "public"."user"("id")
+      ON DELETE cascade ON UPDATE no action;
+  END IF;
+END $$;
+--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'oauth_refresh_token_session_id_session_id_fk'
+  ) THEN
+    ALTER TABLE "oauth_refresh_token" ADD CONSTRAINT "oauth_refresh_token_session_id_session_id_fk"
+      FOREIGN KEY ("session_id") REFERENCES "public"."session"("id")
+      ON DELETE set null ON UPDATE no action;
+  END IF;
+END $$;
+--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'oauth_refresh_token_user_id_user_id_fk'
+  ) THEN
+    ALTER TABLE "oauth_refresh_token" ADD CONSTRAINT "oauth_refresh_token_user_id_user_id_fk"
+      FOREIGN KEY ("user_id") REFERENCES "public"."user"("id")
+      ON DELETE cascade ON UPDATE no action;
+  END IF;
+END $$;
+--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'oauth_access_token_session_id_session_id_fk'
+  ) THEN
+    ALTER TABLE "oauth_access_token" ADD CONSTRAINT "oauth_access_token_session_id_session_id_fk"
+      FOREIGN KEY ("session_id") REFERENCES "public"."session"("id")
+      ON DELETE set null ON UPDATE no action;
+  END IF;
+END $$;
+--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'oauth_access_token_user_id_user_id_fk'
+  ) THEN
+    ALTER TABLE "oauth_access_token" ADD CONSTRAINT "oauth_access_token_user_id_user_id_fk"
+      FOREIGN KEY ("user_id") REFERENCES "public"."user"("id")
+      ON DELETE cascade ON UPDATE no action;
+  END IF;
+END $$;
+--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'oauth_access_token_refresh_id_oauth_refresh_token_id_fk'
+  ) THEN
+    ALTER TABLE "oauth_access_token" ADD CONSTRAINT "oauth_access_token_refresh_id_oauth_refresh_token_id_fk"
+      FOREIGN KEY ("refresh_id") REFERENCES "public"."oauth_refresh_token"("id")
+      ON DELETE cascade ON UPDATE no action;
+  END IF;
+END $$;
+--> statement-breakpoint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'oauth_consent_user_id_user_id_fk'
+  ) THEN
+    ALTER TABLE "oauth_consent" ADD CONSTRAINT "oauth_consent_user_id_user_id_fk"
+      FOREIGN KEY ("user_id") REFERENCES "public"."user"("id")
+      ON DELETE cascade ON UPDATE no action;
+  END IF;
+END $$;
+--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "oauth_client_client_id_unique" ON "oauth_client" USING btree ("client_id");
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "oauth_client_user_id_idx" ON "oauth_client" USING btree ("user_id");
+--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "oauth_refresh_token_token_unique" ON "oauth_refresh_token" USING btree ("token");
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "oauth_refresh_token_client_id_idx" ON "oauth_refresh_token" USING btree ("client_id");
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "oauth_refresh_token_session_id_idx" ON "oauth_refresh_token" USING btree ("session_id");
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "oauth_refresh_token_user_id_idx" ON "oauth_refresh_token" USING btree ("user_id");
+--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "oauth_access_token_token_unique" ON "oauth_access_token" USING btree ("token");
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "oauth_access_token_client_id_idx" ON "oauth_access_token" USING btree ("client_id");
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "oauth_access_token_session_id_idx" ON "oauth_access_token" USING btree ("session_id");
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "oauth_access_token_user_id_idx" ON "oauth_access_token" USING btree ("user_id");
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "oauth_access_token_refresh_id_idx" ON "oauth_access_token" USING btree ("refresh_id");
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "oauth_consent_client_id_idx" ON "oauth_consent" USING btree ("client_id");
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "oauth_consent_user_id_idx" ON "oauth_consent" USING btree ("user_id");

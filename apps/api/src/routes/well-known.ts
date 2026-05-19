@@ -35,9 +35,13 @@ wellKnown.get("/oauth-authorization-server", (c) =>
  * resource server and the AS so `authorization_servers` points at ourselves.
  */
 wellKnown.get("/oauth-protected-resource", (c) => {
+  // `resource` is the API itself. `authorization_servers[0]` must match the
+  // `issuer` claim from the AS metadata or MCP clients refuse the discovery
+  // hand-off — better-auth's issuer is the mount-point of the auth handler
+  // (`${baseAuthUrl}/api/auth`), not the bare API host.
   return c.json({
     resource: baseAuthUrl,
-    authorization_servers: [baseAuthUrl],
+    authorization_servers: [`${baseAuthUrl}/api/auth`],
     scopes_supported: ["publish", "read", "openid", "offline_access"],
     bearer_methods_supported: ["header"],
   });

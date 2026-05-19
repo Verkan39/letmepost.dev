@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
+import { API_URL } from "@/lib/env";
 import { track } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,8 +19,25 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+/**
+ * When the OAuth provider redirects the user here for sign-in, it appends the
+ * full signed authorize-query (response_type, client_id, scope, state,
+ * code_challenge, exp, iat, sig, …). After successful sign-in we have to send
+ * the user back to /api/auth/oauth2/authorize WITH those exact params so the
+ * authorize handler can verify the signature and continue the flow. Anything
+ * else (a bare router.push("/")) drops the OAuth dance on the floor.
+ *
+ * The presence of `response_type=code` is our signal that we're inside an OAuth
+ * loop. If absent, this is a plain dashboard sign-in and we fall back to "/".
+ */
+function buildPostSignInRedirect(search: URLSearchParams): string {
+  if (!search.get("response_type")) return "/";
+  return `${API_URL}/api/auth/oauth2/authorize?${search.toString()}`;
+}
+
 export default function SignInPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -34,7 +52,13 @@ export default function SignInPage() {
         return;
       }
       track({ name: "signin.completed", properties: { provider: "email" } });
-      router.push("/");
+      const target = buildPostSignInRedirect(
+        new URLSearchParams(searchParams?.toString() ?? ""),
+      );
+      // Full-page nav (not router.push) so the browser actually leaves the
+      // dashboard origin and the API receives the request with the new
+      // session cookie attached.
+      window.location.href = target;
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Sign-in request failed.",

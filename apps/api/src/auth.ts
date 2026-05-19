@@ -114,11 +114,13 @@ export const auth = betterAuth({
     jwt(),
     oauthProvider({
       // Dashboard pages the provider redirects to when it needs a logged-in
-      // user (login) or a scope grant (consent). These live in apps/dashboard
-      // and may not be implemented yet — the provider just needs the path so
-      // it can build the 302.
-      loginPage: "/sign-in",
-      consentPage: "/consent",
+      // user (login) or a scope grant (consent). The dashboard lives on a
+      // separate origin (dashboard.letmepost.dev in prod, localhost:3001 in
+      // dev) so these MUST be absolute URLs — better-auth appends `?...signed
+      // query...` and the user lands directly on the dashboard route.
+      // DASHBOARD_URL is the configurable base; default keeps dev working.
+      loginPage: `${process.env.DASHBOARD_URL ?? "http://localhost:3001"}/sign-in`,
+      consentPage: `${process.env.DASHBOARD_URL ?? "http://localhost:3001"}/consent`,
       validAudiences,
       // Custom OAuth scopes:
       // - openid / profile / offline_access — standard OIDC bits the plugin

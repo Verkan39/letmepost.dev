@@ -24,6 +24,7 @@ import { deauth } from "./routes/deauth.js";
 import { health } from "./routes/health.js";
 import { mcp } from "./routes/mcp.js";
 import { media } from "./routes/media.js";
+import { oauthExchange } from "./routes/oauth-exchange.js";
 import { posts } from "./routes/posts.js";
 import {
   createProfileRoutes,
@@ -122,6 +123,9 @@ export function createApp(options: AppOptions = {}) {
   app.route("/.well-known", wellKnown);
 
   app.route("/api/auth", authRoutes);
+  // OAuth-token → API-key trade. Mounted before the session-only api-keys
+  // routes so the global requireSession() middleware doesn't intercept.
+  app.route("/v1/oauth-exchange", oauthExchange);
   app.route("/v1/api-keys", apiKeyRoutes);
 
   if (options.testSession) {

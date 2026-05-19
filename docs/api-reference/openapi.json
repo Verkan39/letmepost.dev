@@ -479,6 +479,11 @@
             "format": "date-time",
             "description": "ISO-8601 timestamp at least 1 second in the future. When set, every target row is queued and the response is 202. Scheduled posts currently accept text only — media and firstComment require an immediate publish.",
             "example": "2026-06-01T12:00:00.000Z"
+          },
+          "profileId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Profile scope for this batch. Use to target a specific workspace when the API key or OAuth token is org-wide. Forbidden when the key is already scoped to a different profile (rule `profile.scope_mismatch`). Omit to fall back to the key's bound profile."
           }
         },
         "example": {

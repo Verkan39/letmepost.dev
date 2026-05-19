@@ -253,6 +253,14 @@ export const MultiTargetCreatePostRequest = z.object({
    * with `publishNow=true`.
    */
   scheduledAt: z.string().datetime().optional(),
+  /**
+   * Profile scope for this batch. Required when the API key / OAuth token is
+   * org-wide and the org has more than one profile. Forbidden when the API
+   * key is already profile-scoped to a different profile (rule
+   * `profile.scope_mismatch`). Omitting falls back to the key's bound
+   * profile when one exists.
+   */
+  profileId: z.string().uuid().optional(),
 });
 export type MultiTargetCreatePostRequest = z.infer<
   typeof MultiTargetCreatePostRequest

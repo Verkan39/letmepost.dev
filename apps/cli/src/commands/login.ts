@@ -176,19 +176,39 @@ async function runOAuthLogin(baseUrl: string): Promise<void> {
     );
   }
 
+  // Trade the JWT for a long-lived API key. The /v1/* surface only accepts
+  // `lmp_live_…` Bearer tokens, so the CLI stores the api key — not the JWT
+  // — and uses it for every subsequent request. The exchange happens once,
+  // here, behind the user's back.
+  const exchangeRes = await fetch(`${baseUrl}/v1/oauth-exchange`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${tokenBody.access_token}`,
+      Accept: "application/json",
+    },
+  });
+  const exchangeBody = (await exchangeRes.json().catch(() => null)) as
+    | { key?: string; organizationId?: string; error?: unknown }
+    | null;
+  if (!exchangeRes.ok || !exchangeBody?.key) {
+    throw new CliError(
+      `OAuth-to-API-key exchange failed (HTTP ${exchangeRes.status}): ${
+        exchangeBody ? JSON.stringify(exchangeBody) : "no body"
+      }`,
+    );
+  }
+
   const existing = readConfig();
   const next: StoredConfig = {
     ...(existing ?? {}),
-    accessToken: tokenBody.access_token,
+    accessToken: exchangeBody.key,
     baseUrl,
     clientId,
   };
-  if (tokenBody.refresh_token) next.refreshToken = tokenBody.refresh_token;
-  if (typeof tokenBody.expires_in === "number") {
-    next.expiresAt = Date.now() + tokenBody.expires_in * 1000;
-  }
   writeConfig(next);
-  process.stdout.write(`${kleur.green("✔")} Logged in. Token saved to ~/.letmepost/config.json\n`);
+  process.stdout.write(
+    `${kleur.green("✔")} Logged in. API key minted and saved to ~/.letmepost/config.json\n`,
+  );
 }
 
 /**

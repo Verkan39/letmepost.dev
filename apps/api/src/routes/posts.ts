@@ -127,11 +127,34 @@ posts.post(
       });
     }
 
+    // ─── Resolve profile scope ───────────────────────────────────────────────
+    // Precedence: explicit body.profileId wins when the key is org-wide.
+    // A profile-scoped key forbids body.profileId from naming any OTHER
+    // profile — that surfaces as a clean 400 instead of a 404 deep in the
+    // resolver. Both null falls back to org-wide lookup.
+    const keyProfileId = c.var.apiKey.profileId ?? null;
+    const requestProfileId = multi.profileId ?? null;
+    if (
+      keyProfileId &&
+      requestProfileId &&
+      requestProfileId !== keyProfileId
+    ) {
+      throw new LetmepostError({
+        code: "validation_failed",
+        status: 400,
+        rule: "profile.scope_mismatch",
+        message:
+          "Explicit profileId does not match the profile this API key is scoped to.",
+        remediation:
+          "Omit profileId, or use an org-wide API key to target other profiles.",
+      });
+    }
+    const profileId = requestProfileId ?? keyProfileId;
+
     // ─── Resolve accounts in parallel ────────────────────────────────────────
     // Each target carries either accountId, platform, or both. accountId →
     // direct lookup; platform-only → unique-account-for-platform within the
     // org+profile scope; both → lookup by id, verify platform agrees.
-    const profileId = c.var.apiKey.profileId ?? null;
     const resolutions = await Promise.all(
       multi.targets.map((t) =>
         resolveTargetAccount(repo, organizationId, profileId, t),

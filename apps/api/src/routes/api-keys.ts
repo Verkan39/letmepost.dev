@@ -4,9 +4,11 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { apiKeys } from "../db/schema/api_keys.js";
+import { member, user as userTable } from "../db/schema/auth.js";
 import { profiles as profilesTable } from "../db/schema/profiles.js";
 import { LetmepostError } from "../errors.js";
 import { idempotency } from "../middleware/idempotency.js";
+import { oauthBearer } from "../middleware/oauth-bearer.js";
 import { rateLimit } from "../middleware/rate-limit.js";
 import { requireSession } from "../middleware/session.js";
 

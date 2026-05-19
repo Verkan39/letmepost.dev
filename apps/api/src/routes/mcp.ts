@@ -30,6 +30,13 @@ import {
 
 import { apiKeyAuth } from "../middleware/api-key.js";
 
+// Public origin used to build the resource_metadata URL in the
+// WWW-Authenticate hint. Falls back to localhost for dev so the header is
+// always populated and MCP clients can discover the auth surface.
+const RESOURCE_METADATA_URL = `${
+  process.env["BETTER_AUTH_URL"] ?? "http://localhost:3000"
+}/.well-known/oauth-protected-resource/mcp`;
+
 // Resolve the spec next to the compiled route. The copy-openapi.mjs build
 // step writes it into src/routes/ for dev and dist/routes/ for prod.
 const here = dirname(fileURLToPath(import.meta.url));
@@ -92,6 +99,18 @@ mcp.options("/", (c) =>
       "authorization, content-type, mcp-session-id",
   }),
 );
+
+// Per MCP Authorization spec, the resource server SHOULD include a
+// WWW-Authenticate header pointing at its protected-resource metadata so
+// clients can discover the OAuth surface without out-of-band config. We
+// emit it on every /mcp response — harmless on 200, load-bearing on 401.
+mcp.use("/", async (c, next) => {
+  c.header(
+    "WWW-Authenticate",
+    `Bearer resource_metadata="${RESOURCE_METADATA_URL}"`,
+  );
+  await next();
+});
 
 mcp.post("/", apiKeyAuth(), async (c) => {
   const authHeader = c.req.header("Authorization") ?? "";

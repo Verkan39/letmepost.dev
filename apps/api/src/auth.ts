@@ -1,8 +1,10 @@
+import { oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { organization } from "better-auth/plugins";
+import { jwt, organization } from "better-auth/plugins";
 import { db } from "./db/instance.js";
 import * as authSchema from "./db/schema/auth.js";
+import * as oauthSchema from "./db/schema/oauth.js";
 import { uuidv7 } from "./db/uuid.js";
 
 function buildSocialProviders() {
@@ -44,6 +46,18 @@ const trustedOrigins = [
 ];
 
 /**
+ * Audiences the OAuth provider will mint access tokens for. The production
+ * API origin is always valid; locally we also accept whatever `BETTER_AUTH_URL`
+ * is pointing at so dev tokens validate against the dev API. JWT `aud` claim
+ * must match exactly one of these or `verifyAccessToken` rejects the token.
+ */
+export const baseAuthUrl =
+  process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
+export const validAudiences = Array.from(
+  new Set(["https://api.letmepost.dev", baseAuthUrl]),
+);
+
+/**
  * Cross-subdomain cookies. In production the API sits at api.letmepost.dev
  * and the dashboard at dashboard.letmepost.dev; the session cookie needs
  * `Domain=.letmepost.dev; SameSite=None; Secure` so both subdomains share
@@ -75,6 +89,11 @@ export const auth = betterAuth({
       organization: authSchema.organization,
       member: authSchema.member,
       invitation: authSchema.invitation,
+      oauthClient: oauthSchema.oauthClient,
+      oauthAccessToken: oauthSchema.oauthAccessToken,
+      oauthRefreshToken: oauthSchema.oauthRefreshToken,
+      oauthConsent: oauthSchema.oauthConsent,
+      jwks: oauthSchema.jwks,
     },
   }),
   advanced: {
@@ -87,9 +106,43 @@ export const auth = betterAuth({
     enabled: true,
   },
   socialProviders: buildSocialProviders(),
-  plugins: [organization()],
+  plugins: [
+    organization(),
+    // JWT keypair store. The oauth-provider plugin signs access tokens with
+    // these keys; the public half is served at /api/auth/jwks for resource
+    // servers (us, here) to verify tokens without a network round-trip.
+    jwt(),
+    oauthProvider({
+      // Dashboard pages the provider redirects to when it needs a logged-in
+      // user (login) or a scope grant (consent). These live in apps/dashboard
+      // and may not be implemented yet — the provider just needs the path so
+      // it can build the 302.
+      loginPage: "/sign-in",
+      consentPage: "/consent",
+      validAudiences,
+      // Custom OAuth scopes:
+      // - openid / profile / offline_access — standard OIDC bits the plugin
+      //   needs for ID tokens + refresh.
+      // - publish — write access to the MCP API surface (publish_post tool).
+      // - read   — read-only access (list_posts, get_post, etc.).
+      scopes: ["openid", "profile", "offline_access", "publish", "read"],
+      // MCP clients (Claude Desktop, Cursor) self-register at install time via
+      // RFC 7591. There's no out-of-band channel to pre-provision a client_id
+      // so we accept unauthenticated registration; the consent screen is the
+      // backstop that prevents drive-by clients from getting tokens.
+      allowDynamicClientRegistration: true,
+      allowUnauthenticatedClientRegistration: true,
+      // Optional HMAC secret for pairwise subject identifiers — when set,
+      // clients with `subject_type: "pairwise"` receive a per-client `sub`
+      // instead of the raw user id. Off by default; turn on in prod when
+      // PAIRWISE_SECRET is set.
+      ...(process.env.PAIRWISE_SECRET
+        ? { pairwiseSecret: process.env.PAIRWISE_SECRET }
+        : {}),
+    }),
+  ],
   secret,
-  baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+  baseURL: baseAuthUrl,
   trustedOrigins,
 });
 

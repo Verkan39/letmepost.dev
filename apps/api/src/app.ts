@@ -29,6 +29,7 @@ import {
   createProfileRoutes,
   profileRoutes,
 } from "./routes/profiles.js";
+import { wellKnown } from "./routes/well-known.js";
 import {
   createWebhookEndpointRoutes,
   webhookEndpointRoutes,
@@ -114,6 +115,11 @@ export function createApp(options: AppOptions = {}) {
     c.set("publishEnqueuer", publishEnqueuer);
     await next();
   });
+
+  // OAuth / OIDC discovery — must be mounted before /api/auth so the
+  // .well-known surface is reachable at the root without basePath conflicts.
+  // Clients walking the RFC 9728 hint hit /.well-known/* directly.
+  app.route("/.well-known", wellKnown);
 
   app.route("/api/auth", authRoutes);
   app.route("/v1/api-keys", apiKeyRoutes);

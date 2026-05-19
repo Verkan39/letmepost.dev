@@ -1,33 +1,149 @@
 ---
 title: CLI
-description: A command-line client for letmepost.dev. Coming soon.
+description: A command-line client for letmepost.dev. Publish from your terminal or from any agentic tool that can shell out.
 icon: terminal
 ---
 
-<Note>
-The CLI is a post-launch deliverable. Until then, the [TypeScript SDK](/sdks/typescript) and raw `curl` cover every operation.
-</Note>
+`@letmepost/cli` is a small, fast CLI that wraps the letmepost.dev REST API. Designed for terminal use, scripts, CI, and agentic tools like [opencode](https://opencode.ai) that need a stable command surface to shell into.
 
-## Planned shape
+## Install
 
-```bash planned.sh
-# auth
-lmp login
-lmp keys create my-key
-
-# accounts
-lmp accounts connect bluesky
-lmp accounts list
-
-# posts
-lmp post --to bluesky --text "Hello from the CLI"
-lmp post --schedule "2026-05-08T12:00:00Z" --to bluesky --text "..."
-lmp posts list --status rejected --since 24h
-
-# media
-lmp media upload ./hero.jpg
+```bash
+npm install -g @letmepost/cli
+# or run without installing
+npx @letmepost/cli --help
 ```
 
-The CLI thin-wraps the same HTTP API documented elsewhere on this site, so anything you can do here you can already do today with `curl`.
+The binary is named `lmp`. Versions older than Node 18 are not supported.
 
-Watch the [GitHub releases](https://github.com/rosekamallove/letmepost.dev/releases) for the announcement.
+## Login
+
+```bash
+lmp login
+```
+
+Opens your browser to authorize the CLI via OAuth 2.1 with PKCE. The CLI:
+
+1. Registers itself dynamically with the OAuth provider (RFC 7591).
+2. Opens a browser to the consent page.
+3. Receives the auth code on a localhost callback.
+4. Exchanges the code for an access token.
+5. Trades the access token for a long-lived API key (so subsequent calls don't depend on token refresh).
+6. Saves everything to `~/.letmepost/config.json` (mode `0600`).
+
+If you're in a headless environment, the URL is printed so you can copy it to another browser. If the OAuth provider isn't reachable, the CLI falls back to prompting for an API key paste.
+
+```bash
+lmp logout         # clears ~/.letmepost/config.json
+lmp whoami         # prints which credential is loaded and what it can see
+lmp version        # CLI version + active API base
+```
+
+## Environment overrides
+
+| Variable        | Description                                                                       |
+| --------------- | --------------------------------------------------------------------------------- |
+| `LMP_API_KEY`   | Skip the stored credential entirely and use this Bearer key for the call.         |
+| `LMP_API_BASE`  | Override the API host (defaults to `https://api.letmepost.dev`). For self-hosted. |
+
+## Profiles
+
+A single organization can carve into N profiles for per-client isolation. Pick which one to publish under.
+
+```bash
+lmp profiles list                 # all profiles in the active org
+lmp profiles use prof_01HX...     # set as the default for subsequent calls
+lmp profiles current              # print the active profile
+```
+
+Per-command override:
+
+```bash
+lmp post "hello" --to=bluesky --profile prof_01HX...
+lmp accounts list --profile prof_01HX...
+lmp posts list --profile prof_01HX...
+```
+
+If the loaded credential is itself profile-scoped, passing a different `--profile` returns a clean `validation_failed` with `rule: profile.scope_mismatch`.
+
+## Accounts
+
+```bash
+lmp accounts list                          # every connected account in the active profile
+lmp accounts list --platform bluesky       # filter
+lmp accounts disconnect acc_01HX...        # hard-delete (revokes the upstream token if possible)
+```
+
+## Posting
+
+```bash
+lmp post "Shipping the CLI today" --to=twitter,bluesky
+lmp post "Reels are live" --to=instagram --media=./hero.mp4
+lmp post "Lots happening" --to=twitter,bluesky --first-comment="Threading more below."
+lmp post "Big news" --to=linkedin --schedule=2026-05-20T18:00:00Z
+```
+
+A single call fans out to every platform in `--to`. The response renders per-target results:
+
+```
+✔ published to twitter — https://x.com/.../status/1234567890
+✔ published to bluesky — at://did:plc:.../app.bsky.feed.post/...
+✗ failed on instagram
+  code:        preflight_failed
+  rule:        instagram.media.aspect_ratio
+  message:     Instagram Reels require 9:16 aspect ratio; got 16:9.
+  remediation: Re-encode the video to 9:16 (1080×1920 is the safe default).
+  docs:        https://docs.letmepost.dev/preflight/instagram-media-aspect_ratio
+  requestId:   req_01HY6X4AWBJM2K9F2PTQMRD9JQ
+batch pst_01HX… (partial_failed)
+```
+
+Exit code is `0` on full success, `2` on any failure. Useful in pipelines:
+
+```bash
+lmp post "$(date)" --to=bluesky || echo "post failed, alert the on-call"
+```
+
+## Post log
+
+```bash
+lmp posts list                                # most recent 20
+lmp posts list --limit 100 --status rejected  # filter
+lmp posts get pst_01HX...                     # one post + all attempts
+```
+
+## Self-host
+
+Point the CLI at your own deployment by setting `LMP_API_BASE`:
+
+```bash
+LMP_API_BASE=https://api.yourdomain.com lmp login
+LMP_API_BASE=https://api.yourdomain.com lmp post "hello" --to=bluesky
+```
+
+Or persist it: after `lmp login` the chosen base URL is saved alongside the credential, so subsequent calls reuse it without the env var.
+
+## Use from opencode / shell agents
+
+The CLI prints structured output and uses standard exit codes, so it composes cleanly into agentic tool definitions:
+
+```jsonc
+{
+  "tools": [
+    {
+      "name": "publish_post",
+      "command": "lmp post \"{text}\" --to={platforms}",
+      "description": "Publish a text post to one or more social platforms."
+    }
+  ]
+}
+```
+
+For tighter integration, use the [MCP server](/mcp) directly — it wraps the same API and exposes one tool per OpenAPI operation.
+
+## Source + roadmap
+
+- Source: [github.com/letmepost/letmepost.dev/tree/main/apps/cli](https://github.com/letmepost/letmepost.dev/tree/main/apps/cli)
+- Apache 2.0
+- v0.1 ships with: `login`, `logout`, `whoami`, `version`, `accounts list/disconnect`, `post`, `posts list/get`, `profiles list/use/current`
+- v0.2 will add: `media upload`, `webhooks` subcommands, `keys` (mint/list/revoke API keys), refresh-token rotation for OAuth-only auth

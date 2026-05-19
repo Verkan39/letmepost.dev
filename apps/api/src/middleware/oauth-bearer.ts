@@ -66,8 +66,12 @@ export function oauthBearer(): MiddlewareHandler {
       payload = await verifyAccessToken(token, {
         jwksUrl: JWKS_URL,
         verifyOptions: {
-          issuer: baseAuthUrl,
-          audience: validAudiences[0]!,
+          // better-auth's issuer is its mount path, not the bare API host.
+          issuer: `${baseAuthUrl}/api/auth`,
+          // Accept any audience we declared — MCP tokens come back with
+          // `aud=https://api.letmepost.dev/mcp` (RFC 8707 resource indicator)
+          // while CLI / api-key-mint tokens use the bare API URL.
+          audience: validAudiences,
         },
       });
     } catch (err) {

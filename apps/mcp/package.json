@@ -1,8 +1,21 @@
 {
   "name": "@letmepost/mcp",
-  "version": "0.1.0",
-  "description": "MCP server for letmepost.dev. Lets AI agents publish to Bluesky, X, LinkedIn, Threads, Instagram, Facebook, Pinterest through a single tool call.",
+  "version": "0.2.0",
+  "description": "MCP server for letmepost.dev. Autogenerates a tool per OpenAPI operation so agents can drive the entire publishing API — posts, media, accounts, webhooks, API keys — without bespoke wrappers.",
   "type": "module",
+  "main": "./dist/autogen.js",
+  "types": "./dist/autogen.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/autogen.d.ts",
+      "default": "./dist/autogen.js"
+    },
+    "./autogen": {
+      "types": "./dist/autogen.d.ts",
+      "default": "./dist/autogen.js"
+    },
+    "./openapi.json": "./dist/openapi.json"
+  },
   "bin": {
     "letmepost-mcp": "./dist/index.js"
   },
@@ -11,10 +24,12 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "prebuild": "node scripts/copy-openapi.mjs",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-openapi.mjs",
+    "predev": "node scripts/copy-openapi.mjs",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "node scripts/copy-openapi.mjs && tsc --noEmit"
   },
   "keywords": [
     "mcp",
@@ -32,9 +47,7 @@
     "directory": "apps/mcp"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.4",
-    "zod": "^3.23.8",
-    "zod-to-json-schema": "^3.24.1"
+    "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "devDependencies": {
     "@letmepost/config-tsconfig": "workspace:*",

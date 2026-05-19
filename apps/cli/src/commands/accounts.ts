@@ -1,5 +1,6 @@
 import kleur from "kleur";
 import { apiFetch, failWithApiError } from "../client.js";
+import { resolveProfileId } from "../config.js";
 import { formatDate, renderTable } from "../format.js";
 
 type Account = {
@@ -16,6 +17,7 @@ type AccountListResponse = { data: Account[] };
 
 export type AccountsListOptions = {
   platform?: string;
+  profile?: string;
 };
 
 /**
@@ -25,7 +27,11 @@ export type AccountsListOptions = {
 export async function runAccountsList(
   options: AccountsListOptions,
 ): Promise<void> {
-  const result = await apiFetch<AccountListResponse>("/v1/accounts");
+  const profileId = resolveProfileId(options.profile);
+  const qs = profileId
+    ? `?${new URLSearchParams({ profileId }).toString()}`
+    : "";
+  const result = await apiFetch<AccountListResponse>(`/v1/accounts${qs}`);
   if (!result.ok) failWithApiError(result);
 
   let rows = result.body.data;
@@ -52,15 +58,26 @@ export async function runAccountsList(
   );
 }
 
+export type AccountsDisconnectOptions = {
+  profile?: string;
+};
+
 /**
  * `lmp accounts disconnect <id>` — DELETE /v1/accounts/:id.
  *
  * The API restricts disconnect to dashboard sessions (programmatic keys 401),
  * so we surface the error envelope verbatim when that happens.
  */
-export async function runAccountsDisconnect(id: string): Promise<void> {
+export async function runAccountsDisconnect(
+  id: string,
+  options: AccountsDisconnectOptions = {},
+): Promise<void> {
+  const profileId = resolveProfileId(options.profile);
+  const qs = profileId
+    ? `?${new URLSearchParams({ profileId }).toString()}`
+    : "";
   const result = await apiFetch<{ id: string; deleted: boolean }>(
-    `/v1/accounts/${encodeURIComponent(id)}`,
+    `/v1/accounts/${encodeURIComponent(id)}${qs}`,
     { method: "DELETE" },
   );
   if (!result.ok) failWithApiError(result);

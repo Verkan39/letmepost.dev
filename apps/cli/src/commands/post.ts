@@ -7,6 +7,7 @@ import {
   requireAuth,
   CliError,
 } from "../client.js";
+import { resolveProfileId } from "../config.js";
 import { renderTargetFailure, renderTargetSuccess } from "../format.js";
 
 const VALID_PLATFORMS = new Set([
@@ -47,6 +48,7 @@ export type PostOptions = {
   media?: string;
   firstComment?: string;
   schedule?: string;
+  profile?: string;
 };
 
 type MediaInput = {
@@ -123,6 +125,12 @@ export async function runPost(text: string, options: PostOptions): Promise<void>
   if (media.length > 0) body["media"] = media;
   if (options.firstComment) body["firstComment"] = { text: options.firstComment };
   if (options.schedule) body["scheduledAt"] = options.schedule;
+  // `profileId` is a sibling field on the create-post body (not a query param).
+  // The API support for it ships in parallel; if the route doesn't know the
+  // field yet the request fails with `validation_failed rule: unknown_field`,
+  // which the structured error renderer surfaces cleanly.
+  const profileId = resolveProfileId(options.profile);
+  if (profileId) body["profileId"] = profileId;
 
   const result = await apiFetch<CreatePostResponse>("/v1/posts", {
     method: "POST",

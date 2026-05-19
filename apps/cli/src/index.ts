@@ -9,6 +9,11 @@ import { runLogin } from "./commands/login.js";
 import { runLogout } from "./commands/logout.js";
 import { runPost } from "./commands/post.js";
 import { runPostsGet, runPostsList } from "./commands/posts.js";
+import {
+  runProfilesCurrent,
+  runProfilesList,
+  runProfilesUse,
+} from "./commands/profiles.js";
 import { runVersion, CLI_VERSION } from "./commands/version.js";
 import { runWhoami } from "./commands/whoami.js";
 import { CliError } from "./client.js";
@@ -49,16 +54,33 @@ accounts
   .command("list")
   .description("List connected accounts (optionally filtered by platform).")
   .option("--platform <name>", "Filter to a single platform (twitter, bluesky, …).")
+  .option(
+    "--profile <id>",
+    "Scope to a profile id (overrides the stored default for this call).",
+  )
   .action(
-    wrap(async (opts: { platform?: string }) =>
-      runAccountsList(opts.platform ? { platform: opts.platform } : {}),
-    ),
+    wrap(async (opts: { platform?: string; profile?: string }) => {
+      const args: Parameters<typeof runAccountsList>[0] = {};
+      if (opts.platform !== undefined) args.platform = opts.platform;
+      if (opts.profile !== undefined) args.profile = opts.profile;
+      await runAccountsList(args);
+    }),
   );
 accounts
   .command("disconnect")
   .description("Disconnect a connected account by id.")
   .argument("<id>", "Account id (uuid)")
-  .action(wrap(async (id: string) => runAccountsDisconnect(id)));
+  .option(
+    "--profile <id>",
+    "Scope to a profile id (overrides the stored default for this call).",
+  )
+  .action(
+    wrap(async (id: string, opts: { profile?: string }) => {
+      const args: Parameters<typeof runAccountsDisconnect>[1] = {};
+      if (opts.profile !== undefined) args.profile = opts.profile;
+      await runAccountsDisconnect(id, args);
+    }),
+  );
 
 const posts = program
   .command("posts")
@@ -70,18 +92,24 @@ posts
   .option("--status <status>", "Filter by status: queued, published, failed, …")
   .option("--platform <platform>", "Filter by platform.")
   .option("--cursor <cursor>", "Pagination cursor returned by a previous list.")
+  .option(
+    "--profile <id>",
+    "Scope to a profile id (overrides the stored default for this call).",
+  )
   .action(
     wrap(async (opts: {
       limit?: string;
       status?: string;
       platform?: string;
       cursor?: string;
+      profile?: string;
     }) => {
       const out: Parameters<typeof runPostsList>[0] = {};
       if (opts.limit !== undefined) out.limit = opts.limit;
       if (opts.status !== undefined) out.status = opts.status;
       if (opts.platform !== undefined) out.platform = opts.platform;
       if (opts.cursor !== undefined) out.cursor = opts.cursor;
+      if (opts.profile !== undefined) out.profile = opts.profile;
       await runPostsList(out);
     }),
   );
@@ -89,7 +117,17 @@ posts
   .command("get")
   .description("Fetch a single post with its publish attempts.")
   .argument("<id>", "Post id")
-  .action(wrap(async (id: string) => runPostsGet(id)));
+  .option(
+    "--profile <id>",
+    "Scope to a profile id (overrides the stored default for this call).",
+  )
+  .action(
+    wrap(async (id: string, opts: { profile?: string }) => {
+      const args: Parameters<typeof runPostsGet>[1] = {};
+      if (opts.profile !== undefined) args.profile = opts.profile;
+      await runPostsGet(id, args);
+    }),
+  );
 
 program
   .command("post")
@@ -105,20 +143,47 @@ program
   )
   .option("--first-comment <text>", "Auto-posted reply (Bluesky-only today).")
   .option("--schedule <iso>", "ISO-8601 timestamp to queue the batch.")
+  .option(
+    "--profile <id>",
+    "Scope to a profile id (overrides the stored default for this call).",
+  )
   .action(
     wrap(async (text: string, opts: {
       to: string;
       media?: string;
       firstComment?: string;
       schedule?: string;
+      profile?: string;
     }) => {
       const out: Parameters<typeof runPost>[1] = { to: opts.to };
       if (opts.media !== undefined) out.media = opts.media;
       if (opts.firstComment !== undefined) out.firstComment = opts.firstComment;
       if (opts.schedule !== undefined) out.schedule = opts.schedule;
+      if (opts.profile !== undefined) out.profile = opts.profile;
       await runPost(text, out);
     }),
   );
+
+const profiles = program
+  .command("profiles")
+  .description("Manage the active profile scope for the CLI.");
+profiles
+  .command("list")
+  .description("List every profile in the active org.")
+  .action(wrap(async () => runProfilesList()));
+profiles
+  .command("use")
+  .description(
+    "Set the default profile id (persisted to ~/.letmepost/config.json).",
+  )
+  .argument("<id>", "Profile id from `lmp profiles list`")
+  .action(wrap(async (id: string) => runProfilesUse(id)));
+profiles
+  .command("current")
+  .description(
+    "Print the currently-selected default profile id (or \"none — using key default\").",
+  )
+  .action(wrap(async () => runProfilesCurrent()));
 
 await program.parseAsync(process.argv);
 

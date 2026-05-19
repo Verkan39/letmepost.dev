@@ -17,6 +17,13 @@ export type StoredConfig = {
   userId?: string;
   /** Client id minted by dynamic registration. Cached to avoid re-registering on every login. */
   clientId?: string;
+  /**
+   * Default profile to scope requests to. When set, the CLI sends it as
+   * `?profileId=…` on GET / DELETE and as a top-level body field on
+   * `POST /v1/posts`. When null/unset, requests omit profile scoping and the
+   * API falls back to the key/token's default profile.
+   */
+  profileId?: string | null;
 };
 
 const DEFAULT_BASE = "https://api.letmepost.dev";
@@ -62,6 +69,36 @@ export function writeConfig(config: StoredConfig): void {
   void dirname(path);
 }
 
+/**
+ * Read just the persisted default profile id. Returns null when the config
+ * file is absent or the field isn't set. Callers prefer this to readConfig()
+ * when they don't need the credential.
+ */
+export function readDefaultProfileId(): string | null {
+  const cfg = readConfig();
+  if (!cfg) return null;
+  const id = cfg.profileId;
+  if (typeof id !== "string" || id.length === 0) return null;
+  return id;
+}
+
+/**
+ * Persist (or clear) the default profile id on disk without touching the
+ * credential. Throws if no config exists yet — the user must `lmp login`
+ * first because we don't want to write a profileId-only file that resolveAuth
+ * would treat as malformed.
+ */
+export function writeDefaultProfileId(profileId: string | null): void {
+  const existing = readConfig();
+  if (!existing) {
+    throw new Error(
+      "No stored credential. Run `lmp login` (or set LMP_API_KEY) before selecting a profile.",
+    );
+  }
+  const next: StoredConfig = { ...existing, profileId };
+  writeConfig(next);
+}
+
 /** Wipe the on-disk config entirely. */
 export function deleteConfig(): boolean {
   try {
@@ -84,6 +121,25 @@ export type ResolvedAuth = {
   baseUrl: string;
   source: "env" | "config";
 };
+
+/**
+ * Pick the profile id the current command should scope to.
+ *
+ * Precedence (highest wins):
+ *   1. `--profile <id>` flag on the command (`flagValue`).
+ *   2. The persisted default in `~/.letmepost/config.json` (`profileId`).
+ *   3. `null` — caller omits profile scoping and the API falls back to the
+ *      key/token's default profile.
+ *
+ * An empty-string flag value is treated as "unset" rather than "clear" so that
+ * `--profile ""` doesn't silently send `?profileId=` to the API.
+ */
+export function resolveProfileId(flagValue?: string | null): string | null {
+  if (typeof flagValue === "string" && flagValue.trim().length > 0) {
+    return flagValue.trim();
+  }
+  return readDefaultProfileId();
+}
 
 export function resolveAuth(): ResolvedAuth | null {
   const envToken = process.env.LMP_API_KEY?.trim();

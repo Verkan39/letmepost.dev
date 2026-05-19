@@ -1,5 +1,6 @@
 import kleur from "kleur";
 import { apiFetch, failWithApiError } from "../client.js";
+import { resolveProfileId } from "../config.js";
 import { formatDate, renderTable } from "../format.js";
 
 type Post = {
@@ -23,6 +24,7 @@ export type PostsListOptions = {
   status?: string;
   platform?: string;
   cursor?: string;
+  profile?: string;
 };
 
 /**
@@ -36,6 +38,8 @@ export async function runPostsList(options: PostsListOptions): Promise<void> {
   if (options.status) params.set("status", options.status);
   if (options.platform) params.set("platform", options.platform);
   if (options.cursor) params.set("cursor", options.cursor);
+  const profileId = resolveProfileId(options.profile);
+  if (profileId) params.set("profileId", profileId);
   const qs = params.toString();
   const path = qs ? `/v1/posts?${qs}` : "/v1/posts";
 
@@ -64,9 +68,22 @@ export async function runPostsList(options: PostsListOptions): Promise<void> {
   }
 }
 
+export type PostsGetOptions = {
+  profile?: string;
+};
+
 /** `lmp posts get <id>` — JSON dump of the post detail (attempts + envelope). */
-export async function runPostsGet(id: string): Promise<void> {
-  const result = await apiFetch<unknown>(`/v1/posts/${encodeURIComponent(id)}`);
+export async function runPostsGet(
+  id: string,
+  options: PostsGetOptions = {},
+): Promise<void> {
+  const profileId = resolveProfileId(options.profile);
+  const qs = profileId
+    ? `?${new URLSearchParams({ profileId }).toString()}`
+    : "";
+  const result = await apiFetch<unknown>(
+    `/v1/posts/${encodeURIComponent(id)}${qs}`,
+  );
   if (!result.ok) failWithApiError(result);
   process.stdout.write(`${JSON.stringify(result.body, null, 2)}\n`);
 }

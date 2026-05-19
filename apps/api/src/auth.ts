@@ -53,8 +53,18 @@ const trustedOrigins = [
  */
 export const baseAuthUrl =
   process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
+// MCP clients (Claude Code, Cursor, Claude Desktop) walk RFC 8707 — they
+// pass `resource=https://api.letmepost.dev/mcp` on the token request,
+// which becomes the JWT `aud`. So the resource URLs MUST also be in
+// validAudiences or verifyAccessToken rejects with "requested resource
+// invalid" on every tool call.
 export const validAudiences = Array.from(
-  new Set(["https://api.letmepost.dev", baseAuthUrl]),
+  new Set([
+    "https://api.letmepost.dev",
+    "https://api.letmepost.dev/mcp",
+    baseAuthUrl,
+    `${baseAuthUrl}/mcp`,
+  ]),
 );
 
 /**

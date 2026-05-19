@@ -13,3 +13,9 @@ coverage
 .claude
 DAY_ZERO.md
 LAUNCH-PREP.md
+
+# Build artefacts copied into src/ by the openapi prebuild step (the
+# canonical copy lives in docs/api-reference/openapi.json).
+apps/mcp/src/openapi.json
+apps/api/src/openapi.json
+apps/api/src/routes/openapi.json

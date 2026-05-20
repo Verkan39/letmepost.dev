@@ -53,7 +53,7 @@ const endpoints = [
   {
     method: "POST",
     path: "/v1/posts",
-    desc: "One call. Eight platforms at v1. Text, images, video, carousels, scheduled or now.",
+    desc: "One call. Seven platforms at v1. Text, images, video, carousels, scheduled or now.",
   },
   {
     method: "POST",
@@ -92,7 +92,7 @@ const methodClasses: Record<string, string> = {
 const faqs = [
   {
     q: "What actually works today?",
-    a: 'Bluesky is live end-to-end. You can connect an account, send a post, attach images or video, and get a webhook back. Videos route through the transcoding service automatically. Pinterest and X publishers are built and tested but waiting on platform review (Pinterest Standard access and X Pay Per Use). Meta (Instagram, Facebook, Threads), LinkedIn, and YouTube are review-gated and usually clear in 3 to 12 weeks. YouTube goes through the CASA verification track. See the <a href="https://github.com/letmepost/letmepost.dev/blob/main/plan.md">plan</a> for dates.',
+    a: 'Bluesky is live end-to-end. You can connect an account, send a post, attach images or video, and get a webhook back. Videos route through the transcoding service automatically. Pinterest and X publishers are built and tested but waiting on platform review (Pinterest Standard access and X Pay Per Use). Meta (Instagram, Facebook, Threads) and LinkedIn are review-gated and usually clear in 3 to 12 weeks. See the <a href="https://github.com/letmepost/letmepost.dev/blob/main/plan.md">plan</a> for dates.',
   },
   {
     q: "Why another social media API?",
@@ -179,15 +179,14 @@ const faqJsonLd = {
       </div>
 
       <h1>
-        Eight social platforms. One API.
-        <span class="text-accent">Loud errors.</span>
+        Open source social media API.
+        <span class="text-accent">Built for devs and AI agents.</span>
       </h1>
 
       <p class="text-[1.2rem] leading-[1.65] mt-7 mb-11 text-text-secondary">
-        One POST endpoint that posts to Bluesky, X, LinkedIn, Threads,
-        Pinterest, Instagram, Facebook, and YouTube. When something breaks,
-        you get the rule that failed, the raw platform response, and how to
-        fix it. Never an empty body.
+        Ship social features in minutes, not months. One API to publish
+        across 7 platforms, with scheduling, webhooks, and idempotency
+        built in. Native MCP server. Apache 2.0.
       </p>
 
       <div class="flex gap-[0.7rem] flex-wrap">

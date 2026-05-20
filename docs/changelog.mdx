@@ -8,6 +8,33 @@ The canonical record lives in the git history; this page summarises the mileston
 
 ## 2026-05
 
+### Added — hosted MCP server + CLI
+
+- **[@letmepost/mcp](https://www.npmjs.com/package/@letmepost/mcp) on npm.** `npx @letmepost/mcp@latest` runs the stdio binary for Claude Desktop, Cursor, Claude Code, opencode, and any MCP-aware client. The tool surface is generated from the OpenAPI spec at startup, so the hosted server and the stdio binary expose an identical set of tools (21 today).
+- **Hosted MCP at `https://api.letmepost.dev/mcp`.** Streamable HTTP transport, stateless mode. Accepts both `Authorization: Bearer lmp_live_...` API keys and OAuth 2.1 bearer tokens.
+- **[@letmepost/cli](https://www.npmjs.com/package/@letmepost/cli) on npm.** `npm i -g @letmepost/cli` installs the `lmp` binary. Commands: `login`, `logout`, `whoami`, `version`, `accounts`, `posts`, `post`, `profiles`. Config persists at `~/.letmepost/config.json`.
+- **Profile scoping wired through both.** `lmp post --profile <id>` on the CLI, top-level `profileId` on the OpenAPI request body, and auto-resolution when an API key is profile-scoped. Mismatch surfaces as `profile.scope_mismatch`.
+
+### Added — OAuth 2.1 provider
+
+- **Dynamic Client Registration (RFC 7591).** MCP clients self-register at install with no out-of-band config.
+- **PKCE-only flow.** No client secrets needed in fat clients.
+- **Path-suffixed well-known endpoints.** `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource` per RFC 8414 and RFC 9728, with `/api/auth` and `/mcp` suffixed variants for clients that walk the issuer path.
+- **RFC 8707 resource indicators.** The `aud` claim is the MCP endpoint URL, validated on every tool call.
+- **Hosted login + consent pages on the dashboard.** Standard better-auth session, then a scope-grant screen before the redirect back to the loopback callback.
+- **`WWW-Authenticate: Bearer resource_metadata="..."` on `/mcp`** so MCP clients can discover the OAuth surface from a single header.
+- **`POST /v1/oauth-exchange`.** Trades a verified OAuth JWT for a plaintext API key. Used by the CLI's `lmp login` flow so the resulting key works against every `/v1/*` endpoint, not just `/mcp`.
+- **`/mcp` accepts both shapes.** Keys with the `lmp_live_` / `lmp_test_` prefix pass through to the standard auth path. JWTs are verified against JWKS and mint a per-user `letmepost-mcp` API key on first use, cached in-process keyed by JWT `sub`.
+
+### Added — top-level `profileId` on `POST /v1/posts`
+
+- Sits alongside `targets` so an MCP or CLI caller can scope a whole batch to a profile without rotating to a profile-scoped API key.
+- Validates against the connected account's profile. Mismatches surface as `profile.scope_mismatch`.
+
+### Changed — agent docs live under `/agents/`
+
+- The MCP and CLI guides moved to [docs.letmepost.dev/agents/mcp](https://docs.letmepost.dev/agents/mcp) and [docs.letmepost.dev/agents/cli](https://docs.letmepost.dev/agents/cli). The old `/mcp` route is reserved by Mintlify for its own docs MCP server, so the local pages were being shadowed.
+
 ### Changed — v1 wire shape
 
 - **`POST /v1/posts` is now multi-target.** Body shape: `{ targets: [{ accountId | platform, text?, media?, firstComment?, options? }], text?, media?, firstComment?, publishNow?, scheduledAt? }`. One request fans out to up to 25 connected accounts in parallel.

@@ -98,28 +98,29 @@ jobs:
           token: ${{ secrets.LETMEPOST_SDK_SYNC_TOKEN }}
           path: sdk-go
 
-      - name: Set up Go 1.23
-        uses: actions/setup-go@v5
+      - name: Set up Java (required by openapi-generator-cli)
+        uses: actions/setup-java@v4
         with:
-          go-version: "1.23"
+          distribution: temurin
+          java-version: "17"
 
-      - name: Install oapi-codegen
-        run: go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+      - name: Install openapi-generator-cli
+        run: npm install -g @openapitools/openapi-generator-cli
 
-      # oapi-codegen does not support OpenAPI 3.1 nullable arrays
-      # (`type: [string, null]`). Down-convert to 3.0 first so the codegen
-      # step gets a spec it can parse.
-      - name: Down-convert spec to OpenAPI 3.0
-        run: |
-          npx -y @apiture/openapi-down-convert@latest \
-            --input letmepost.dev/docs/api-reference/openapi.json \
-            --output letmepost.dev/docs/api-reference/openapi.v3.0.json
-
+      # openapi-generator handles OpenAPI 3.1 and implicit oneOf
+      # discriminators that oapi-codegen rejects. Output is a full Go module
+      # at the repo root (not a single file), so we wipe the sibling repo's
+      # generated tree before regen to keep deletions clean.
       - name: Regenerate Go SDK from spec
         run: |
-          oapi-codegen -package letmepost -generate types,client \
-            letmepost.dev/docs/api-reference/openapi.v3.0.json \
-            > sdk-go/client.go
+          find sdk-go -mindepth 1 -maxdepth 1 \
+            ! -name '.git' ! -name 'LICENSE' ! -name 'README.md' \
+            -exec rm -rf {} +
+          openapi-generator-cli generate \
+            -i letmepost.dev/docs/api-reference/openapi.json \
+            -g go \
+            -o sdk-go \
+            --additional-properties=packageName=letmepost,packageVersion=0.1.0,moduleName=github.com/letmepost/sdk-go,withGoMod=true,generateInterfaces=true
 
       - name: Configure git
         working-directory: sdk-go

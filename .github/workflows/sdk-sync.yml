@@ -106,10 +106,19 @@ jobs:
       - name: Install oapi-codegen
         run: go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
 
+      # oapi-codegen does not support OpenAPI 3.1 nullable arrays
+      # (`type: [string, null]`). Down-convert to 3.0 first so the codegen
+      # step gets a spec it can parse.
+      - name: Down-convert spec to OpenAPI 3.0
+        run: |
+          npx -y @apiture/openapi-down-convert@latest \
+            --input letmepost.dev/docs/api-reference/openapi.json \
+            --output letmepost.dev/docs/api-reference/openapi.v3.0.json
+
       - name: Regenerate Go SDK from spec
         run: |
           oapi-codegen -package letmepost -generate types,client \
-            letmepost.dev/docs/api-reference/openapi.json \
+            letmepost.dev/docs/api-reference/openapi.v3.0.json \
             > sdk-go/client.go
 
       - name: Configure git

@@ -25,8 +25,8 @@ export const PLATFORM_STATES = ["live", "trial", "pending"] as const;
  */
 export const PLATFORM_STATE: Record<Platform, PlatformState> = {
   bluesky: "live",
-  pinterest: "trial",
-  twitter: "trial",
+  pinterest: "live",
+  twitter: "live",
   linkedin: "pending",
   facebook: "pending",
   instagram: "pending",

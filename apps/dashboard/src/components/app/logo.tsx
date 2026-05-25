@@ -1,11 +1,10 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Brand mark — same as `apps/web/src/components/Logo.astro`. Forest-green
- * circle with a paper-cream square rotated 16° inside. Color is taken via
- * `currentColor` on the circle so callers can recolor with text-* utilities;
- * the inner square uses `var(--background)` so it punches a hole through to
- * whatever the page bg is (works on either light or dark themes).
+ * Brand mark — forest-green disc, three offset cream sheets, dashed ring.
+ * Sourced from /public/logo.png so it stays in lockstep with the favicon
+ * and the marketing site's logo without bitrotting into a hand-maintained
+ * inline SVG.
  */
 export function LogoMark({
   size = 32,
@@ -15,24 +14,15 @@ export function LogoMark({
   className?: string;
 }) {
   return (
-    <svg
+    <img
+      src="/logo.png"
       width={size}
       height={size}
-      viewBox="0 0 32 32"
-      xmlns="http://www.w3.org/2000/svg"
+      alt=""
       aria-hidden="true"
-      className={cn("text-primary shrink-0", className)}
-    >
-      <circle cx="16" cy="16" r="15" fill="currentColor" />
-      <rect
-        x="9.5"
-        y="9.5"
-        width="13"
-        height="13"
-        fill="var(--background)"
-        transform="rotate(16 16 16)"
-      />
-    </svg>
+      className={cn("shrink-0 select-none", className)}
+      draggable={false}
+    />
   );
 }
 

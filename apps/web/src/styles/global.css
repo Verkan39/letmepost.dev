@@ -229,30 +229,22 @@ hr.double {
 }
 .nav-rail::-webkit-scrollbar { display: none; }
 .nav-rail .brand {
-  font-size: 12px;
-  letter-spacing: 0.36em;
+  font-size: 16px;
+  letter-spacing: 0.32em;
   font-weight: 700;
   text-decoration: none;
   color: var(--r-ink);
-  padding-left: 0.36em;
-  display: flex; align-items: center; gap: 10px;
-  margin-bottom: 6px;
+  padding-left: 0.32em;
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 22px;
 }
 .r-stamp {
-  width: 14px; height: 14px; background: var(--r-accent);
-  position: relative; flex-shrink: 0;
+  width: 28px; height: 28px;
+  background: url('/mark.png') center / contain no-repeat;
+  flex-shrink: 0;
   display: inline-block;
 }
-.r-stamp::after {
-  content: ''; position: absolute; inset: 3px;
-  background: var(--r-paper); transform: rotate(18deg);
-}
-.r-stamp.sm { width: 12px; height: 12px; }
-.nav-rail .brand-sub {
-  font-size: 10px; letter-spacing: 0.14em;
-  text-transform: uppercase; color: var(--r-very);
-  padding-left: 24px; margin-bottom: 20px;
-}
+.r-stamp.sm { width: 18px; height: 18px; }
 .nav-rail .nav-section,
 .mobile-sheet .sheet-section {
   font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase;

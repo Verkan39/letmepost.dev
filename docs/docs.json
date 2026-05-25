@@ -8,7 +8,7 @@
     "light": "#53C68C",
     "dark": "#185838"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/favicon.ico",
   "styling": {
     "codeblocks": "system"
   },
@@ -17,8 +17,8 @@
   },
   "css": "/style.css",
   "logo": {
-    "light": "https://letmepost.dev/logo.svg",
-    "dark": "https://letmepost.dev/logo-dark.svg",
+    "light": "https://letmepost.dev/logo.png",
+    "dark": "https://letmepost.dev/logo-dark.png",
     "href": "https://letmepost.dev"
   },
   "seo": {

@@ -20,6 +20,21 @@ export const user = pgTable(
     email: text("email").notNull(),
     emailVerified: boolean("email_verified").notNull().default(false),
     image: text("image"),
+    // First-touch attribution. Captured on landing in apps/web, propagated
+    // to dashboard.letmepost.dev via query params, and persisted here by
+    // better-auth's `user.additionalFields` on signup. Null for users who
+    // signed up before this shipped or arrived without any attribution
+    // signal. signupSource is the derived high-level bucket
+    // ("producthunt", "hackernews", "google", "direct", ...); the raw
+    // utm_* and referrer fields are kept for re-derivation.
+    signupSource: text("signup_source"),
+    signupUtmSource: text("signup_utm_source"),
+    signupUtmMedium: text("signup_utm_medium"),
+    signupUtmCampaign: text("signup_utm_campaign"),
+    signupUtmContent: text("signup_utm_content"),
+    signupUtmTerm: text("signup_utm_term"),
+    signupReferrer: text("signup_referrer"),
+    signupLandingPath: text("signup_landing_path"),
     ...timestamps,
   },
   (t) => ({

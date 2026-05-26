@@ -18,6 +18,7 @@ import {
   createAccountRoutes,
 } from "./routes/accounts.js";
 import { apiKeyRoutes } from "./routes/api-keys.js";
+import { attribution } from "./routes/attribution.js";
 import { authRoutes } from "./routes/auth.js";
 import {
   billingRoutes,
@@ -132,6 +133,11 @@ export function createApp(options: AppOptions = {}) {
   // routes so the global requireSession() middleware doesn't intercept.
   app.route("/v1/oauth-exchange", oauthExchange);
   app.route("/v1/api-keys", apiKeyRoutes);
+  // First-touch attribution backfill for OAuth signups. Lives outside
+  // the session-with-org gate because the user may not have an org yet
+  // at the moment this is called (between OAuth callback and the org-
+  // creation onboarding step).
+  app.route("/v1/auth/attribution", attribution);
 
   if (options.testSession) {
     const session = options.testSession;

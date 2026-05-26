@@ -2,6 +2,7 @@
 import "../styles/global.css";
 import { ClientRouter } from "astro:transitions";
 import Analytics from "../components/Analytics.astro";
+import Attribution from "../components/Attribution.astro";
 import NavRail from "../components/NavRail.astro";
 import MobilePill from "../components/MobilePill.astro";
 import MobileSheet from "../components/MobileSheet.astro";
@@ -165,6 +166,7 @@ const ctaConfig =
 
     <ClientRouter />
     <Analytics />
+    <Attribution />
   </head>
   <body>
     <div class="page" style={pageStyle}>

@@ -58,7 +58,21 @@ type WebhookEventType =
 
 export type DashboardEvent =
   // ── Auth & onboarding ───────────────────────────────────────────────
-  | { name: "signup.started"; properties: { provider: AuthProvider; referrer?: string } }
+  | {
+      name: "signup.started";
+      properties: {
+        provider: AuthProvider;
+        referrer?: string;
+        // First-touch attribution snapshot taken from localStorage at the
+        // moment the form is focused or an OAuth flow begins. Optional
+        // because users who arrive directly (typed URL, bookmark) have
+        // none of these.
+        signup_source?: string;
+        utm_source?: string;
+        utm_medium?: string;
+        utm_campaign?: string;
+      };
+    }
   | { name: "signup.completed"; properties: { provider: AuthProvider } }
   | { name: "signin.completed"; properties: { provider: AuthProvider } }
   | { name: "signout.completed"; properties: Record<string, never> }

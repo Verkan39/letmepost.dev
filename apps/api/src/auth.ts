@@ -115,6 +115,40 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  account: {
+    // Auto-link OAuth identities to an existing user when the verified
+    // email matches. Without this, a user who signed up with email +
+    // password and later clicks "Continue with GitHub" hits an
+    // `account_not_linked` 400 because better-auth defaults to refusing
+    // to merge accounts (defensive against confused-deputy attacks where
+    // an attacker controls a provider that lies about emails).
+    //
+    // `trustedProviders` is the whitelist of providers we trust to have
+    // verified the email server-side. Google and GitHub both verify
+    // emails before issuing OIDC/OAuth identities, so it's safe to
+    // auto-link from them. If we later add a provider that doesn't
+    // (custom SAML, etc.) it must NOT go on this list.
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ["google", "github"],
+    },
+  },
+  user: {
+    // First-touch attribution. The dashboard collects these from URL params
+    // + localStorage at signup time and passes them straight through to
+    // better-auth. All optional — users who arrive without UTMs (typed the
+    // URL, opened a saved tab) end up with nulls, which is correct.
+    additionalFields: {
+      signupSource: { type: "string", required: false, input: true },
+      signupUtmSource: { type: "string", required: false, input: true },
+      signupUtmMedium: { type: "string", required: false, input: true },
+      signupUtmCampaign: { type: "string", required: false, input: true },
+      signupUtmContent: { type: "string", required: false, input: true },
+      signupUtmTerm: { type: "string", required: false, input: true },
+      signupReferrer: { type: "string", required: false, input: true },
+      signupLandingPath: { type: "string", required: false, input: true },
+    },
+  },
   socialProviders: buildSocialProviders(),
   plugins: [
     organization(),

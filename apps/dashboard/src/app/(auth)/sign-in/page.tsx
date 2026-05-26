@@ -2,11 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { API_URL } from "@/lib/env";
 import { track } from "@/lib/analytics";
+import {
+  EmailIcon,
+  GitHubIcon,
+  GoogleIcon,
+} from "@/components/auth/provider-icons";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,14 +26,10 @@ import { Label } from "@/components/ui/label";
 
 /**
  * When the OAuth provider redirects the user here for sign-in, it appends the
- * full signed authorize-query (response_type, client_id, scope, state,
- * code_challenge, exp, iat, sig, …). After successful sign-in we have to send
- * the user back to /api/auth/oauth2/authorize WITH those exact params so the
- * authorize handler can verify the signature and continue the flow. Anything
- * else (a bare router.push("/")) drops the OAuth dance on the floor.
- *
- * The presence of `response_type=code` is our signal that we're inside an OAuth
- * loop. If absent, this is a plain dashboard sign-in and we fall back to "/".
+ * full signed authorize-query (response_type, client_id, scope, state, …).
+ * After sign-in we send the user back to /api/auth/oauth2/authorize with
+ * those exact params so the authorize handler can verify the signature and
+ * continue. A bare router.push("/") drops the OAuth dance on the floor.
  */
 function buildPostSignInRedirect(search: URLSearchParams): string {
   if (!search.get("response_type")) return "/";
@@ -36,11 +37,12 @@ function buildPostSignInRedirect(search: URLSearchParams): string {
 }
 
 export default function SignInPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [socialBusy, setSocialBusy] = useState<"google" | "github" | null>(null);
+  const [showEmailForm, setShowEmailForm] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -55,9 +57,8 @@ export default function SignInPage() {
       const target = buildPostSignInRedirect(
         new URLSearchParams(searchParams?.toString() ?? ""),
       );
-      // Full-page nav (not router.push) so the browser actually leaves the
-      // dashboard origin and the API receives the request with the new
-      // session cookie attached.
+      // Full-page nav so the browser leaves the dashboard origin and the
+      // API receives the request with the new session cookie attached.
       window.location.href = target;
     } catch (err) {
       toast.error(
@@ -68,58 +69,137 @@ export default function SignInPage() {
     }
   }
 
+  async function onSocial(provider: "google" | "github") {
+    if (socialBusy) return;
+    setSocialBusy(provider);
+    try {
+      // If we're inside an OAuth-provider authorize loop (someone clicked
+      // "Sign in with letmepost" on a third-party app), preserve the
+      // authorize query so the round-trip back lands on /authorize.
+      const callbackURL = buildPostSignInRedirect(
+        new URLSearchParams(searchParams?.toString() ?? ""),
+      );
+      const { error } = await authClient.signIn.social({
+        provider,
+        callbackURL,
+      });
+      if (error) {
+        toast.error(error.message ?? `${provider} sign-in failed.`);
+        setSocialBusy(null);
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : `${provider} sign-in failed.`,
+      );
+      setSocialBusy(null);
+    }
+  }
+
+  const anyBusy = submitting || socialBusy !== null;
+
   return (
-    <form onSubmit={onSubmit}>
-      <Card className="py-6 gap-6">
-        <CardHeader className="gap-1.5 px-6">
-          <CardTitle className="text-base font-semibold">Sign in</CardTitle>
-          <CardDescription>
-            One inbox. One operator. Pick up where you left off.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-6 space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              required
-              className="h-9 text-sm"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+    <Card className="py-6 gap-6">
+      <CardHeader className="gap-1.5 px-6">
+        <CardTitle className="text-base font-semibold">Sign in</CardTitle>
+        <CardDescription>
+          One inbox. One operator. Pick up where you left off.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="px-6 space-y-4">
+        <Button
+          type="button"
+          size="lg"
+          className="w-full gap-2"
+          onClick={() => onSocial("github")}
+          disabled={anyBusy}
+        >
+          <GitHubIcon size={18} />
+          {socialBusy === "github" ? "Connecting…" : "Continue with GitHub"}
+        </Button>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              className="h-9 text-sm"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">or</span>
           </div>
-        </CardContent>
-        <CardFooter className="px-6 py-4 flex-col items-stretch gap-3">
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
           <Button
-            type="submit"
-            size="lg"
-            className="w-full"
-            disabled={submitting}
+            type="button"
+            variant="outline"
+            className="h-9 gap-2"
+            onClick={() => onSocial("google")}
+            disabled={anyBusy}
           >
-            {submitting ? "Signing in…" : "Sign in"}
+            <GoogleIcon size={16} />
+            {socialBusy === "google" ? "Connecting…" : "Google"}
           </Button>
-          <p className="text-xs text-muted-foreground text-center">
-            Don&apos;t have an account?{" "}
-            <Link className="underline underline-offset-2" href="/sign-up">
-              Sign up
-            </Link>
-          </p>
-        </CardFooter>
-      </Card>
-    </form>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 gap-2"
+            onClick={() => setShowEmailForm((v) => !v)}
+            disabled={anyBusy}
+            aria-expanded={showEmailForm}
+            aria-controls="email-signin-form"
+          >
+            <EmailIcon size={16} />
+            {showEmailForm ? "Hide email" : "Email"}
+          </Button>
+        </div>
+
+        {showEmailForm && (
+          <form
+            id="email-signin-form"
+            onSubmit={onSubmit}
+            className="space-y-4"
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                required
+                className="h-9 text-sm"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                className="h-9 text-sm"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              disabled={anyBusy}
+            >
+              {submitting ? "Signing in…" : "Sign in"}
+            </Button>
+          </form>
+        )}
+      </CardContent>
+      <CardFooter className="px-6 py-4 flex-col items-stretch gap-3">
+        <p className="text-xs text-muted-foreground text-center">
+          Don&apos;t have an account?{" "}
+          <Link className="underline underline-offset-2" href="/sign-up">
+            Sign up
+          </Link>
+        </p>
+      </CardFooter>
+    </Card>
   );
 }

@@ -1,0 +1,64 @@
+# letmepost.dev
+
+> Open-source social media publishing API for developers and AI agents.
+> One POST endpoint publishes across eight platforms. Native MCP server,
+> idempotency by default, version-pinned upstream APIs, transparent
+> error responses. Apache 2.0. The hosted SaaS runs the same image you
+> can self-host.
+
+## What it is
+
+letmepost.dev is a single API for publishing posts to social platforms.
+You send one HTTP request; we handle per-platform OAuth flows, version
+drift, rate limits, retries, idempotency, and webhook delivery.
+
+Where existing APIs (Ayrshare, Buffer, Hootsuite) fail silently, bill
+per-profile, and break every six months, letmepost.dev fails loudly,
+bills per-org, and pins API versions internally.
+
+Built for two audiences:
+- Developers shipping social features into their own product
+- AI agents (via the native MCP server at api.letmepost.dev/mcp)
+
+## Status (as of 2026-05-26)
+
+- Bluesky, X (Twitter), Pinterest — live end-to-end
+- Instagram, Facebook, Threads, LinkedIn — in platform review
+- TikTok — planned for v2
+
+## Pricing
+
+- Free: 50 posts/month, full API surface, indefinite (not a trial)
+- Pro: $79/mo, 5,000 posts/month
+- Business: $299/mo, 25,000 posts/month, 99.9% SLA
+- All flat per-org. Profiles, accounts, team members, webhooks, API keys
+  are all free. Hard caps, no overage surprises.
+
+## Key pages
+
+- Homepage: https://letmepost.dev/
+- Pricing: https://letmepost.dev/pricing
+- For agents (MCP): https://letmepost.dev/agents
+- Status: https://letmepost.dev/status
+- About: https://letmepost.dev/about
+- Engineering blog: https://letmepost.dev/blog
+- Platform-specific landing pages: https://letmepost.dev/platforms
+
+## API surfaces
+
+- Publishing: https://letmepost.dev/api/publishing
+- Media: https://letmepost.dev/api/media
+- Webhooks: https://letmepost.dev/api/webhooks
+- Full docs: https://docs.letmepost.dev
+
+## Source code
+
+- GitHub: https://github.com/letmepost/letmepost.dev
+- Licence: Apache 2.0
+- Self-host: https://docs.letmepost.dev/self-host
+
+## Contact
+
+- Email: rose@letmepost.dev (replies in ~24h on weekdays)
+- X: @letmepostdotdev
+- Founder: Rose Kamal Love (ex-GrooveHQ, Kroto)

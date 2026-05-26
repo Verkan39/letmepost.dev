@@ -1,10 +1,27 @@
 ---
+import { getCollection } from "astro:content";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import { Icon } from "astro-icon/components";
 import Tape from "../components/Tape.astro";
 import Closeout from "../components/Closeout.astro";
 import { PLATFORMS } from "../data/platforms.ts";
 import { highlight } from "../lib/highlight.ts";
+
+const recentPosts = (
+  await getCollection("blog", ({ data }) => {
+    return import.meta.env.PROD ? data.draft !== true : true;
+  })
+)
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
+  .slice(0, 3);
+
+function fmtPostDate(d: Date): string {
+  return d.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 /**
  * Landing page — receipt direction. Pixel-mirrors design/letmepost.html.
@@ -117,8 +134,8 @@ for r in result.targets:
 ---
 
 <BaseLayout
-  title="letmepost.dev — one POST, eight platforms, Meta App Review already done"
-  description="Open-source social publishing API. We absorbed Meta's eight-week App Review, LinkedIn's five 2024–25 sunsets, and the 80 platform-specific preflight rules. You publish. Apache 2.0, native MCP server, real free tier."
+  title="Open-source social media publishing API"
+  description="One POST, eight platforms. Meta App Review absorbed, LinkedIn's 2024-25 sunsets pinned, 80 preflight rules built in. Apache 2.0, native MCP server, real free tier."
   jsonLd={[faqJsonLd]}
 >
   <Tape />
@@ -385,6 +402,35 @@ for r in result.targets:
     </p>
   </section>
 
+  {recentPosts.length > 0 && (
+    <>
+      <hr class="dash" />
+
+      {/* Latest writing — surfaces blog posts on the highest-authority
+          page so Outrank-published articles inherit link equity from
+          the home page. */}
+      <section class="section">
+        <h2 class="h-mixed">Latest writing.</h2>
+        <p class="subtitle left">engineering notes from the platform-review queue</p>
+
+        <ul class="recent-posts">
+          {recentPosts.map((post) => (
+            <li>
+              <a href={`/blog/${post.id}/`}>
+                <span class="rp-date">{fmtPostDate(post.data.pubDate)}</span>
+                <span class="rp-title">{post.data.title}</span>
+                <span class="rp-desc">{post.data.description}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+        <p class="recent-more">
+          <a href="/blog">All writing →</a>
+        </p>
+      </section>
+    </>
+  )}
+
   <hr class="dash" />
 
   {/* Fine print */}
@@ -473,6 +519,61 @@ for r in result.targets:
 </BaseLayout>
 
 <style is:global>
+  /* Latest writing strip — surfaces blog posts on the home page */
+  .recent-posts {
+    list-style: none;
+    padding: 0;
+    margin: 14px 0 14px;
+    display: grid;
+    gap: 0;
+    border-top: 1px dotted var(--r-very);
+  }
+  .recent-posts li a {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px dotted var(--r-very);
+    text-decoration: none;
+    color: inherit;
+  }
+  .recent-posts li a:hover .rp-title { color: var(--r-accent); }
+  .recent-posts .rp-date {
+    font-family: var(--r-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--r-very);
+    padding-top: 3px;
+  }
+  .recent-posts .rp-title {
+    font-family: var(--r-mono);
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 1.3;
+    color: var(--r-ink);
+    grid-column: 2;
+    margin-bottom: 3px;
+  }
+  .recent-posts .rp-desc {
+    grid-column: 2;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--r-dim);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .recent-more {
+    margin: 8px 0 0;
+    font-family: var(--r-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .recent-more a { color: var(--r-accent); text-decoration: none; }
+  .recent-more a:hover { text-decoration: underline; }
+
   /* ── /index landing-only overrides ────────────────────────
      Quieter hero pattern: tiny ledger row at top, big H1 leading
      left-aligned, with the PAID-IN-FULL stamp demoted to a small

@@ -4,6 +4,9 @@ import type { CollectionEntry } from "astro:content";
 import BlogLayout, {
   type JsonLdGraph,
 } from "../../layouts/BlogLayout.astro";
+import { breadcrumbSchema, ROSE_PERSON_SCHEMA } from "../../lib/seo.ts";
+
+const siteUrl = Astro.site!.toString().replace(/\/$/, "");
 
 export async function getStaticPaths() {
   const posts = await getCollection("blog", ({ data }) => {
@@ -69,9 +72,17 @@ const jsonLd: JsonLdGraph[] = [
     ...(post.data.updatedDate
       ? { dateModified: fmtISO(post.data.updatedDate) }
       : {}),
-    author: { "@type": "Person", name: post.data.author },
+    author: { "@id": ROSE_PERSON_SCHEMA["@id"] },
+    publisher: { "@id": `${siteUrl}/#organization` },
     ...(post.data.heroImage ? { image: post.data.heroImage } : {}),
+    mainEntityOfPage: `${siteUrl}/blog/${post.id}/`,
   },
+  ROSE_PERSON_SCHEMA,
+  breadcrumbSchema([
+    { name: "Home", url: `${siteUrl}/` },
+    { name: "Blog", url: `${siteUrl}/blog/` },
+    { name: post.data.title },
+  ]),
 ];
 ---
 
@@ -100,7 +111,7 @@ const jsonLd: JsonLdGraph[] = [
 
         {post.data.heroImage && (
           <figure class="bp-post-hero">
-            <img src={post.data.heroImage} alt="" loading="eager" />
+            <img src={post.data.heroImage} alt={post.data.title} loading="eager" fetchpriority="high" />
           </figure>
         )}
 

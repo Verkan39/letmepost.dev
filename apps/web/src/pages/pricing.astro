@@ -1,7 +1,8 @@
 ---
-import BaseLayout from "../layouts/BaseLayout.astro";
+import BaseLayout, { type JsonLdGraph } from "../layouts/BaseLayout.astro";
 import Tape from "../components/Tape.astro";
 import Closeout from "../components/Closeout.astro";
+import { faqPageSchema, pricingProductSchema } from "../lib/seo.ts";
 
 /**
  * Pricing — receipt direction. 3-tier RATE CARD (Free / Pro / Business)
@@ -43,11 +44,21 @@ const faqs = [
     a: 'If something we built is broken and we can\'t fix it in the period, yes. Email <a href="mailto:rose@letmepost.dev">rose@letmepost.dev</a>.',
   },
 ];
+
+const jsonLd: JsonLdGraph[] = [
+  pricingProductSchema([
+    { name: "Free", price: 0, description: "50 posts per month, all 8 platforms, full API surface." },
+    { name: "Pro", price: 79, description: "5,000 posts per month, all webhook events, 30-day publish logs." },
+    { name: "Business", price: 299, description: "25,000 posts per month, white-label OAuth, 99.9% SLA." },
+  ]),
+  faqPageSchema(faqs),
+];
 ---
 
 <BaseLayout
-  title="Pricing — flat per-org, no per-profile tax"
+  title="Pricing: flat per-org, no per-profile tax"
   description="Three tiers, one flat number per month. Free 50/mo, Pro $79 / 5,000, Business $299 / 25,000. Profiles, accounts, team members, webhooks, and API keys are all free. Hard caps, never overage surprises."
+  jsonLd={jsonLd}
 >
   <Tape />
 

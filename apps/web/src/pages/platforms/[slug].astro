@@ -1,5 +1,6 @@
 ---
 import BaseLayout, { type JsonLdGraph } from "../../layouts/BaseLayout.astro";
+import { faqPageSchema } from "../../lib/seo.ts";
 import { Icon } from "astro-icon/components";
 import Tape from "../../components/Tape.astro";
 import Closeout from "../../components/Closeout.astro";
@@ -130,10 +131,10 @@ const learnMore = [
 ---
 
 <BaseLayout
-  title={`Publish to ${platform.name}`}
+  title={`${platform.name} API for developers`}
   description={`Publish to ${platform.name} via letmepost.dev. ${platform.tagline}.`}
   ogType="product"
-  jsonLd={[breadcrumbJsonLd, softwareJsonLd]}
+  jsonLd={[breadcrumbJsonLd, softwareJsonLd, faqPageSchema(content.faqs)]}
 >
   <Fragment slot="navColophon">
     <div class="colophon" set:html={content.colophon} />

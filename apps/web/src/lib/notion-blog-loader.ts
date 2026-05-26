@@ -72,6 +72,42 @@ function stripInlineToc(markdown: string): string {
   );
 }
 
+/**
+ * Walk the markdown line-by-line, track the latest heading, and rewrite
+ * bare `![](url)` images to `![Figure: <heading>](url)` so every body
+ * image has descriptive alt text. Images that already have alt text are
+ * left alone.
+ */
+function addImageAlts(markdown: string, fallback: string): string {
+  let currentHeading = fallback;
+  return markdown
+    .split("\n")
+    .map((line) => {
+      const heading = line.match(/^#{1,6}\s+(.+?)\s*$/);
+      if (heading) {
+        currentHeading = heading[1].trim();
+        return line;
+      }
+      return line.replace(
+        /!\[\]\((https?:\/\/[^\s)]+)\)/g,
+        (_, url) => `![Figure: ${currentHeading}](${url})`,
+      );
+    })
+    .join("\n");
+}
+
+/**
+ * Outrank stamps every generated article with a "Built with the Outrank
+ * app" attribution link at the bottom. Strip it — we don't want a follow
+ * link out to a vendor on every post.
+ */
+function stripOutrankAttribution(markdown: string): string {
+  return markdown.replace(
+    /\n?\*Built with \*\[\*the Outrank app\*\]\([^)]+\)\s*$/i,
+    "",
+  );
+}
+
 export function notionBlogLoader(opts: NotionBlogLoaderOptions): Loader {
   return {
     name: "notion-blog",
@@ -153,7 +189,9 @@ export function notionBlogLoader(opts: NotionBlogLoaderOptions): Loader {
 
         const mdBlocks = await n2m.pageToMarkdown(page.id);
         const mdResult = n2m.toMarkdownString(mdBlocks);
-        const body = stripInlineToc(mdResult.parent ?? "");
+        const cleaned = stripInlineToc(mdResult.parent ?? "");
+        const noAttribution = stripOutrankAttribution(cleaned);
+        const body = addImageAlts(noAttribution, title);
         if (!body.trim()) {
           logger.warn(`Skipping ${slug}: empty body`);
           continue;

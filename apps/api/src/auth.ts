@@ -130,13 +130,16 @@ export const auth = betterAuth({
     // (custom SAML, etc.) it must NOT go on this list.
     accountLinking: {
       enabled: true,
-      // "credential" must be in this list too — better-auth refuses to
-      // link an incoming OAuth identity (google/github) into an existing
-      // account whose primary provider isn't trusted, even if the OAuth
-      // provider itself is trusted. A user who signed up with email +
-      // password and later clicks "Continue with GitHub" would otherwise
-      // hit `account_not_linked` on the API.
-      trustedProviders: ["google", "github", "credential"],
+      trustedProviders: ["google", "github"],
+      // Default is `true`, which refuses to link an incoming OAuth
+      // identity to an existing account whose local `emailVerified` is
+      // false — and our email/password signup never sets that field
+      // (we don't send verification emails). The fix is to trust the
+      // OAuth provider's `emailVerified` claim instead: Google and
+      // GitHub both verify emails server-side before issuing OAuth
+      // identities, so if a verified-OAuth email matches an existing
+      // unverified local account, linking is safe.
+      requireLocalEmailVerified: false,
     },
   },
   user: {

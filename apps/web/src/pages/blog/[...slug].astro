@@ -1,18 +1,10 @@
 ---
 import { getCollection, render } from "astro:content";
 import type { CollectionEntry } from "astro:content";
-import BaseLayout, { type JsonLdGraph } from "../../layouts/BaseLayout.astro";
-import Tape from "../../components/Tape.astro";
-import Closeout from "../../components/Closeout.astro";
+import BlogLayout, {
+  type JsonLdGraph,
+} from "../../layouts/BlogLayout.astro";
 
-/**
- * Static post pages, one per MDX entry. `getStaticPaths` is the source
- * of truth for what gets built — drafts are excluded in production.
- *
- * Post layout is the receipt design's blog-post template: centered
- * post head, TL;DR card, .prose body with § headings + pullquote +
- * figure + blockquote, next-up card, sticky right-rail TOC.
- */
 export async function getStaticPaths() {
   const posts = await getCollection("blog", ({ data }) => {
     return import.meta.env.PROD ? data.draft !== true : true;
@@ -31,16 +23,35 @@ interface Props {
 const { post, allPosts } = Astro.props;
 const { Content, headings } = await render(post);
 
+// TOC: only h2/h3, skip stray "Table of Contents" (defensive — the
+// loader already strips it, but the markdown renderer can resurface
+// headings from text we missed).
+const tocHeadings = headings.filter(
+  (h) =>
+    (h.depth === 2 || h.depth === 3) &&
+    !/^table of contents$/i.test(h.text.trim()),
+);
+
 const sortedPosts = [...allPosts].sort(
   (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
 );
 const currentIdx = sortedPosts.findIndex((p) => p.id === post.id);
 const nextPost = currentIdx > 0 ? sortedPosts[currentIdx - 1] : null;
+const prevPost =
+  currentIdx >= 0 && currentIdx < sortedPosts.length - 1
+    ? sortedPosts[currentIdx + 1]
+    : null;
 
-function fmtISO(d: Date): string {
-  return d.toISOString().slice(0, 10);
+function fmtDate(d: Date): string {
+  return d.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 }
-
+function fmtISO(d: Date): string {
+  return d.toISOString();
+}
 function readingMin(p: CollectionEntry<"blog">): number {
   if (p.data.readingTime) return p.data.readingTime;
   const body = p.body ?? "";
@@ -48,350 +59,452 @@ function readingMin(p: CollectionEntry<"blog">): number {
   return Math.max(1, Math.round(words / 200));
 }
 
-const categoryLabel: Record<string, string> = {
-  engineering: "ENGINEERING",
-  philosophy: "PHILOSOPHY",
-  "release-notes": "RELEASE NOTES",
-};
-
-// Dispatch number = position in the published series (newest first
-// = highest number). Stable across rebuilds as long as pubDate stays.
-const totalPosts = sortedPosts.length;
-const dispatchNum = String(totalPosts - currentIdx).padStart(2, "0");
-
-// Build TOC from rendered h2/h3 headings. h2 gets §N, h3 gets ·
-// (matches the design's two-level indent).
-let h2Count = 0;
-const toc = headings
-  .filter((h) => h.depth === 2 || h.depth === 3)
-  .map((h) => {
-    if (h.depth === 2) h2Count += 1;
-    return {
-      depth: h.depth,
-      text: h.text,
-      slug: h.slug,
-      num: h.depth === 2 ? `§${h2Count}` : "·",
-    };
-  });
-
-const siteUrl = Astro.site!.toString().replace(/\/$/, "");
-
-const articleJsonLd: JsonLdGraph = {
-  "@context": "https://schema.org",
-  "@type": "BlogPosting",
-  headline: post.data.title,
-  description: post.data.description,
-  datePublished: post.data.pubDate.toISOString(),
-  dateModified: (post.data.updatedDate ?? post.data.pubDate).toISOString(),
-  author: {
-    "@type": "Organization",
-    name: post.data.author,
-    url: siteUrl,
+const jsonLd: JsonLdGraph[] = [
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: post.data.title,
+    description: post.data.description,
+    datePublished: fmtISO(post.data.pubDate),
+    ...(post.data.updatedDate
+      ? { dateModified: fmtISO(post.data.updatedDate) }
+      : {}),
+    author: { "@type": "Person", name: post.data.author },
+    ...(post.data.heroImage ? { image: post.data.heroImage } : {}),
   },
-  publisher: { "@id": `${siteUrl}/#organization` },
-  mainEntityOfPage: {
-    "@type": "WebPage",
-    "@id": `${siteUrl}/blog/${post.id}/`,
-  },
-  ...(post.data.heroImage
-    ? {
-        image: post.data.heroImage.startsWith("http")
-          ? post.data.heroImage
-          : new URL(post.data.heroImage, siteUrl).toString(),
-      }
-    : {}),
-  keywords: post.data.tags.join(", "),
-};
-
-const breadcrumbJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "BreadcrumbList",
-  itemListElement: [
-    { "@type": "ListItem", position: 1, name: "Home", item: `${siteUrl}/` },
-    { "@type": "ListItem", position: 2, name: "Blog", item: `${siteUrl}/blog/` },
-    {
-      "@type": "ListItem",
-      position: 3,
-      name: post.data.title,
-      item: `${siteUrl}/blog/${post.id}/`,
-    },
-  ],
-};
-
-const ogImage = post.data.heroImage ?? "/og-image.png";
-const minutes = readingMin(post);
+];
 ---
 
-<BaseLayout
+<BlogLayout
   title={post.data.title}
   description={post.data.description}
-  ogImage={ogImage}
+  ogImage={post.data.heroImage}
   ogType="article"
-  jsonLd={[articleJsonLd, breadcrumbJsonLd]}
+  jsonLd={jsonLd}
 >
-  <Tape />
-
-  <span
-    data-blog-tags={post.data.tags.join(",")}
-    data-blog-published-at={post.data.pubDate.toISOString()}
-    hidden
-  ></span>
-
-  <header class="post-head" data-sticky-anchor>
-    <div class="kicker">
-      DISPATCH №{dispatchNum}
-      <span class="dot"></span>
-      {categoryLabel[post.data.category]}
-      <span class="dot"></span>
-      {fmtISO(post.data.pubDate)}
-    </div>
-    <h1>{post.data.title}</h1>
-    <p class="dek">{post.data.description}</p>
-    <div class="byline">
-      <span>by <b>{post.data.author}</b></span>
-      <span>· {minutes} min read</span>
-      {post.data.tags.length > 0 && <span>· {post.data.tags.join(", ")}</span>}
-    </div>
-  </header>
-
-  <article class="prose">
-    <Content />
-  </article>
-
-  {
-    nextPost && (
-      <>
-        <hr class="dash" style="margin-top: 48px;" />
-        <div class="next-up">
-          <div>
-            <div class="lbl">Next dispatch</div>
-            <h3>
-              <a href={`/blog/${nextPost.id}`}>{nextPost.data.title}</a>
-            </h3>
-            <p>{nextPost.data.description}</p>
+  <div class="bp-post-wrap">
+    <div class="bp-post-grid">
+      <article class="bp-post">
+        <header class="bp-post-head">
+          <a href="/blog" class="bp-back">← All writing</a>
+          <div class="bp-post-meta">
+            <span>{fmtDate(post.data.pubDate)}</span>
+            <span class="bp-dot">·</span>
+            <span>{readingMin(post)} min read</span>
+            <span class="bp-dot">·</span>
+            <span>by {post.data.author}</span>
           </div>
-          <div class="arrow">→</div>
+          <h1 class="bp-post-h">{post.data.title}</h1>
+          <p class="bp-post-lede">{post.data.description}</p>
+        </header>
+
+        {post.data.heroImage && (
+          <figure class="bp-post-hero">
+            <img src={post.data.heroImage} alt="" loading="eager" />
+          </figure>
+        )}
+
+        <div class="bp-post-body">
+          <Content />
         </div>
-      </>
-    )
-  }
 
-  <hr class="double" />
+        <footer class="bp-post-foot">
+          <div class="bp-post-share">
+            <span>Tagged:</span>
+            {post.data.tags.length > 0
+              ? post.data.tags.map((t) => <span class="bp-tag">{t}</span>)
+              : <span class="bp-tag">{post.data.category}</span>}
+          </div>
+        </footer>
 
-  <Closeout
-    thanks="* * * THANK YOU FOR READING * * *"
-    codeLine={`DISPATCH ${dispatchNum} · ${fmtISO(post.data.pubDate)} · ${minutes} MIN`}
-    links={[
-      { href: "/blog", label: "all dispatches" },
-      { href: "/rss.xml", label: "rss" },
-      { href: "https://bsky.app/profile/rosekamallove.dev", label: "bluesky" },
-      { href: "mailto:rose@letmepost.dev", label: "email" },
-    ]}
-  />
-  <Tape bottom />
-
-  {/* Right rail — table of contents */}
-  <aside class="toc" aria-label="Table of contents" slot="rightRail">
-    <div class="lbl">Contents</div>
-    {
-      toc.length > 0 ? (
-        <ol>
-          {toc.map((h) => (
-            <li>
-              <a href={`#${h.slug}`}>
-                <span class="num">{h.num}</span>
-                <span>{h.text}</span>
+        {(prevPost || nextPost) && (
+          <nav class="bp-post-nav">
+            {prevPost ? (
+              <a href={`/blog/${prevPost.id}`} class="bp-nav-card bp-nav-prev">
+                <span class="bp-nav-label">← Previous</span>
+                <span class="bp-nav-title">{prevPost.data.title}</span>
               </a>
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <p style="font-size: 11px; color: var(--r-very);">No headings yet.</p>
-      )
-    }
-    <div class="read">
-      Reading time <b>{minutes} min</b><br />
-      Filed {fmtISO(post.data.pubDate)}<br />
-      Bangalore, India
+            ) : <span />}
+            {nextPost ? (
+              <a href={`/blog/${nextPost.id}`} class="bp-nav-card bp-nav-next">
+                <span class="bp-nav-label">Next →</span>
+                <span class="bp-nav-title">{nextPost.data.title}</span>
+              </a>
+            ) : <span />}
+          </nav>
+        )}
+      </article>
+
+      {tocHeadings.length > 0 && (
+        <aside class="bp-toc" aria-label="Table of contents">
+          <div class="bp-toc-inner">
+            <div class="bp-toc-h">On this page</div>
+            <ul>
+              {tocHeadings.map((h) => (
+                <li class={`bp-toc-d${h.depth}`}>
+                  <a href={`#${h.slug}`}>{h.text}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </aside>
+      )}
     </div>
-  </aside>
-</BaseLayout>
+  </div>
+</BlogLayout>
 
 <style is:global>
-  /* ── Single blog post only ─────────────────────────────── */
+  /* ── /blog post detail ──────────────────────────────────── */
 
-  .post-head { padding: 36px 0 8px; text-align: center; }
-  .post-head .kicker {
-    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
-    color: var(--r-accent); margin-bottom: 14px;
+  /* Article column is 720px + 220px TOC + 56px gap = 996px. Center the
+     whole reading column together so the article isn't pulled left and
+     the TOC isn't pinned to the page edge. */
+  .bp-post-wrap {
+    max-width: 1020px;
+    margin: 0 auto;
+    padding: 40px var(--bp-gutter) 0;
   }
-  .post-head .kicker .dot {
-    display: inline-block; width: 4px; height: 4px;
-    background: var(--r-very); margin: 0 8px 2px; vertical-align: middle;
+  .bp-post-grid {
+    display: grid;
+    grid-template-columns: 720px 220px;
+    gap: 56px;
+    justify-content: center;
   }
-  .post-head h1 {
-    font-family: var(--r-mono); font-weight: 700;
-    font-size: 30px; line-height: 1.18; letter-spacing: -0.02em;
-    margin: 0 0 16px; text-wrap: balance; color: var(--r-ink);
-  }
-  .post-head h1 .acc { color: var(--r-accent); }
-  .post-head .dek {
-    font-size: 15px; line-height: 1.55; color: var(--r-dim);
-    max-width: 560px; margin: 0 auto 22px; text-wrap: balance;
-  }
-  .post-head .byline {
-    display: inline-flex; gap: 14px; flex-wrap: wrap;
-    font-size: var(--r-fs-xs); letter-spacing: 0.1em; text-transform: uppercase;
-    color: var(--r-very); justify-content: center;
-  }
-  .post-head .byline b { color: var(--r-ink); font-weight: 700; }
 
-  .prose {
+  .bp-post { min-width: 0; }
+
+  .bp-post-head { margin-bottom: 32px; }
+  .bp-back {
+    display: inline-block;
     font-family: var(--r-mono);
-    color: var(--r-fg);
-    font-size: 14px; line-height: 1.75;
-    max-width: 580px; margin: 0 auto;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--r-dim);
+    text-decoration: none;
+    margin-bottom: 28px;
+    transition: color 0.15s;
   }
-  .prose > * + * { margin-top: 1.1em; }
-  .prose p { margin: 0; }
-  .prose p + p { margin-top: 1.1em; }
-  .prose p > b, .prose p > strong { color: var(--r-ink); font-weight: 700; }
-  .prose h2 {
-    font-family: var(--r-mono); font-weight: 700;
-    font-size: 18px; letter-spacing: -0.005em;
-    margin-top: 2em; margin-bottom: 0.6em;
-    padding-bottom: 6px; border-bottom: 1px dashed var(--r-very);
+  .bp-back:hover { color: var(--r-accent); }
+
+  .bp-post-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--r-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--r-very);
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .bp-post-h {
+    font-family: var(--r-mono);
+    font-weight: 700;
+    font-size: clamp(28px, 4.6vw, 44px);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
     color: var(--r-ink);
+    margin: 0 0 18px;
+    text-wrap: balance;
   }
-  .prose h2::before { content: '§ '; color: var(--r-accent); }
-  .prose h3 {
-    font-family: var(--r-mono); font-weight: 700;
-    font-size: 15px; letter-spacing: 0;
-    margin-top: 1.6em; margin-bottom: 0.4em;
-    color: var(--r-ink);
+  .bp-post-lede {
+    font-family: var(--bp-serif);
+    font-size: 20px;
+    line-height: 1.5;
+    color: var(--r-dim);
+    margin: 0;
+    text-wrap: balance;
   }
-  .prose ul, .prose ol { padding-left: 1.2em; margin: 0; }
-  .prose li { margin-bottom: 0.4em; }
-  .prose li::marker { color: var(--r-accent); }
-  .prose a {
-    color: var(--r-accent);
-    text-decoration: underline; text-decoration-thickness: 1px;
-    text-decoration-style: dotted; text-underline-offset: 3px;
+
+  .bp-post-hero {
+    margin: 36px 0;
   }
-  .prose a:hover { color: var(--r-ink); }
-  .prose code:not(pre code) {
-    background: var(--r-accent-soft); padding: 1px 6px;
-    font-size: 0.92em;
-  }
-  .prose pre {
-    background: var(--r-code-bg); color: var(--r-code-fg);
-    padding: 14px 16px; overflow-x: auto;
-    font-size: 11.5px; line-height: 1.6;
+  .bp-post-hero img {
+    width: 100%;
+    height: auto;
+    display: block;
     border: 1px solid var(--r-line);
   }
-  .prose pre code { background: transparent; padding: 0; }
-  .prose blockquote {
-    margin: 1.4em 0;
-    padding: 12px 18px;
-    border-left: 3px solid var(--r-accent);
-    background: var(--r-paper-deep);
+
+  /* Article body — serif for readability */
+  .bp-post-body {
+    font-family: var(--bp-serif);
+    font-size: 18px;
+    line-height: 1.7;
     color: var(--r-fg);
+  }
+  .bp-post-body > * + * { margin-top: 1.1em; }
+
+  /* Headings stay mono to match the brand */
+  .bp-post-body h1,
+  .bp-post-body h2,
+  .bp-post-body h3,
+  .bp-post-body h4 {
+    font-family: var(--r-mono);
+    font-weight: 700;
+    color: var(--r-ink);
+    letter-spacing: -0.01em;
+    scroll-margin-top: 24px;
+    text-wrap: balance;
+  }
+  .bp-post-body h1 {
+    font-size: 28px;
+    line-height: 1.2;
+    margin: 2em 0 0.5em;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--r-line);
+  }
+  .bp-post-body h2 {
+    font-size: 22px;
+    line-height: 1.25;
+    margin: 1.8em 0 0.4em;
+  }
+  .bp-post-body h3 {
+    font-size: 17px;
+    line-height: 1.3;
+    margin: 1.5em 0 0.4em;
+    letter-spacing: 0;
+  }
+  .bp-post-body h4 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 1.4em 0 0.4em;
+    color: var(--r-dim);
+  }
+
+  .bp-post-body a {
+    color: var(--r-accent);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+  .bp-post-body a:hover { text-decoration-thickness: 2px; }
+
+  .bp-post-body strong { color: var(--r-ink); font-weight: 600; }
+  .bp-post-body em { font-style: italic; }
+
+  .bp-post-body blockquote {
+    border-left: 3px solid var(--r-accent);
+    padding: 4px 0 4px 20px;
+    margin: 1.4em 0;
+    color: var(--r-dim);
     font-style: italic;
   }
-  .prose blockquote p { margin: 0; }
-  .prose blockquote cite {
-    display: block; margin-top: 8px;
-    font-size: 11px; letter-spacing: 0.06em;
-    color: var(--r-very); font-style: normal;
+  .bp-post-body blockquote p { margin: 0; }
+  .bp-post-body blockquote p + p { margin-top: 0.8em; }
+
+  .bp-post-body ul, .bp-post-body ol { padding-left: 1.4em; }
+  .bp-post-body li { margin: 0.4em 0; }
+  .bp-post-body li::marker { color: var(--r-accent); }
+
+  .bp-post-body code:not(pre code) {
+    font-family: var(--r-mono);
+    font-size: 0.85em;
+    background: var(--r-accent-soft);
+    color: var(--r-ink);
+    padding: 2px 6px;
   }
-  .prose hr {
-    border: 0; height: 28px; margin: 28px 0;
-    background:
-      radial-gradient(circle, var(--r-very) 1.5px, transparent 2px) center / 12px 12px no-repeat,
-      radial-gradient(circle, var(--r-very) 1.5px, transparent 2px) calc(50% - 18px) / 12px 12px no-repeat,
-      radial-gradient(circle, var(--r-very) 1.5px, transparent 2px) calc(50% + 18px) / 12px 12px no-repeat;
+
+  .bp-post-body pre {
+    font-family: var(--r-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    background: var(--r-code-bg);
+    color: var(--r-code-fg);
+    padding: 18px 20px;
+    border: 1px solid var(--r-code-line);
+    overflow-x: auto;
+    margin: 1.4em 0;
   }
-  .prose img {
-    max-width: 100%; height: auto;
+  .bp-post-body pre code {
+    background: transparent;
+    padding: 0;
+    font-size: inherit;
+    color: inherit;
+  }
+
+  .bp-post-body img {
+    max-width: 100%;
+    height: auto;
+    margin: 1.4em 0;
+    display: block;
     border: 1px solid var(--r-line);
   }
-  .prose table {
-    width: 100%; border-collapse: collapse;
-    font-size: 0.92em;
-  }
-  .prose th, .prose td {
-    padding: 6px 10px; border: 1px solid var(--r-line);
-    text-align: left;
-  }
-  .prose th { background: var(--r-accent-soft); font-weight: 700; color: var(--r-ink); }
-
-  .pullquote {
-    margin: 2em -10px;
-    padding: 18px 24px;
-    border-top: 2px solid var(--r-ink); border-bottom: 2px solid var(--r-ink);
-    font-family: var(--r-mono); font-weight: 700;
-    font-size: 18px; line-height: 1.35; letter-spacing: -0.005em;
+  .bp-post-body figure { margin: 1.4em 0; }
+  .bp-post-body figcaption {
+    font-family: var(--r-mono);
+    font-size: 11px;
+    color: var(--r-very);
+    margin-top: 8px;
     text-align: center;
+  }
+
+  .bp-post-body table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--bp-serif);
+    font-size: 15px;
+    margin: 1.4em 0;
+    border: 1px solid var(--r-line);
+  }
+  .bp-post-body table th,
+  .bp-post-body table td {
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--r-line);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+  .bp-post-body table tr:last-child td { border-bottom: 0; }
+  .bp-post-body table th {
+    font-family: var(--r-mono);
+    font-weight: 700;
+    color: var(--r-ink);
+    background: var(--r-paper);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .bp-post-body hr {
+    border: 0;
+    border-top: 1px dashed var(--r-very);
+    margin: 2.4em 0;
+  }
+
+  /* Post footer */
+  .bp-post-foot {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--r-line);
+  }
+  .bp-post-share {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-family: var(--r-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--r-very);
+  }
+  .bp-tag {
+    padding: 3px 9px;
+    background: var(--r-accent-soft);
+    color: var(--r-accent);
+    font-weight: 700;
+  }
+
+  /* Prev / next */
+  .bp-post-nav {
+    margin-top: 48px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .bp-nav-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px 18px;
+    border: 1px solid var(--r-line);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s;
+  }
+  .bp-nav-card:hover { border-color: var(--r-accent); }
+  .bp-nav-prev { text-align: left; }
+  .bp-nav-next { text-align: right; }
+  .bp-nav-label {
+    font-family: var(--r-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--r-very);
+  }
+  .bp-nav-title {
+    font-family: var(--r-mono);
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 1.3;
     color: var(--r-ink);
   }
-  .pullquote .acc { color: var(--r-accent); }
 
-  .figure {
-    margin: 1.5em 0;
-    padding: 12px 14px;
-    border: 1px solid var(--r-line); background: var(--r-paper-deep);
-    font-size: 12.5px; line-height: 1.6;
+  /* Right-rail TOC — sticky, generated from h2/h3 of the post.
+     The grid item must stretch to row height for sticky to have
+     scroll space within (otherwise position: sticky is a no-op
+     because the parent's height === content's height). */
+  .bp-toc {
+    position: relative;
+    align-self: stretch;
   }
-  .figure pre {
-    background: var(--r-code-bg); color: var(--r-code-fg);
-    padding: 12px 14px; margin: 0;
-    overflow-x: auto; font-size: 11.5px;
+  .bp-toc-inner {
+    position: sticky;
+    top: 32px;
+    padding-top: 4px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    scrollbar-width: thin;
   }
-  .figure figcaption {
-    font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--r-very); margin-top: 8px;
+  .bp-toc-inner::-webkit-scrollbar { width: 4px; }
+  .bp-toc-inner::-webkit-scrollbar-thumb {
+    background: var(--r-line);
+    border-radius: 2px;
+  }
+  .bp-toc-h {
+    font-family: var(--r-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--r-very);
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--r-line);
+  }
+  .bp-toc ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .bp-toc li.bp-toc-d3 { padding-left: 14px; }
+  .bp-toc a {
+    font-family: var(--r-mono);
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: var(--r-dim);
+    text-decoration: none;
+    display: block;
+    padding: 2px 0;
+    border-left: 2px solid transparent;
+    padding-left: 10px;
+    margin-left: -12px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .bp-toc a:hover {
+    color: var(--r-accent);
+    border-left-color: var(--r-accent);
   }
 
-  .tldr {
-    margin: 18px auto 28px;
-    max-width: 580px;
-    padding: 16px 20px;
-    border: 1px dashed var(--r-accent);
-    background: var(--r-accent-soft);
-    font-size: 13px; line-height: 1.6; color: var(--r-fg);
+  @media (max-width: 1020px) {
+    .bp-post-grid {
+      grid-template-columns: minmax(0, 720px);
+      justify-content: center;
+    }
+    .bp-toc { display: none; }
   }
-  .tldr .lbl {
-    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
-    color: var(--r-accent); font-weight: 700; margin-bottom: 6px;
-  }
-  .tldr p { margin: 0; }
-
-  .next-up {
-    margin: 36px 0 6px;
-    padding: 22px 24px;
-    border: 1px solid var(--r-line);
-    background: var(--r-paper);
-    display: grid; grid-template-columns: 1fr auto;
-    gap: 16px; align-items: center;
-  }
-  .next-up .lbl {
-    font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase;
-    color: var(--r-accent); margin-bottom: 8px;
-  }
-  .next-up h3 {
-    font-family: var(--r-mono); font-weight: 700;
-    font-size: 16px; margin: 0 0 4px; line-height: 1.3; color: var(--r-ink);
-  }
-  .next-up h3 a { text-decoration: none; color: var(--r-ink); }
-  .next-up h3 a:hover { color: var(--r-accent); }
-  .next-up p { margin: 0; font-size: 12px; color: var(--r-dim); }
-  .next-up .arrow {
-    font-size: 22px; color: var(--r-accent); font-weight: 700;
-  }
-
-  @media (max-width: 700px) {
-    .post-head h1 { font-size: 24px; }
-    .pullquote { font-size: 15px; margin: 1.6em 0; }
-    .next-up { grid-template-columns: 1fr; }
+  @media (max-width: 640px) {
+    .bp-post-wrap { padding: 24px 18px 0; }
+    .bp-post-body { font-size: 17px; line-height: 1.65; }
+    .bp-post-body pre { margin-left: -18px; margin-right: -18px; }
+    .bp-post-nav { grid-template-columns: 1fr; }
+    .bp-nav-next { text-align: left; }
   }
 </style>

@@ -1,38 +1,34 @@
 import { defineCollection, z } from "astro:content";
-import { glob } from "astro/loaders";
+import { notionBlogLoader } from "./lib/notion-blog-loader.js";
 
 /**
- * Blog collection — MDX files under `src/content/blog/`. The `glob`
- * loader scopes by extension so we can drop a `.txt` README in the
- * directory without it polluting the route table.
+ * Blog content collection — sourced from the "Outrank <> LMP" Notion
+ * database. Outrank writes new articles there; this loader walks the DB
+ * at build time and renders them into the site. No local `.mdx` files
+ * are read — Notion is the only source of truth so the publishing
+ * workflow stays "edit in Notion, redeploy."
  *
- * Frontmatter shape is intentionally narrow:
+ * Schema mirrors the Notion column set:
+ *   - `title`       — Notion `Title` (falls back to `Name`).
+ *   - `description` — Notion `Meta Description`.
+ *   - `pubDate`     — Notion `Publish Date` start.
+ *   - `heroImage`   — auto-extracted from the first image in the body.
+ *   - `tags` / `category` / `author` / `draft` — defaulted; not on the
+ *     Notion DB today.
  *
- *   - `title`         — the post title; renders in the <title> tag and
- *                       on the post page hero.
- *   - `description`   — meta description + OG description. Required so
- *                       every post has a search-engine-friendly summary.
- *   - `pubDate`       — first published. Sort key on the index. Once
- *                       set, never bump it on edits — that's what
- *                       `updatedDate` is for.
- *   - `updatedDate`?  — last edit. Optional; surfaces as "Updated …"
- *                       on the post page when present.
- *   - `author`        — defaults to letmepost.dev. Override per post.
- *   - `tags`          — for tag pages later; the index also surfaces
- *                       them as chips.
- *   - `heroImage`?    — public-path or absolute URL; renders above the
- *                       post body and as the OG image when set.
- *   - `draft`         — when true, hidden in production builds. Always
- *                       visible in dev so authors can preview.
- *   - `canonicalUrl`? — for cross-posted content (e.g. dev.to mirrors)
- *                       so Google attributes correctly.
- *
- * Schema is strict: extra fields trigger a build error. That's the
- * point — typos in frontmatter become build failures, not silent
- * missing OG images in production.
+ * Schema stays strict: a malformed Notion row breaks the build instead
+ * of silently shipping bad HTML.
  */
+// Env reads are intentionally lazy — `astro sync` (which generates the
+// content collection types and is invoked by IDE tooling + `astro check`)
+// evaluates this file even without env, so we defer the strict check to
+// the loader itself. The loader throws at load() time if either var is
+// missing, which is when a real build or dev run actually needs them.
 const blog = defineCollection({
-  loader: glob({ base: "./src/content/blog", pattern: "**/*.{md,mdx}" }),
+  loader: notionBlogLoader({
+    token: import.meta.env.NOTION_TOKEN ?? "",
+    databaseId: import.meta.env.NOTION_BLOG_DATABASE_ID ?? "",
+  }),
   schema: z.object({
     title: z.string().min(1).max(120),
     description: z.string().min(1).max(220),

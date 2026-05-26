@@ -73,12 +73,14 @@ export default function SignInPage() {
     if (socialBusy) return;
     setSocialBusy(provider);
     try {
-      // If we're inside an OAuth-provider authorize loop (someone clicked
-      // "Sign in with letmepost" on a third-party app), preserve the
-      // authorize query so the round-trip back lands on /authorize.
-      const callbackURL = buildPostSignInRedirect(
+      // Preserve any OAuth-authorize query; force absolute so the
+      // callback lands on the dashboard, not the API baseURL.
+      const raw = buildPostSignInRedirect(
         new URLSearchParams(searchParams?.toString() ?? ""),
       );
+      const callbackURL = raw.startsWith("http")
+        ? raw
+        : `${window.location.origin}${raw}`;
       const { error } = await authClient.signIn.social({
         provider,
         callbackURL,

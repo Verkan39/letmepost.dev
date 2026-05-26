@@ -141,9 +141,10 @@ export default function SignUpPage() {
         name: "signup.started",
         properties: { provider },
       });
+      // Absolute URL — a relative path resolves against the API baseURL.
       const { error } = await authClient.signIn.social({
         provider,
-        callbackURL: "/",
+        callbackURL: `${window.location.origin}/`,
       });
       if (error) {
         toast.error(error.message ?? `${provider} sign-in failed.`);

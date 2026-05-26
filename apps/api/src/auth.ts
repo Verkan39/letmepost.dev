@@ -130,7 +130,13 @@ export const auth = betterAuth({
     // (custom SAML, etc.) it must NOT go on this list.
     accountLinking: {
       enabled: true,
-      trustedProviders: ["google", "github"],
+      // "credential" must be in this list too — better-auth refuses to
+      // link an incoming OAuth identity (google/github) into an existing
+      // account whose primary provider isn't trusted, even if the OAuth
+      // provider itself is trusted. A user who signed up with email +
+      // password and later clicks "Continue with GitHub" would otherwise
+      // hit `account_not_linked` on the API.
+      trustedProviders: ["google", "github", "credential"],
     },
   },
   user: {

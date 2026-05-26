@@ -3,7 +3,13 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "env": [
+        "NOTION_TOKEN",
+        "NOTION_BLOG_DATABASE_ID",
+        "PUBLIC_POSTHOG_KEY",
+        "PUBLIC_POSTHOG_HOST"
+      ]
     },
     "dev": {
       "cache": false,

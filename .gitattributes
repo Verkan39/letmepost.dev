@@ -1,0 +1,4 @@
+# Collapse generated files in GitHub PR diffs.
+pnpm-lock.yaml linguist-generated=true
+apps/api/drizzle/meta/*.json linguist-generated=true
+apps/api/drizzle/meta/_journal.json linguist-generated=true

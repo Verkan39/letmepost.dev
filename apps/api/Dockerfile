@@ -72,6 +72,11 @@ COPY --from=build /app/apps/mcp/dist apps/mcp/dist
 # Migrations are read at runtime by `dist/db/migrate.js`.
 COPY apps/api/drizzle apps/api/drizzle
 
+# Sentry/OTel init loaded via `node --import ./instrument.mjs` in both
+# start:api and start:worker. Lives outside dist/ because it must run
+# before any application code (including the compiled server entrypoint).
+COPY apps/api/instrument.mjs apps/api/instrument.mjs
+
 EXPOSE 3000
 
 # Default to the API process. The worker service overrides this in

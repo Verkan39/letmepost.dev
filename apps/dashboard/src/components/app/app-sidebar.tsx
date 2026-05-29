@@ -64,15 +64,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-// Three groups in priority order:
-//   - Operate: the daily flow (compose → schedule → publish → audit)
-//   - Setup: things you connect once and reuse (orgs, accounts, media)
-//   - Developer: API surface (keys, webhooks)
-// Settings lives in the footer alongside Docs + Billing.
-//
-// Posts is a parent item with three sub-pages (Grid / List / Calendar);
-// clicking the parent navigates to /posts (= grid view). The children
-// auto-expand whenever the active route is under /posts/*.
 const NAV_GROUPS = [
   {
     label: "Operate",
@@ -280,12 +271,6 @@ export function AppSidebar() {
                   const hasChildren =
                     "children" in item && item.children !== undefined;
 
-                  // Parent items with children become collapsible groups.
-                  // The parent button itself is the trigger (matches the
-                  // canonical shadcn nav pattern) — clicking "Posts"
-                  // toggles the sub-list. To get to the grid view the user
-                  // picks "Grid" from the expanded list. Default-open when
-                  // the current route lives under the parent.
                   if (hasChildren) {
                     return (
                       <Collapsible

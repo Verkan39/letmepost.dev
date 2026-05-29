@@ -6,13 +6,6 @@ import { Plus } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { ComposePostSheet } from "@/components/app/compose-post-sheet";
 
-/**
- * Shared chrome for /posts/* — page title + Create Post CTA. The CTA
- * sits here (not in the sidebar) so it's visible across grid / list /
- * calendar without duplication, and the Sheet primitive stays mounted
- * inside this layout so route changes inside /posts don't drop its
- * state.
- */
 export default function PostsLayout({
   children,
 }: {
@@ -22,9 +15,6 @@ export default function PostsLayout({
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Empty-state on /posts hands off to the sheet via `?compose=1` so it
-  // doesn't need to thread a callback up two component layers. The
-  // layout consumes the flag, opens the sheet, then strips the param.
   useEffect(() => {
     if (searchParams.get("compose") === "1") {
       setComposeOpen(true);

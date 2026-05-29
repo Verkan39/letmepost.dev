@@ -83,10 +83,6 @@ function Section({
   );
 }
 
-// Best-effort thumbnail URL extraction from the unknown mediaRefs shape.
-// Persisted media is whatever the publisher stored at write time — we
-// look for the conventional `{ url, kind }` shape and bail to null
-// otherwise so a malformed entry doesn't crash the card.
 function firstMediaThumb(refs: unknown[]): { url: string; isVideo: boolean } | null {
   for (const ref of refs) {
     if (!ref || typeof ref !== "object") continue;
@@ -127,8 +123,6 @@ function PostCard({
         </div>
         <span className={statusChipClass(post.status)}>{post.status}</span>
       </div>
-      {/* Body: text + thumbnail. Two-column when media exists so the
-          image stays compact and the copy gets the rest of the width. */}
       <div
         className={
           thumb

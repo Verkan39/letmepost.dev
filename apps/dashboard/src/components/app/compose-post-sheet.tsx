@@ -37,17 +37,6 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-/**
- * Slide-in compose surface. Lives at the right edge of the screen,
- * single column, narrow enough to fit alongside the posts grid on
- * desktop. Not a Dialog (centered modal) and not a route — a Sheet,
- * because the user wanted neither.
- *
- * The form intentionally avoids redundant chrome: no breadcrumb-style
- * header, no big empty media well. Media uploads inline directly under
- * the textarea with a compact + button.
- */
-
 type Account = {
   id: string;
   platform: string;
@@ -249,10 +238,6 @@ export function ComposePostSheet({
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
-          {/* Profile + accounts come first because they constrain the
-              rest — picking a different profile changes which accounts
-              are available, and the form's content has to fit the
-              narrowest platform's limits anyway. */}
           <section className="space-y-2">
             <Label className="text-xs uppercase tracking-wide">Profile</Label>
             <Select
@@ -341,8 +326,6 @@ export function ComposePostSheet({
               placeholder="what's on your mind…"
               className="min-h-32 w-full resize-y bg-muted/30 p-3 text-sm outline-none focus:bg-muted/40 transition-colors ring-1 ring-foreground/10 focus:ring-foreground/20"
             />
-            {/* Media is part of the content section now — small inline
-                thumbs + a + button right under the textarea. */}
             <div className="flex flex-wrap gap-1.5">
               {media.map((m) => (
                 <div

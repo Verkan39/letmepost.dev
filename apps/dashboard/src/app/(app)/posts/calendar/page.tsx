@@ -1,6 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 import { listPosts, type PostListItem } from "@/lib/posts";
@@ -8,22 +13,32 @@ import { queryKeys } from "@/lib/query-keys";
 import { useActiveProfile } from "@/lib/profiles";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { ScheduledPostDrawer } from "@/components/app/scheduled-post-drawer";
 import { PLATFORM_BRANDS } from "@/components/app/platform-icons";
+import {
+  formatStamp,
+  relevantStamp,
+  statusChipClass,
+} from "@/components/app/post-views/shared";
 import { cn } from "@/lib/utils";
 
-/**
- * Month-grid calendar of scheduled + published posts. The grid is intentionally
- * hand-rolled (no calendar lib) so we keep dependency weight low and the day
- * cells stay easy to style. Each post renders as a chip; click → drawer with
- * the reschedule / cancel actions wired through PATCH/DELETE /v1/posts/:id.
- */
 export default function PostsCalendarPage() {
   const [cursor, setCursor] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [selected, setSelected] = useState<PostListItem | null>(null);
+  const [dayDetail, setDayDetail] = useState<{
+    label: string;
+    posts: PostListItem[];
+  } | null>(null);
   const { activeProfile } = useActiveProfile();
 
   const { firstDay, lastDay, leading, days } = useMemo(
@@ -67,6 +82,16 @@ export default function PostsCalendarPage() {
 
   function jump(months: number) {
     setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + months, 1));
+  }
+
+  function openDay(day: number, posts: PostListItem[]) {
+    const date = new Date(cursor.getFullYear(), cursor.getMonth(), day);
+    const label = date.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    });
+    setDayDetail({ label, posts });
   }
 
   return (
@@ -116,51 +141,14 @@ export default function PostsCalendarPage() {
             today.getMonth() === cursor.getMonth() &&
             today.getDate() === day;
           return (
-            <div
+            <DayCell
               key={key}
-              className={cn(
-                "aspect-square border-b border-r border-foreground/5 p-1.5 flex flex-col gap-1 overflow-hidden",
-                isToday && "bg-primary/5",
-              )}
-            >
-              <span
-                className={cn(
-                  "text-xs tabular-nums",
-                  isToday
-                    ? "font-semibold text-primary"
-                    : "text-muted-foreground",
-                )}
-              >
-                {day}
-              </span>
-              <div className="flex-1 space-y-1 overflow-hidden">
-                {posts.slice(0, 3).map((p) => {
-                  const brand = PLATFORM_BRANDS.find((b) => b.id === p.platform);
-                  const Icon = brand?.Icon;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setSelected(p)}
-                      className={cn(
-                        "flex items-center gap-1 w-full text-left text-[10px] truncate px-1.5 py-0.5",
-                        "ring-1 ring-foreground/10 hover:ring-foreground/30 transition-shadow",
-                        statusBg(p.status),
-                      )}
-                      title={p.text}
-                    >
-                      {Icon ? <Icon className="size-3 shrink-0" /> : null}
-                      <span className="truncate">{p.text}</span>
-                    </button>
-                  );
-                })}
-                {posts.length > 3 ? (
-                  <p className="text-[10px] text-muted-foreground">
-                    +{posts.length - 3} more
-                  </p>
-                ) : null}
-              </div>
-            </div>
+              day={day}
+              posts={posts}
+              isToday={isToday}
+              onSelectPost={setSelected}
+              onSelectDay={() => openDay(day, posts)}
+            />
           );
         })}
       </div>
@@ -173,6 +161,17 @@ export default function PostsCalendarPage() {
         </div>
       ) : null}
 
+      <DayPostsSheet
+        day={dayDetail}
+        onOpenChange={(open) => {
+          if (!open) setDayDetail(null);
+        }}
+        onSelectPost={(p) => {
+          setDayDetail(null);
+          setSelected(p);
+        }}
+      />
+
       <ScheduledPostDrawer
         post={selected}
         onOpenChange={(open) => {
@@ -180,6 +179,146 @@ export default function PostsCalendarPage() {
         }}
       />
     </div>
+  );
+}
+
+const CHIP_HEIGHT_PX = 22;
+const MORE_RESERVE_PX = 18;
+
+function DayCell({
+  day,
+  posts,
+  isToday,
+  onSelectPost,
+  onSelectDay,
+}: {
+  day: number;
+  posts: PostListItem[];
+  isToday: boolean;
+  onSelectPost: (p: PostListItem) => void;
+  onSelectDay: () => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [maxVisible, setMaxVisible] = useState(3);
+
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const height = entries[0]?.contentRect.height ?? 0;
+      const usable = Math.max(0, height - MORE_RESERVE_PX);
+      const fit = Math.max(1, Math.floor(usable / CHIP_HEIGHT_PX));
+      setMaxVisible(fit);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const overflowCount = Math.max(0, posts.length - maxVisible);
+  const visible =
+    overflowCount > 0 ? posts.slice(0, maxVisible) : posts;
+
+  return (
+    <div
+      className={cn(
+        "aspect-square border-b border-r border-foreground/5 p-1.5 flex flex-col gap-1 overflow-hidden",
+        isToday && "bg-primary/5",
+      )}
+    >
+      <span
+        className={cn(
+          "text-xs tabular-nums shrink-0",
+          isToday ? "font-semibold text-primary" : "text-muted-foreground",
+        )}
+      >
+        {day}
+      </span>
+      <div ref={containerRef} className="flex-1 space-y-1 overflow-hidden min-h-0">
+        {visible.map((p) => {
+          const brand = PLATFORM_BRANDS.find((b) => b.id === p.platform);
+          const Icon = brand?.Icon;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onSelectPost(p)}
+              className={cn(
+                "flex items-center gap-1 w-full text-left text-[10px] px-1.5 py-0.5 min-w-0",
+                "ring-1 ring-foreground/10 hover:ring-foreground/30 transition-shadow",
+                statusBg(p.status),
+              )}
+              title={p.text}
+            >
+              {Icon ? <Icon className="size-3 shrink-0" /> : null}
+              <span className="truncate min-w-0">{p.text}</span>
+            </button>
+          );
+        })}
+        {overflowCount > 0 ? (
+          <button
+            type="button"
+            onClick={onSelectDay}
+            className="text-[10px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+          >
+            +{overflowCount} more
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function DayPostsSheet({
+  day,
+  onOpenChange,
+  onSelectPost,
+}: {
+  day: { label: string; posts: PostListItem[] } | null;
+  onOpenChange: (open: boolean) => void;
+  onSelectPost: (p: PostListItem) => void;
+}) {
+  return (
+    <Sheet open={day != null} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-md flex flex-col p-0">
+        <SheetHeader className="px-4 py-3 border-b">
+          <SheetTitle>{day?.label ?? "Day"}</SheetTitle>
+          <SheetDescription>
+            {day?.posts.length ?? 0} posts on this day. Pick one to manage.
+          </SheetDescription>
+        </SheetHeader>
+        <div className="flex-1 overflow-y-auto divide-y divide-foreground/5">
+          {day?.posts.map((p) => {
+            const brand = PLATFORM_BRANDS.find((b) => b.id === p.platform);
+            const Icon = brand?.Icon;
+            const stamp = relevantStamp(p);
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => onSelectPost(p)}
+                className="w-full flex items-start gap-3 p-3 text-left hover:bg-muted/40 transition-colors"
+              >
+                <div className="flex items-center gap-1.5 shrink-0 w-24">
+                  {Icon ? <Icon className="size-4 shrink-0" /> : null}
+                  <span className="text-xs font-semibold capitalize">
+                    {brand?.label ?? p.platform}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0 space-y-1">
+                  <p className="text-sm truncate">{p.text}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {stamp.label} {formatStamp(stamp.iso)}
+                  </p>
+                </div>
+                <span className={`shrink-0 ${statusChipClass(p.status)}`}>
+                  {p.status}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 

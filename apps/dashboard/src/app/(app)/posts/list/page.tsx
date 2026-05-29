@@ -59,7 +59,9 @@ export default function PostsListPage() {
             <span className={`shrink-0 ${statusChipClass(p.status)}`}>
               {p.status}
             </span>
-            <span className="flex-1 min-w-0 truncate text-sm">{p.text}</span>
+            <span className="flex-1 min-w-0 text-sm truncate block max-w-[60ch]">
+              {p.text}
+            </span>
             <span className="text-[11px] text-muted-foreground tabular-nums shrink-0 inline-flex items-center gap-1">
               <Clock className="size-3" />
               {stamp.label} {formatStamp(stamp.iso)}

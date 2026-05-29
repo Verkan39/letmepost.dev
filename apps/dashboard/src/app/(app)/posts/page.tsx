@@ -83,6 +83,20 @@ function Section({
   );
 }
 
+// Best-effort thumbnail URL extraction from the unknown mediaRefs shape.
+// Persisted media is whatever the publisher stored at write time — we
+// look for the conventional `{ url, kind }` shape and bail to null
+// otherwise so a malformed entry doesn't crash the card.
+function firstMediaThumb(refs: unknown[]): { url: string; isVideo: boolean } | null {
+  for (const ref of refs) {
+    if (!ref || typeof ref !== "object") continue;
+    const r = ref as { url?: unknown; kind?: unknown };
+    if (typeof r.url !== "string") continue;
+    return { url: r.url, isVideo: r.kind === "video" };
+  }
+  return null;
+}
+
 function PostCard({
   post,
   onSelect,
@@ -94,6 +108,7 @@ function PostCard({
   const stamp = relevantStamp(post);
   const brand = PLATFORM_BRANDS.find((b) => b.id === post.platform);
   const Icon = brand?.Icon;
+  const thumb = firstMediaThumb(post.mediaRefs);
   return (
     <button
       type="button"
@@ -112,7 +127,36 @@ function PostCard({
         </div>
         <span className={statusChipClass(post.status)}>{post.status}</span>
       </div>
-      <p className="text-sm line-clamp-3 leading-relaxed">{post.text}</p>
+      {/* Body: text + thumbnail. Two-column when media exists so the
+          image stays compact and the copy gets the rest of the width. */}
+      <div
+        className={
+          thumb
+            ? "grid grid-cols-[1fr_64px] gap-3 items-start"
+            : "block"
+        }
+      >
+        <p className="text-sm line-clamp-3 leading-relaxed min-w-0">
+          {post.text}
+        </p>
+        {thumb ? (
+          <div className="size-16 ring-1 ring-foreground/10 overflow-hidden bg-muted/30 shrink-0">
+            {thumb.isVideo ? (
+              <div className="w-full h-full grid place-items-center text-[10px] uppercase tracking-wide text-muted-foreground">
+                Video
+              </div>
+            ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={thumb.url}
+                alt=""
+                loading="lazy"
+                className="w-full h-full object-cover"
+              />
+            )}
+          </div>
+        ) : null}
+      </div>
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
         <span className="inline-flex items-center gap-1 tabular-nums">
           <Clock className="size-3" />

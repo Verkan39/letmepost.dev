@@ -25,6 +25,7 @@ import {
   Gear,
   SquaresFour,
   Scroll as ScrollIcon,
+  CaretRight,
 } from "@phosphor-icons/react";
 
 import { authClient } from "@/lib/auth-client";
@@ -49,6 +50,11 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -294,6 +300,55 @@ export function AppSidebar() {
                         pathname.startsWith(`${item.href}/`);
                   const hasChildren =
                     "children" in item && item.children !== undefined;
+
+                  // Parent items with children become collapsible groups.
+                  // The parent button itself is the trigger (matches the
+                  // canonical shadcn nav pattern) — clicking "Posts"
+                  // toggles the sub-list. To get to the grid view the user
+                  // picks "Grid" from the expanded list. Default-open when
+                  // the current route lives under the parent.
+                  if (hasChildren) {
+                    return (
+                      <Collapsible
+                        key={item.href}
+                        asChild
+                        defaultOpen={active}
+                        className="group/collapsible"
+                      >
+                        <SidebarMenuItem>
+                          <CollapsibleTrigger asChild>
+                            <SidebarMenuButton isActive={active}>
+                              <Icon className="size-4" />
+                              <span>{item.label}</span>
+                              <CaretRight className="ml-auto size-3.5 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                            </SidebarMenuButton>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <SidebarMenuSub>
+                              {item.children!.map((child) => {
+                                const ChildIcon = child.icon;
+                                const childActive = pathname === child.href;
+                                return (
+                                  <SidebarMenuSubItem key={child.href}>
+                                    <SidebarMenuSubButton
+                                      asChild
+                                      isActive={childActive}
+                                    >
+                                      <Link href={child.href}>
+                                        <ChildIcon className="size-3.5" />
+                                        <span>{child.label}</span>
+                                      </Link>
+                                    </SidebarMenuSubButton>
+                                  </SidebarMenuSubItem>
+                                );
+                              })}
+                            </SidebarMenuSub>
+                          </CollapsibleContent>
+                        </SidebarMenuItem>
+                      </Collapsible>
+                    );
+                  }
+
                   return (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton asChild isActive={active}>
@@ -302,27 +357,6 @@ export function AppSidebar() {
                           <span>{item.label}</span>
                         </Link>
                       </SidebarMenuButton>
-                      {hasChildren && active ? (
-                        <SidebarMenuSub>
-                          {item.children!.map((child) => {
-                            const ChildIcon = child.icon;
-                            const childActive = pathname === child.href;
-                            return (
-                              <SidebarMenuSubItem key={child.href}>
-                                <SidebarMenuSubButton
-                                  asChild
-                                  isActive={childActive}
-                                >
-                                  <Link href={child.href}>
-                                    <ChildIcon className="size-3.5" />
-                                    <span>{child.label}</span>
-                                  </Link>
-                                </SidebarMenuSubButton>
-                              </SidebarMenuSubItem>
-                            );
-                          })}
-                        </SidebarMenuSub>
-                      ) : null}
                     </SidebarMenuItem>
                   );
                 })}

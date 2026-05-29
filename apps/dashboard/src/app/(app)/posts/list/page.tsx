@@ -59,7 +59,10 @@ export default function PostsListPage() {
             <span className={`shrink-0 ${statusChipClass(p.status)}`}>
               {p.status}
             </span>
-            <span className="flex-1 truncate text-sm">{p.text}</span>
+            {/* min-w-0 is what actually lets `truncate` work on a flex
+                child — without it the flex math respects the text's
+                intrinsic width and the row blows out horizontally. */}
+            <span className="flex-1 min-w-0 truncate text-sm">{p.text}</span>
             <span className="text-[11px] text-muted-foreground tabular-nums shrink-0 inline-flex items-center gap-1">
               <Clock className="size-3" />
               {stamp.label} {formatStamp(stamp.iso)}

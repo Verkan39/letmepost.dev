@@ -20,6 +20,7 @@ import {
   type TikTokCreatorInfo,
   type TikTokPrivacyLevel,
   type TikTokTokenResponse,
+  type TikTokUserInfo,
 } from "./client.js";
 
 /**
@@ -231,9 +232,31 @@ export class TikTokProvider implements AccountProvider {
     // an extra round-trip. Both calls happen serially — TikTok's API
     // rate limits are loose here and the alternative (parallel + retry)
     // adds complexity for no real benefit.
+    //
+    // /user/info requires the `user.info.basic` scope. Sandbox apps don't
+    // always have that scope provisioned in the TikTok dev portal even
+    // when the OAuth grant succeeded, so the call returns
+    // `scope_not_authorized`. We tolerate that: the token response
+    // already carries `open_id`, which is all we strictly need to
+    // persist the platform_accounts row. Display name and username
+    // degrade gracefully to null and the publisher fills them in via
+    // creator_info or the next token refresh.
     const apiBase = this.config.apiBase ?? TIKTOK_API_BASE;
     const client = new TikTokClient(tokens.access_token, apiBase);
-    const user = await client.getUserInfo();
+    let user: TikTokUserInfo;
+    try {
+      user = await client.getUserInfo();
+    } catch (err) {
+      if (
+        err instanceof LetmepostError &&
+        err.code === "platform_auth_failed" &&
+        tokens.open_id
+      ) {
+        user = { open_id: tokens.open_id };
+      } else {
+        throw err;
+      }
+    }
 
     // creator_info is the audit-state oracle. If it fails (e.g. the
     // account is missing video.upload scope after a partial grant) we

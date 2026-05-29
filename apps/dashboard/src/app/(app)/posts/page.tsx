@@ -191,7 +191,7 @@ function EmptyState() {
         account on this profile.
       </p>
       <Button asChild size="sm" className="mt-4">
-        <Link href="/posts/new">
+        <Link href="?compose=1">
           <Plus className="size-4" />
           Create post
         </Link>

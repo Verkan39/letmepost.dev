@@ -2,11 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  ArrowLeft,
   Plus,
   Lightning,
   Clock,
@@ -21,6 +19,13 @@ import { queryKeys } from "@/lib/query-keys";
 import { track } from "@/lib/analytics";
 import { PLATFORM_BRANDS } from "@/components/app/platform-icons";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -33,11 +38,14 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * Full-page composer at /posts/new. Two columns at large viewports
- * (content left, profile + accounts + publishing right); stacks on small
- * screens. Skips the dialog wrapper used previously — the modal layout
- * was cramped at typical viewports and didn't survive the keyboard on
- * mobile.
+ * Slide-in compose surface. Lives at the right edge of the screen,
+ * single column, narrow enough to fit alongside the posts grid on
+ * desktop. Not a Dialog (centered modal) and not a route — a Sheet,
+ * because the user wanted neither.
+ *
+ * The form intentionally avoids redundant chrome: no breadcrumb-style
+ * header, no big empty media well. Media uploads inline directly under
+ * the textarea with a compact + button.
  */
 
 type Account = {
@@ -59,8 +67,13 @@ type MediaItem = {
 
 const MAX_MEDIA_PER_POST = 4;
 
-export default function ComposePostPage() {
-  const router = useRouter();
+export function ComposePostSheet({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const qc = useQueryClient();
   const { profiles, activeProfile, setActiveProfile } = useActiveProfile();
   const tz = useMemo(
@@ -70,17 +83,26 @@ export default function ComposePostPage() {
 
   const [text, setText] = useState("");
   const [tab, setTab] = useState<Tab>("schedule");
-  const [when, setWhen] = useState(() => {
-    // Default scheduled time: 1h from now in user's local tz.
-    const t = new Date(Date.now() + 60 * 60 * 1000);
-    const pad = (n: number) => n.toString().padStart(2, "0");
-    return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}`;
-  });
+  const [when, setWhen] = useState("");
   const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(
     new Set(),
   );
   const [media, setMedia] = useState<MediaItem[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setText("");
+      setMedia([]);
+      setSelectedAccountIds(new Set());
+      setTab("schedule");
+      const t = new Date(Date.now() + 60 * 60 * 1000);
+      const pad = (n: number) => n.toString().padStart(2, "0");
+      setWhen(
+        `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}`,
+      );
+    }
+  }, [open]);
 
   const accountsQuery = useQuery({
     queryKey: queryKeys.accounts.list(activeProfile?.id ?? null),
@@ -91,6 +113,7 @@ export default function ComposePostPage() {
       const res = await apiFetch<{ data: Account[] }>(url);
       return res.data;
     },
+    enabled: open,
   });
 
   const accounts = accountsQuery.data ?? [];
@@ -173,7 +196,7 @@ export default function ComposePostPage() {
       });
       toast.success(tab === "schedule" ? "Scheduled" : "Published");
       qc.invalidateQueries({ queryKey: ["posts"] });
-      router.push("/posts");
+      onOpenChange(false);
     },
     onError: (err: unknown) => {
       toast.error(
@@ -216,115 +239,21 @@ export default function ComposePostPage() {
     (tab === "schedule" || tab === "now");
 
   return (
-    <div className="space-y-4" data-page-wide>
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <Button asChild variant="ghost" size="icon">
-            <Link href="/posts">
-              <ArrowLeft className="size-4" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-lg font-semibold">Create post</h1>
-            <p className="text-xs text-muted-foreground">
-              Compose, attach media, and pick where + when it lands.
-            </p>
-          </div>
-        </div>
-      </div>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-[480px] flex flex-col p-0">
+        <SheetHeader className="px-4 py-3 border-b">
+          <SheetTitle>Create post</SheetTitle>
+          <SheetDescription className="sr-only">
+            Compose, attach media, and pick where + when it lands.
+          </SheetDescription>
+        </SheetHeader>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
-        {/* Left: content + media */}
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="content" className="text-xs uppercase tracking-wide">
-              Content
-            </Label>
-            <textarea
-              id="content"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="what's on your mind…"
-              className="mt-2 min-h-48 w-full resize-y bg-muted/30 p-3 text-sm outline-none focus:bg-muted/40 transition-colors ring-1 ring-foreground/10 focus:ring-foreground/20"
-            />
-            <div className="flex justify-end text-xs text-muted-foreground mt-1 tabular-nums">
-              {text.length} chars
-            </div>
-          </div>
-
-          <div>
-            <Label className="text-xs uppercase tracking-wide">Media</Label>
-            {tab === "schedule" && media.length > 0 ? (
-              <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1">
-                Scheduled posts are text-only until the media slice ships.
-                Switch to Publish Now to keep these attachments.
-              </p>
-            ) : null}
-            <div className="grid grid-cols-4 gap-2 mt-2">
-              {media.map((m) => (
-                <div
-                  key={m.id}
-                  className="aspect-square ring-1 ring-foreground/10 overflow-hidden relative group bg-muted/30"
-                >
-                  {m.contentType.startsWith("image") ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={m.url}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full grid place-items-center text-xs text-muted-foreground p-2">
-                      {m.contentType}
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMedia((prev) => prev.filter((x) => x.id !== m.id))
-                    }
-                    className="absolute top-1 right-1 size-5 grid place-items-center bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity"
-                    aria-label="Remove media"
-                  >
-                    <Trash className="size-3" />
-                  </button>
-                </div>
-              ))}
-              {media.length < MAX_MEDIA_PER_POST ? (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadMedia.isPending}
-                  className="aspect-square ring-1 ring-dashed ring-foreground/20 hover:ring-foreground/40 transition-shadow grid place-items-center text-xs text-muted-foreground gap-1"
-                >
-                  {uploadMedia.isPending ? (
-                    <span>Uploading…</span>
-                  ) : (
-                    <>
-                      <ImageIcon className="size-4" />
-                      <span>Add</span>
-                    </>
-                  )}
-                </button>
-              ) : null}
-            </div>
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept="image/*,video/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) uploadMedia.mutate(file);
-                if (e.target) e.target.value = "";
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Right: profile + accounts + publishing */}
-        <div className="space-y-4">
-          <div className="space-y-1">
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+          {/* Profile + accounts come first because they constrain the
+              rest — picking a different profile changes which accounts
+              are available, and the form's content has to fit the
+              narrowest platform's limits anyway. */}
+          <section className="space-y-2">
             <Label className="text-xs uppercase tracking-wide">Profile</Label>
             <Select
               value={activeProfile?.id ?? ""}
@@ -341,16 +270,16 @@ export default function ComposePostPage() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </section>
 
-          <div>
+          <section className="space-y-2">
             <Label className="text-xs uppercase tracking-wide">
-              Accounts on this profile
+              Post to
             </Label>
             {accountsQuery.isLoading ? (
-              <p className="text-xs text-muted-foreground mt-2">Loading…</p>
+              <p className="text-xs text-muted-foreground">Loading…</p>
             ) : accounts.length === 0 ? (
-              <p className="text-xs text-muted-foreground mt-2">
+              <p className="text-xs text-muted-foreground">
                 No accounts connected.{" "}
                 <Link href="/accounts" className="underline">
                   Connect one
@@ -358,7 +287,7 @@ export default function ComposePostPage() {
                 to publish.
               </p>
             ) : (
-              <div className="grid grid-cols-2 gap-2 mt-2">
+              <div className="grid grid-cols-2 gap-2">
                 {accounts.map((a) => {
                   const selected = selectedAccountIds.has(a.id);
                   const brand = PLATFORM_BRANDS.find(
@@ -383,7 +312,10 @@ export default function ComposePostPage() {
                           {brand?.label ?? a.platform}
                         </p>
                         <p className="text-muted-foreground truncate">
-                          {a.displayName ?? a.handle ?? a.platformAccountId?.slice(0, 12) ?? a.id.slice(0, 8)}
+                          {a.displayName ??
+                            a.handle ??
+                            a.platformAccountId?.slice(0, 12) ??
+                            a.id.slice(0, 8)}
                         </p>
                       </div>
                     </button>
@@ -391,13 +323,96 @@ export default function ComposePostPage() {
                 })}
               </div>
             )}
-          </div>
+          </section>
 
-          <div>
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="content" className="text-xs uppercase tracking-wide">
+                Content
+              </Label>
+              <span className="text-[11px] text-muted-foreground tabular-nums">
+                {text.length}
+              </span>
+            </div>
+            <textarea
+              id="content"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="what's on your mind…"
+              className="min-h-32 w-full resize-y bg-muted/30 p-3 text-sm outline-none focus:bg-muted/40 transition-colors ring-1 ring-foreground/10 focus:ring-foreground/20"
+            />
+            {/* Media is part of the content section now — small inline
+                thumbs + a + button right under the textarea. */}
+            <div className="flex flex-wrap gap-1.5">
+              {media.map((m) => (
+                <div
+                  key={m.id}
+                  className="size-12 ring-1 ring-foreground/10 overflow-hidden relative group bg-muted/30"
+                >
+                  {m.contentType.startsWith("image") ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={m.url}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full grid place-items-center text-[9px] text-muted-foreground">
+                      VID
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMedia((prev) => prev.filter((x) => x.id !== m.id))
+                    }
+                    className="absolute top-0.5 right-0.5 size-4 grid place-items-center bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label="Remove media"
+                  >
+                    <Trash className="size-2.5" />
+                  </button>
+                </div>
+              ))}
+              {media.length < MAX_MEDIA_PER_POST ? (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadMedia.isPending}
+                  className="size-12 ring-1 ring-dashed ring-foreground/20 hover:ring-foreground/40 transition-shadow grid place-items-center text-muted-foreground"
+                  aria-label="Add media"
+                >
+                  {uploadMedia.isPending ? (
+                    <span className="text-[9px]">…</span>
+                  ) : (
+                    <ImageIcon className="size-4" />
+                  )}
+                </button>
+              ) : null}
+            </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept="image/*,video/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) uploadMedia.mutate(file);
+                if (e.target) e.target.value = "";
+              }}
+            />
+            {tab === "schedule" && media.length > 0 ? (
+              <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                Scheduled posts are text-only until the media slice ships.
+                Switch to Publish Now to keep these.
+              </p>
+            ) : null}
+          </section>
+
+          <section className="space-y-2">
             <Label className="text-xs uppercase tracking-wide">
-              Publishing
+              When
             </Label>
-            <div className="grid grid-cols-4 gap-1 mt-2 p-1 bg-muted/40">
+            <div className="grid grid-cols-4 gap-1 p-1 bg-muted/40">
               <TabBtn
                 active={tab === "schedule"}
                 onClick={() => setTab("schedule")}
@@ -423,30 +438,23 @@ export default function ComposePostPage() {
                 label="Draft"
               />
             </div>
-
-            <div className="mt-3">
+            <div className="pt-1">
               {tab === "schedule" ? (
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="when" className="text-xs">
-                      Date & time
-                    </Label>
-                    <Input
-                      id="when"
-                      type="datetime-local"
-                      value={when}
-                      onChange={(e) => setWhen(e.target.value)}
-                    />
-                  </div>
+                <div className="space-y-1">
+                  <Input
+                    id="when"
+                    type="datetime-local"
+                    value={when}
+                    onChange={(e) => setWhen(e.target.value)}
+                  />
                   <p className="text-[11px] text-muted-foreground">
                     Your timezone: <span className="font-mono">{tz}</span>
                   </p>
                 </div>
               ) : tab === "now" ? (
                 <p className="text-xs text-muted-foreground">
-                  Publish immediately to every selected account. Failure on
-                  one account doesn't block the others — per-target results
-                  land in the response and the post log.
+                  Publish immediately to every selected account. Per-target
+                  failures don't block the others.
                 </p>
               ) : (
                 <ComingSoonState
@@ -455,29 +463,29 @@ export default function ComposePostPage() {
                 />
               )}
             </div>
-          </div>
-
-          <div className="pt-2 flex items-center justify-end gap-2 border-t">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push("/posts")}
-            >
-              Cancel
-            </Button>
-            {tab === "schedule" || tab === "now" ? (
-              <Button
-                size="sm"
-                disabled={!canSubmit || submit.isPending}
-                onClick={() => submit.mutate()}
-              >
-                {submit.isPending ? "Working…" : ctaLabel}
-              </Button>
-            ) : null}
-          </div>
+          </section>
         </div>
-      </div>
-    </div>
+
+        <div className="px-4 py-3 border-t flex items-center justify-end gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          {tab === "schedule" || tab === "now" ? (
+            <Button
+              size="sm"
+              disabled={!canSubmit || submit.isPending}
+              onClick={() => submit.mutate()}
+            >
+              {submit.isPending ? "Working…" : ctaLabel}
+            </Button>
+          ) : null}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -521,14 +529,14 @@ function ComingSoonState({
     feature === "queue"
       ? {
           title: "Queues — coming soon",
-          desc: "Save a per-profile slot template (Mon 9am, Wed 2pm…) and drop content into the next free slot. Vote to bump it.",
+          desc: "Save a per-profile slot template and drop content into the next free slot. Vote to bump it.",
         }
       : {
           title: "Drafts — coming soon",
-          desc: "Keep half-written posts around for later without scheduling them. Vote to bump it.",
+          desc: "Keep half-written posts around without scheduling them. Vote to bump it.",
         };
   return (
-    <div className="ring-1 ring-dashed ring-foreground/15 p-4 text-center space-y-2">
+    <div className="ring-1 ring-dashed ring-foreground/15 p-3 text-center space-y-2">
       <p className="text-sm font-semibold">{copy.title}</p>
       <p className="text-xs text-muted-foreground">{copy.desc}</p>
       <Button

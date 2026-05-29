@@ -265,27 +265,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Primary CTA — Create post — pinned above the section nav so
-            it's the first thing your eye hits. Lives in the sidebar
-            (not the page header) so it's reachable from anywhere. */}
-        <SidebarGroup className="group-data-[collapsible=icon]:px-1">
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground font-semibold"
-                >
-                  <Link href="/posts/new">
-                    <Plus className="size-4" />
-                    <span>Create post</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
         {NAV_GROUPS.map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>

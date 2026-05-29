@@ -1,33 +1,56 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Plus } from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
+import { ComposePostSheet } from "@/components/app/compose-post-sheet";
 
 /**
- * Shared chrome for /posts/* — page title + lead copy. The view switcher
- * lives in the sidebar (Posts ▾ Grid / List / Calendar), not in the page
- * header, so this layout intentionally stays minimal.
- *
- * /posts/new gets its own chrome (full-bleed composer with its own back
- * arrow), so it bypasses the wrapper entirely.
+ * Shared chrome for /posts/* — page title + Create Post CTA. The CTA
+ * sits here (not in the sidebar) so it's visible across grid / list /
+ * calendar without duplication, and the Sheet primitive stays mounted
+ * inside this layout so route changes inside /posts don't drop its
+ * state.
  */
 export default function PostsLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  if (pathname.startsWith("/posts/new")) {
-    return <>{children}</>;
-  }
+  const [composeOpen, setComposeOpen] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Empty-state on /posts hands off to the sheet via `?compose=1` so it
+  // doesn't need to thread a callback up two component layers. The
+  // layout consumes the flag, opens the sheet, then strips the param.
+  useEffect(() => {
+    if (searchParams.get("compose") === "1") {
+      setComposeOpen(true);
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete("compose");
+      const qs = next.toString();
+      router.replace(qs ? `?${qs}` : "?", { scroll: false });
+    }
+  }, [searchParams, router]);
+
   return (
     <div className="space-y-4" data-page-wide>
-      <div>
-        <h1 className="text-lg font-semibold">Posts</h1>
-        <p className="text-xs text-muted-foreground">
-          Compose, schedule, and review your queued and published content.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-lg font-semibold">Posts</h1>
+          <p className="text-xs text-muted-foreground">
+            Compose, schedule, and review your queued and published content.
+          </p>
+        </div>
+        <Button size="sm" onClick={() => setComposeOpen(true)}>
+          <Plus className="size-4" />
+          Create post
+        </Button>
       </div>
       {children}
+      <ComposePostSheet open={composeOpen} onOpenChange={setComposeOpen} />
     </div>
   );
 }

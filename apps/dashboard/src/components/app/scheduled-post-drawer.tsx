@@ -12,8 +12,8 @@ import {
 } from "@/lib/posts";
 import { ApiRequestError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 import {
   Sheet,
   SheetContent,
@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { PLATFORM_BRANDS } from "@/components/app/platform-icons";
 
 /**
  * Drawer for inspecting and mutating a single scheduled post. Driven by an
@@ -40,28 +41,17 @@ export function ScheduledPostDrawer({
   onOpenChange: (open: boolean) => void;
 }) {
   const qc = useQueryClient();
-  const [draftWhen, setDraftWhen] = useState("");
+  const [draftWhen, setDraftWhen] = useState<Date | null>(null);
   const open = post != null;
 
   useEffect(() => {
-    if (!post?.scheduledAt) {
-      setDraftWhen("");
-      return;
-    }
-    // datetime-local wants a value WITHOUT the timezone suffix in the user's
-    // local time. Build it manually from the parsed Date so the UI shows the
-    // same wall-clock time the user originally picked.
-    const d = new Date(post.scheduledAt);
-    const pad = (n: number) => n.toString().padStart(2, "0");
-    setDraftWhen(
-      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`,
-    );
+    setDraftWhen(post?.scheduledAt ? new Date(post.scheduledAt) : null);
   }, [post]);
 
   const reschedule = useMutation({
-    mutationFn: (when: string) => {
+    mutationFn: (when: Date) => {
       if (!post) throw new Error("No post selected");
-      return reschedulePost(post.id, new Date(when).toISOString());
+      return reschedulePost(post.id, when.toISOString());
     },
     onSuccess: () => {
       toast.success("Rescheduled");
@@ -131,36 +121,29 @@ export function ScheduledPostDrawer({
 
               <Separator />
 
-              <div className="space-y-2">
-                <Label htmlFor="when" className="flex items-center gap-1.5">
-                  <Clock className="size-3" />
-                  Scheduled for
-                </Label>
-                <Input
-                  id="when"
-                  type="datetime-local"
-                  value={draftWhen}
-                  onChange={(e) => setDraftWhen(e.target.value)}
-                  disabled={!editable}
-                />
-                {!editable ? (
-                  <p className="text-xs text-muted-foreground">
-                    {post.status === "canceled"
-                      ? "This post was canceled."
-                      : "This post has already fired and can't be changed."}
-                  </p>
-                ) : null}
-              </div>
+              {editable ? (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5">
+                    <Clock className="size-3" />
+                    Scheduled for
+                  </Label>
+                  <DateTimePicker
+                    value={draftWhen}
+                    onChange={setDraftWhen}
+                    minDate={new Date(Date.now() + 60_000)}
+                  />
+                </div>
+              ) : (
+                <PostedStatusLine post={post} />
+              )}
 
               <Separator />
 
               <div>
                 <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Posting to
+                  {editable ? "Posting to" : "Posted to"}
                 </Label>
-                <p className="text-sm mt-1">
-                  {post.account.displayName ?? post.account.platformAccountId}
-                </p>
+                <AccountLine post={post} />
               </div>
 
               <div className="text-xs">
@@ -199,4 +182,71 @@ export function ScheduledPostDrawer({
       </SheetContent>
     </Sheet>
   );
+}
+
+function PostedStatusLine({ post }: { post: PostListItem }) {
+  // Pick the most informative timestamp: actual publish time beats the
+  // schedule (since the row fired and we know exactly when), and the
+  // canceled state has no time so falls through to scheduledAt.
+  const showPublished = post.publishedAt;
+  const showCanceled = post.status === "canceled";
+  const showScheduled =
+    !showPublished && post.scheduledAt && !showCanceled;
+  return (
+    <div className="space-y-1">
+      <Label className="flex items-center gap-1.5">
+        <Clock className="size-3" />
+        {showPublished
+          ? "Posted on"
+          : showCanceled
+            ? "Was scheduled for"
+            : showScheduled
+              ? "Scheduled for"
+              : "Created"}
+      </Label>
+      <p className="text-sm tabular-nums">
+        {formatStamp(
+          post.publishedAt ?? post.scheduledAt ?? post.createdAt,
+        )}
+      </p>
+      {showCanceled ? (
+        <p className="text-xs text-muted-foreground">
+          This post was canceled before it fired.
+        </p>
+      ) : showPublished ? null : (
+        <p className="text-xs text-muted-foreground">
+          This post has already fired and can't be changed.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function AccountLine({ post }: { post: PostListItem }) {
+  const brand = PLATFORM_BRANDS.find((b) => b.id === post.platform);
+  const Icon = brand?.Icon;
+  const handle = post.account.displayName ?? post.account.platformAccountId;
+  return (
+    <div className="flex items-center gap-2 mt-1">
+      {Icon ? <Icon className="size-4 shrink-0" /> : null}
+      <div className="min-w-0">
+        <p className="text-sm font-semibold capitalize">
+          {brand?.label ?? post.platform}
+        </p>
+        <p className="text-xs text-muted-foreground truncate">{handle}</p>
+      </div>
+    </div>
+  );
+}
+
+function formatStamp(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }

@@ -26,8 +26,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 import {
   Select,
   SelectContent,
@@ -72,7 +72,7 @@ export function ComposePostSheet({
 
   const [text, setText] = useState("");
   const [tab, setTab] = useState<Tab>("schedule");
-  const [when, setWhen] = useState("");
+  const [when, setWhen] = useState<Date | null>(null);
   const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(
     new Set(),
   );
@@ -85,11 +85,11 @@ export function ComposePostSheet({
       setMedia([]);
       setSelectedAccountIds(new Set());
       setTab("schedule");
+      // Default scheduled time: 1h from now, rounded to next 5 min so
+      // the picker lands on a slot that's in the dropdown.
       const t = new Date(Date.now() + 60 * 60 * 1000);
-      const pad = (n: number) => n.toString().padStart(2, "0");
-      setWhen(
-        `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}T${pad(t.getHours())}:${pad(t.getMinutes())}`,
-      );
+      t.setMinutes(Math.ceil(t.getMinutes() / 5) * 5, 0, 0);
+      setWhen(t);
     }
   }, [open]);
 
@@ -152,7 +152,8 @@ export function ComposePostSheet({
         ...(activeProfile ? { profileId: activeProfile.id } : {}),
       };
       if (tab === "schedule") {
-        body.scheduledAt = new Date(when).toISOString();
+        if (!when) throw new Error("Pick a date and time first.");
+        body.scheduledAt = when.toISOString();
       } else {
         body.publishNow = true;
       }
@@ -224,7 +225,7 @@ export function ComposePostSheet({
   const canSubmit =
     text.trim().length > 0 &&
     selectedAccountIds.size > 0 &&
-    (tab !== "schedule" || when.length > 0) &&
+    (tab !== "schedule" || when != null) &&
     (tab === "schedule" || tab === "now");
 
   return (
@@ -424,11 +425,10 @@ export function ComposePostSheet({
             <div className="pt-1">
               {tab === "schedule" ? (
                 <div className="space-y-1">
-                  <Input
-                    id="when"
-                    type="datetime-local"
+                  <DateTimePicker
                     value={when}
-                    onChange={(e) => setWhen(e.target.value)}
+                    onChange={setWhen}
+                    minDate={new Date(Date.now() + 60_000)}
                   />
                   <p className="text-[11px] text-muted-foreground">
                     Your timezone: <span className="font-mono">{tz}</span>

@@ -157,7 +157,7 @@ export function ComposePostSheet({
       } else {
         body.publishNow = true;
       }
-      if (media.length > 0 && tab === "now") {
+      if (media.length > 0) {
         body.media = media.map((m) => ({
           kind: m.contentType.startsWith("video") ? "video" : "image",
           url: m.url,
@@ -384,12 +384,6 @@ export function ComposePostSheet({
                 if (e.target) e.target.value = "";
               }}
             />
-            {tab === "schedule" && media.length > 0 ? (
-              <p className="text-[11px] text-amber-700 dark:text-amber-400">
-                Scheduled posts are text-only until the media slice ships.
-                Switch to Publish Now to keep these.
-              </p>
-            ) : null}
           </section>
 
           <section className="space-y-2">

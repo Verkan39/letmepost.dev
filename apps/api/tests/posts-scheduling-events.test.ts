@@ -206,11 +206,12 @@ describeIfDb("POST /v1/posts — scheduled path (Approach B hybrid)", () => {
     });
   });
 
-  it("rejects scheduledAt combined with media until the scheduled-media slice lands", async () => {
+  it("accepts scheduledAt combined with media and persists mediaRefs", async () => {
     const { db } = await getTestDb();
     await runInTransaction(db, async (tx) => {
       const fixture = await seed(tx);
-      const app = createApp({ db: tx });
+      const { enqueuer } = captureEnqueuer();
+      const app = createApp({ db: tx, publishEnqueuer: enqueuer });
 
       const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
       const res = await app.request("/v1/posts", {
@@ -220,7 +221,7 @@ describeIfDb("POST /v1/posts — scheduled path (Approach B hybrid)", () => {
           Authorization: `Bearer ${fixture.apiKey.plaintext}`,
         },
         body: JSON.stringify({
-          account: { platform: "bluesky", id: fixture.accountId },
+          targets: [{ accountId: fixture.accountId, platform: "bluesky" }],
           text: "with image",
           scheduledAt: future,
           media: [
@@ -233,10 +234,50 @@ describeIfDb("POST /v1/posts — scheduled path (Approach B hybrid)", () => {
         }),
       });
 
+      expect(res.status).toBe(202);
+      const body = (await res.json()) as {
+        status: string;
+        results: Array<{ postId: string; status: string }>;
+      };
+      expect(body.status).toBe("queued");
+      expect(body.results[0]?.status).toBe("queued");
+
+      const row = await tx.query.posts.findFirst({
+        where: (p, { eq }) => eq(p.id, body.results[0]!.postId),
+      });
+      expect(row).toBeDefined();
+      expect(row?.mediaRefs).toEqual([
+        { kind: "image", url: "https://example.com/x.jpg", altText: "test" },
+      ]);
+    });
+  });
+
+  it("still rejects scheduledAt combined with firstComment", async () => {
+    const { db } = await getTestDb();
+    await runInTransaction(db, async (tx) => {
+      const fixture = await seed(tx);
+      const { enqueuer } = captureEnqueuer();
+      const app = createApp({ db: tx, publishEnqueuer: enqueuer });
+
+      const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      const res = await app.request("/v1/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${fixture.apiKey.plaintext}`,
+        },
+        body: JSON.stringify({
+          targets: [{ accountId: fixture.accountId, platform: "bluesky" }],
+          text: "scheduled with first comment",
+          scheduledAt: future,
+          firstComment: { text: "more thoughts" },
+        }),
+      });
+
       expect(res.status).toBe(400);
       const body = (await res.json()) as { error: { code: string; rule?: string } };
       expect(body.error.code).toBe("validation_failed");
-      expect(body.error.rule).toBe("scheduledAt.text_only");
+      expect(body.error.rule).toBe("scheduledAt.no_first_comment");
     });
   });
 });

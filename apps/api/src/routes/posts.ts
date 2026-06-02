@@ -70,9 +70,9 @@ const MIN_FUTURE_DELAY_MS = 1_000;
  * same per-target results) instead of re-publishing; changing any target
  * mid-retry surfaces as a 409 idempotency_conflict.
  *
- * Scheduled posts currently accept text only. Media and first-comment on
- * scheduled posts need persistent media storage (R2) and a dedicated
- * first-comment column — both land in a follow-up slice.
+ * Scheduled posts accept media: refs are persisted on `posts.mediaRefs` and
+ * the worker reads them back at fire time. First-comment on scheduled posts
+ * still rejects — that column doesn't exist yet and is a follow-up.
  */
 posts.post(
   "/",
@@ -235,15 +235,15 @@ posts.post(
         });
       }
       for (const { input } of resolved) {
-        if (input.media || input.firstComment) {
+        if (input.firstComment) {
           throw new LetmepostError({
             code: "validation_failed",
             status: 400,
             message:
-              "Scheduled posts do not yet support media or firstComment — publish immediately or wait for the scheduled-media slice.",
-            rule: "scheduledAt.text_only",
+              "Scheduled posts do not yet support firstComment — publish immediately or drop the field.",
+            rule: "scheduledAt.no_first_comment",
             remediation:
-              "Drop media/firstComment from this request, or omit scheduledAt to publish synchronously.",
+              "Drop firstComment from this request, or omit scheduledAt to publish synchronously.",
           });
         }
       }
@@ -259,6 +259,7 @@ posts.post(
             accountId: account.id,
             status: "queued",
             text: input.text,
+            mediaRefs: input.media ? [...input.media] : [],
             scheduledAt: when,
           })
           .returning();

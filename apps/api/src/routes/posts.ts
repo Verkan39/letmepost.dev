@@ -17,7 +17,6 @@ import {
 import { checkAndIncrementQuota } from "../billing/quota.js";
 import { posts as postsTable, type Post } from "../db/schema/posts.js";
 import { LetmepostError } from "../errors.js";
-import { apiKeyAuth } from "../middleware/api-key.js";
 import { apiKeyOrSession } from "../middleware/api-key-or-session.js";
 import { idempotency } from "../middleware/idempotency.js";
 import { assertKeyCanAccessProfile } from "../middleware/profile-scope.js";
@@ -40,13 +39,15 @@ import {
 export const posts = new Hono();
 
 // Per-route middleware chains:
-//   POST /v1/posts          → strict API key + rate limit + idempotency
+//   POST /v1/posts          → API key OR dashboard session + rate limit + idempotency
 //   GET  /v1/posts          → API key OR dashboard session (read-only)
 //   GET  /v1/posts/:id      → same as list
 //
-// Reads accept session because the dashboard talks to the same endpoint;
-// writes stay strict-key only because idempotency / audit / billing are
-// keyed on the api_keys row.
+// Both reads and writes accept the dashboard session: the dashboard's compose
+// flow needs to publish without a hard-coded API key. Idempotency keys are
+// scoped per organizationId (not apiKeyId), so synthetic session contexts
+// replay correctly; rate-limit buckets per session id keep dashboard traffic
+// in its own lane.
 
 /**
  * Minimum future-delay before we accept a scheduled post, to avoid races
@@ -75,7 +76,7 @@ const MIN_FUTURE_DELAY_MS = 1_000;
  */
 posts.post(
   "/",
-  apiKeyAuth(),
+  apiKeyOrSession(),
   rateLimit(),
   idempotency(),
   async (c) => {

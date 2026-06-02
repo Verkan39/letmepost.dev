@@ -90,7 +90,7 @@ export function apiKeyOrSession(): MiddlewareHandler {
       // The literal "session" prefix flags downstream code that this isn't a
       // real key id — useful in audit logs that want to distinguish surfaces.
       apiKeyId: `session:${result.session.id}`,
-      scopes: ["posts:read"],
+      scopes: ["posts:read", "posts:write"],
       // Session = org-wide read. Profile filtering is via ?profileId only.
       profileId: null,
     };

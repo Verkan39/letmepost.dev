@@ -1,490 +1,301 @@
-# letmepost.dev — Phased v1 Roadmap
+# letmepost.dev — Status & Pre-Launch Checklist
 
-## Context
-
-**Status (May 2026):** Phases 1–7.5 landed in code; **Phase 8 Meta trio shipped (awaiting App Review)**; **Phase 9 X/Twitter shipped (incl. chunked video upload, multi-image, reply chains, quote tweets, PKCE fix — awaiting Pay Per Use signup decision)**; **Phase 11 Pinterest extras shipped (video pin via register-media → S3 → poll)**; **Phase 13 marketing + docs site shipped** (Mintlify-pivoted docs at `docs.letmepost.dev` with full preflight/error/webhook/platform coverage, Astro landing with Docs+Product navbar dropdowns, dynamic per-platform + per-API pages, /pricing page, /blog scaffolded MDX+RSS, full SEO suite — sitemap priorities, JSON-LD Organization/WebSite/FAQPage/BreadcrumbList/SoftwareApplication/BlogPosting, AI-crawler robots.txt, twitter:site, /sitemap.xml alias). **All 8 v1 platforms publish in code.** **341+ API tests passing** (5 unrelated session-auth tests are pre-existing baseline failures). Bluesky live end-to-end; everything else awaiting approvals.
-
-**Launch-week additions (May 2026):**
-- **PostHog product analytics** wired across `apps/web` (Astro) and `apps/dashboard` (Next.js). Typed `track()` helper per app with a discriminated `WebEvent`/`DashboardEvent` union; ~30 events instrumented covering marketing CTAs, signup → first-publish funnel, OAuth lifecycle, post lifecycle (preflight failures, retries, raw-response expand), api-keys, webhooks, theme/org. Person identification via better-auth session with the active org wired as a PostHog group. CONTRIBUTING.md §11 documents the conventions (naming, ordering, single identify site).
-- **Platform launch-state gate.** Canonical `PLATFORM_STATE: Record<Platform, "live"|"trial"|"pending">` in `@letmepost/schemas/platform-state` (zod-free subpath so client bundles can consume it without weight). Backend gate at `/v1/accounts/connect/:platform` rejects `pending` with new `platform_not_enabled` error code; `PLATFORM_STATE_OVERRIDES` env can flip a platform without a redeploy (validated loudly — typos throw at parse time). Dashboard connect drawer greys out pending tiles and badges trial tiles. Marketing site reads from the same canonical map. Launch config: bluesky=live, pinterest=trial, twitter=trial, rest=pending; youtube=planned (marketing-only, not in backend enum).
-- **X per-account cost cap.** `apps/api/src/platforms/twitter/launch-cap.ts` — 50 billable posts (`published`/`rejected`/`failed`) per X account per rolling 30 days, enforced from `_shared/dispatch.ts` via the new required `PublishContext { db }`. Returns `rate_limited` 429 with `Retry-After` computed from the oldest billable post in the window. Tunable via `TWITTER_LAUNCH_CAP_PER_ACCOUNT`. Tests opt out of all dispatch gates via `{ skipGates: true }`.
-- **Pre-publish gate pattern** documented in CONTRIBUTING §3.5 (gates throw `LetmepostError`, live in `platforms/<name>/<gate>.ts`, called from `_shared/dispatch.ts`, required-not-optional `db` on `PublishContext`).
-
-**Production live:** API at `https://api.letmepost.dev` (Railway), dashboard at `https://dashboard.letmepost.dev`, landing at `https://letmepost.dev`, docs at `https://docs.letmepost.dev` (Mintlify). NeonDB Postgres + Upstash Redis. Cross-subdomain cookies via `COOKIE_DOMAIN=.letmepost.dev`. OAuth state HMAC-signed (10-min TTL); Twitter PKCE `codeVerifier` rides the same signed state envelope so the dashboard never has to stash it across the redirect.
-
-**Approvals in flight (May 2026):**
-- **Meta App Review** — submitted; need demo videos for some scopes
-- **LinkedIn MDP** — submitted, awaiting review
-- **Pinterest Standard Access** — pending demo video recording (Trial Access works; pins private until Standard clears)
-- **X Pay Per Use** — signup decision pending (Basic/Pro tiers closed to new signups Feb 2026; pay-per-use is the only path; signed-up = budget burns from first call)
-- **YouTube CASA verification** — not yet submitted
-
-**Scope decision (April 2026):** YouTube replaces TikTok for v1. TikTok deferred to v2.
-
-**Recent session shipped (May 2026):**
-- Bluesky video upload via `app.bsky.video.uploadVideo` service flow (service auth → upload → poll job status → embed)
-- Twitter v1.1 chunked video upload (INIT/APPEND/FINALIZE/STATUS) replacing the placeholder simple-upload path
-- Pinterest video pin (POST /v5/media → presigned-S3 multipart → poll → createPin with `source_type: video_id`)
-- Profile-switching UX bug fixed: promoted `useActiveProfile` to a Context provider (single source of truth across sidebar + every page), profile-scoped query keys for accounts/api-keys/posts, `?profileId=` filter on `GET /v1/accounts`, top-level prefix invalidation on switch
-- X OAuth PKCE bug fixed: `codeVerifier` now embedded in the signed state token (round-trips via Twitter and back) — was failing with `validation_failed` because the dashboard's full-page redirect lost client-side state
-- Dashboard tab titles via per-route `layout.tsx` files (Dashboard / Logs / Accounts / Connect / Profiles / API keys / Webhooks / Media / Welcome / Sign in / Sign up)
-- Mintlify docs accuracy audit: 5 stale field-name fixes (`handle` → `identifier` on Bluesky connect), 13 new preflight rule pages for video work, removed 2 obsolete rule pages, fixed Twitter/Pinterest/Bluesky platform pages to reflect actual capabilities, refreshed nav
-- Astro landing redesign: navbar with Docs + Product dropdowns (8 platforms, 3 API surfaces), wider container, borderless chrome, bigger nav fonts
-- Per-platform marketing pages (`/platforms/[slug]` × 8) + per-API marketing pages (`/api/[slug]` × 3) — shared shell, status badges, code samples, content-type chips, demo placeholders, FAQ
-- /pricing page (TBD content)
-- Blog scaffolded — `@astrojs/mdx` + content collection at `src/content/blog/` + `/blog` index + `/blog/[...slug]` post page + `/rss.xml` feed + Article JSON-LD per post + sample seed post (`draft: true`)
-- Full SEO suite: sitemap priority/changefreq/lastmod, JSON-LD on every page (Organization + WebSite default; FAQPage on home; BreadcrumbList + SoftwareApplication on platform pages; BreadcrumbList on API pages; BlogPosting on posts), `twitter:site`/`creator`, AI-crawler robots.txt directives, `/sitemap.xml` convention alias
-
-**Immediate next slice:**
-- Submit Meta demo videos (per-scope) and Pinterest demo video to clear approvals
-- Decide on X Pay Per Use signup
-- Begin YouTube CASA submission
-- Draft + publish first 2–3 blog posts (LinkedIn version-churn flagship; "fails loudly" thesis; OAuth lifecycle deep-dive)
-- Wire `/2/users/me` lookup at Twitter connect-complete to replace the synthetic `twitter-${uuid}` platform_account_id with the real X user id (one-line TODO in `apps/api/src/platforms/twitter/provider.ts`)
-
-What's still missing from the original plan: Phase 6 LinkedIn org/Company-Page posting (MDP-gated), Phase 7.5 Media Upload Service (in flight), **Phase 8 Meta trio (was Phase 9 — promoted ahead of X because it's buildable today against Tester accounts while X waits on a paid-tier signup decision)**, Phase 9 Twitter/X (was Phase 8), Phase 10 YouTube, Phase 11 Pinterest extras, Phase 12 SDK pipeline, Phase 13 docs polish, Phase 14 obs + launch prep, Phase 15 launch. Phase 5.5 (Profiles) was added after the initial plan to pick up the agency / multi-brand use case without per-profile pricing — both API and dashboard are done.
-
-This plan takes us from that state to a public v1 launch. Every phase is filtered through the **seven product principles** in `PRODUCT.md` and traces to the **six research-corpus problems** we exist to solve:
-
-1. **Silent failures** — posts "succeed" then never appear; `{body:{}, message:""}`; scheduled posts disappearing.
-2. **LinkedIn API version churn** — 5 versions sunset in 6 months simultaneously breaking every competitor. Fix is one HTTP header.
-3. **Opaque media upload rejections** — Instagram Reels, YouTube quota / aspect-ratio rejects, Threads `OAuthException 2207052` (and TikTok's `file_format_check_failed` historically — TikTok is now v2). All catchable with preflight.
-4. **OAuth token lifecycle rot** — LinkedIn/Meta 60d, GBP daily, Bluesky minutes.
-5. **Per-profile / per-seat pricing** — universally hated.
-6. **Double-posting from retry storms** — Postiz #1321; fix is idempotency keys.
-
-The goal is not to match any competitor's feature count. The goal is to be the publishing primitive where **failure is loud, preventable, and documented** — with API version abstraction and flat pricing as the commercial wedges.
-
-**Honest estimate: 30 weeks of coding, 7–8 months to public launch** accounting for Meta + YouTube verification variance. (Original 28; +1 for Phase 5.5 profiles retrofit; +1 for Phase 7.5 media service.)
+> Single source of truth for what's shipped, what's pending external approval, and what's left before the public v1 launch. Replaces the original 15-phase build roadmap (every phase except 15 has landed in code).
+>
+> **Don't use this as a kanban.** The day-to-day work board is the Notion *Product Development* DB in the `letmepost.dev` workspace. This file documents the steady-state.
 
 ---
 
-## Day 0 — Prerequisites (NOT a phase; fire before Phase 1)
+## Status snapshot (June 2026)
 
-These are calendar-gated and take months. Start them all before writing any Phase 1 code.
+Everything from the original roadmap that doesn't depend on calendar-gated reviews is shipped. The remaining work is content (blog posts, demo videos), demos in flight, and the v1 launch itself.
 
-| Action | Why Day 0 | Expected wait | Buildable pre-approval? | Status (April 2026) |
-|---|---|---|---|---|
-| **Meta App Review** (IG Graph + FB Pages + Threads) | 2–8 weeks per review cycle, rejections normal, business verification is its own slog | 6–12 weeks realistic | **Yes.** App in Development Mode can publish to the developer's own account + any account registered as a Tester. Same Graph API endpoints, same response shapes as post-approval — approval only lifts the "testers only" restriction. Phase 8 is genuinely a same-day deploy on approval. | Business verification in progress; submission tomorrow |
-| **YouTube OAuth verification** (Google Cloud) | Restricted-scope (`youtube.upload`) requires a one-time security assessment by an approved third-party CASA auditor; ~3–6 weeks first time, annual renewal after | 3–6 weeks first cycle | **Yes.** Unverified apps cap at 100 lifetime users — fine for staged rollout while the assessment runs. Same Data API v3 endpoints, same response shapes; verification only lifts the user cap and the unverified-app warning screen. | Not yet submitted |
-| **X API paid tier** | Paid billing near-instant; Elevated write + use-case review 1–3 weeks. **⚠ Feb 2026 shift:** X killed tiered pricing for new signups — Basic/Pro are closed to new developers; pay-per-use is the new floor. Budget starts accruing from Phase 9 start, not from launch. Revisit whether X stays in v1. | 1–3 weeks | **Partial.** No free write path; pay-per-use bills from the first call. | Not yet submitted |
-| **LinkedIn MDP / Community Management API** application | Many post scopes require MDP approval; we want this ready by Phase 6 | 2–6 weeks | **Partial.** Personal-account posting (`w_member_social`, Share on LinkedIn product) works on the standard dev tier without MDP. MDP / Community Management API gates **org- and company-page** posting only. ~60–70% of Phase 6 (personal posts, preflight suite, version-pinning layer, person-URN validation) is buildable day 0; the org-post codepath waits on approval. | Submitted, awaiting review |
-| **Pinterest developer account + trial access** | Needed by Phase 11 | 1–2 weeks | **Yes.** Trial Access is the sandbox — all endpoints exposed, pins private to creator until Standard approval (requires a video of the OAuth flow). | Trial Access live; Standard pending demo video |
+**Production deploys:**
 
-Also Day 0 (non-gating, cheap): register `letmepost` GitHub org, reserve `@letmepost` npm scope, reserve `letmepost` on PyPI, create empty `letmepost/sdk-python` and `letmepost/sdk-go` repos.
+- API — `https://api.letmepost.dev` (Railway)
+- Worker — same Railway project, separate service
+- Dashboard — `https://dashboard.letmepost.dev` (Vercel)
+- Marketing — `https://letmepost.dev` (Vercel, Astro)
+- Docs — `https://docs.letmepost.dev` (Mintlify)
+- MCP — `https://api.letmepost.dev/mcp` (streamable HTTP, stateless)
+- npm — `@letmepost/sdk`, `@letmepost/mcp`, `@letmepost/cli`
+- PyPI — `letmepost` (generated from OpenAPI)
+- Go — `github.com/letmepost/letmepost-go` (generated)
+
+**Infra:** NeonDB Postgres (branching-per-preview), Upstash Redis (BullMQ), S3 `letmepost-media`, Resend (transactional + onboarding sequence), Lemon Squeezy (billing), Sentry (api + worker + dashboard), Axiom (logs + traces), PostHog (web + dashboard product analytics).
+
+**Cross-subdomain auth:** better-auth with `COOKIE_DOMAIN=.letmepost.dev`; email/password + Google + GitHub social sign-in with account linking; first-touch UTM attribution snapshot on signup.
 
 ---
 
-## Phase 1 — Persistence & Tenancy Foundation - DONE
+## Platforms
 
-**Goal:** Turn the single-tenant Bluesky prototype into a multi-tenant service with real data.
+Canonical state lives in `packages/schemas/src/platform-state.ts`; the dashboard connect drawer, marketing site, and backend connect gate all read from the same map. `PLATFORM_STATE_OVERRIDES` env can flip a platform without a redeploy.
 
-**Ships:** NeonDB project with branching-per-preview; Drizzle schemas (`users`, `organizations`, `api_keys`, `accounts` with encrypted token blobs, `posts`, `post_attempts`, `idempotency_records`, `webhook_endpoints`, `platform_versions`); `drizzle-kit` migration tooling; seeding harness for tests; AES-256-GCM envelope encryption module (DEK-per-token, KEK in env, rotation-ready); `AccountsRepository` / `PostsRepository` interfaces.
-
-**Problems solved:** Enabling (unblocks 4, 6).
-**Principles served:** 5 (same schema OSS + hosted), 7 (data shapes designed).
-**Depends on:** Nothing.
-**Effort:** 1.5 weeks.
-**Risks:** Drizzle relational queries vs. migration ergonomics diverge occasionally; Neon branching in CI is sharp-edged.
-**NOT in scope:** Auth, queue, webhooks, OAuth, new platforms. No user-visible endpoint changes.
-
-## Phase 2 — Auth, API Keys, and Org Model - DONE
-
-**Goal:** Authenticated multi-tenant API access.
-
-**Ships:** `better-auth` with email/password + API-keys plugin + organizations plugin; `POST /v1/api-keys`, `GET /v1/api-keys`, `DELETE /v1/api-keys/:id` (internal only — no dashboard yet); Bearer-token middleware with org scoping on every query; key prefixing (`lmp_live_…` / `lmp_test_…`) and last-4 storage; hash-indexed key lookup; Bluesky publisher migrated off request-body credentials onto the `accounts` table.
-
-**Problems solved:** Enabling.
-**Principles served:** 5, 7.
-**Depends on:** Phase 1.
-**Effort:** 1.5 weeks.
-**Risks:** better-auth's API-keys plugin edges — if it bites for more than 2 days, fall back to a hand-rolled keys table.
-**NOT in scope:** OAuth connect flows, dashboard UI, billing, webhooks, queue.
-
-## Phase 3 — Idempotency, Rate Limiting, Error Contract - DONE
-
-**Goal:** Make every write safe to retry, every response structurally transparent.
-
-**Ships:** `Idempotency-Key` on all writes (24h replay window, stored response fingerprint, conflict detection on body mismatch); `@upstash/ratelimit` (per-key quota + per-IP floor + per-platform connect-attempt floor); canonical `ErrorResponse` contract finalized in `packages/schemas` (code, rule, platform, platform_version, platform_response, remediation, request_id, trace_id); error-code registry module ready for docs; Sentry wired; Axiom OTel exporter wired for logs + traces.
-
-**Problems solved:** 1 (silent failures), 6 (double-posting).
-**Principles served:** 2, 4.
-**Depends on:** Phase 1, 2.
-**Effort:** 1.5–2 weeks.
-**Risks:** Idempotency semantics on future multi-platform posts is subtle — design the storage shape now so Phase 6+ doesn't force a migration.
-**NOT in scope:** Per-platform error mapping (happens in each platform phase); webhooks; dashboard.
-
-## Phase 4 — Job Queue, Scheduling, Webhooks - DONE
-
-**Goal:** Everything that makes "it posted" or "it failed" actually observable.
-
-**Ships:** BullMQ on Upstash Redis with `publish`, `validate`, `refresh-token`, `webhook-deliver` queues; separate Railway worker service; `POST /v1/posts` accepts `scheduled_at` (delayed jobs); webhook subsystem with HMAC-SHA256 signing, exponential backoff, dead-letter queue, `/v1/webhook-endpoints` CRUD; event catalog (`post.queued`, `post.validated`, `post.published`, `post.rejected`, `post.failed`, `token.expiring`, `token.revoked`, `version.deprecated`); worker retries use idempotency keys on upstream platform APIs where supported; existing Bluesky publisher refactored through the queue.
-
-**Problems solved:** 1 (scheduled-post disappearing), 6 (retry storms).
-**Principles served:** 2, 4.
-**Depends on:** Phases 1–3.
-**Effort:** 2 weeks.
-**Risks:** Upstash connection cap on free tier; Railway worker cold-start when queue is idle. Decide "what happens on a 5xx from a webhook consumer" before coding — single most-asked integrator question.
-**NOT in scope:** Webhook replay UI, delivery logs UI (dashboard later), per-event filter subscriptions.
-
-## Phase 5 — OAuth Connect Framework + Bluesky Migration - DONE
-
-**Goal:** Generic account-connect machinery that every platform plugs into. The framework is the product.
-
-**Ships:** `POST /v1/accounts/connect/:platform` returning OAuth URL (or app-password form for Bluesky); `GET /v1/accounts/oauth/:platform/callback` generic callback router; `GET /v1/accounts`, `DELETE /v1/accounts/:id`; token refresh scheduler sized per-platform (Bluesky minutes, LinkedIn 60d, Meta 60d, GBP daily); `token.expiring` webhook at 7 days out; scope registry (narrow by default — direct answer to Ayrshare's broad-scope complaint); Bluesky migrated onto the framework with existing 20 tests still green.
-
-**Problems solved:** 4 (token rot), partial 2 (scoped OAuth).
-**Principles served:** 2, 5, 7.
-**Depends on:** Phases 1, 2, 4.
-**Effort:** 2 weeks.
-**Risks:** PKCE vs. classic OAuth differences across LinkedIn/X/Meta must not become `if platform === …` soup. Invest in the abstraction.
-**NOT in scope:** LinkedIn publisher itself (next phase), dashboard UI.
-
-## Phase 5.5 — Profiles (Workspace Primitive) - DONE
-
-**Goal:** Zernio-style profiles — an org sub-unit that groups platform accounts. Agencies get one org with 20 profiles (one per client); a brand with multiple product lines gets multiple profiles under one org. Crucially: **profiles are free.** Per-profile pricing is research-corpus problem #5; we use profiles as a structure primitive and keep pricing flat at the org level — that's a commercial wedge against Ayrshare / Zernio in itself.
-
-**Ships:** new `profiles` table (`id`, `organization_id`, `name`, `slug`, `created_at`, `updated_at`); `platform_accounts.profile_id` NOT NULL with a "Default" profile auto-created per org in the migration (all existing rows attach to it); `api_keys.scope` gains optional `profile_id` so keys can be narrowed to a single profile (empty scope = org-wide, preserves existing behavior); `/v1/profiles` CRUD (create / list / rename / delete — delete blocked when non-empty); all `/v1/accounts` and `/v1/posts` routes accept and enforce the profile scope; dashboard gets a profile switcher in the sidebar (primary day-to-day surface; org switcher moves to a settings page); post + webhook lifecycle events carry `profileId` in the data payload.
-
-**Problems solved:** 5 (we *have* the structure others charge per-unit for, without the charge). Enabling for multi-client agencies, which are a high-LTV segment.
-**Principles served:** 5 (same schema OSS + hosted), 7 (data shapes designed — retrofit *before* real users, not after).
-**Depends on:** Phases 1, 2, 5.
-**Effort:** 1 week.
-**Risks:** API-key scope semantics is the subtle part — an org-wide key must still work against any profile's accounts; a profile-scoped key must 404 on cross-profile account IDs. Build the test matrix up front (org-key × profile-key × same-profile × cross-profile × missing-account).
-**NOT in scope:** Per-profile billing or usage meters (Phase 14); per-profile webhook endpoints (endpoints stay org-scoped; consumers filter on the `profileId` event field); per-profile custom branding; cross-profile account sharing.
-
-## Phase 6 — LinkedIn: The Wedge - PARTIAL
-
-**Status:** Personal-account text UGC publishes today via the AccountProvider framework. 3,000-grapheme preflight + URN validation + the `LinkedIn-Version`-pinned client are live. Org / Company-Page posting and the full media surface (image, multi-image, video, document, article preflight with OG-tag fetch) wait on MDP approval.
-
-**Goal:** Ship the platform that *demonstrates the pitch*. This is the phase that has to be visibly better than every competitor.
-
-**Ships:** LinkedIn OAuth (personal + organization) through the Phase 5 framework with MDP scopes; `POST /v1/posts` with `platform: "linkedin"` — text, article share, single image, multi-image, video, document; **preflight validator suite** (each a pure function with its own tests):
-- 3,000-grapheme emoji-aware limit (matches LinkedIn's real counter)
-- URN pattern validation (`urn:li:person:…` / `urn:li:organization:…`)
-- Org-post authorization (ACL preflight)
-- Media type + size + aspect-ratio rules
-- `visibility` enum + `lifecycleState` legal values
-- Article URL reachability + OG-tag preflight
-
-**Version abstraction layer:** every LinkedIn call goes through a client that pins `LinkedIn-Version`; version is a single config value; upgrades are one commit. LinkedIn error mapper: every known error code → letmepost error code + rule + remediation, raw response preserved. `GET /v1/platform-versions` public endpoint. Contract-test suite against real LinkedIn on a cron (not in the fast loop). `POST /v1/posts/validate` endpoint — preflight only, no publish.
-
-**Problems solved:** 1, 2 (the headline), 3 (opaque rejections pattern).
-**Principles served:** 1, 2, 3 — this phase *is* the pitch.
-**Depends on:** Phases 1–5.5; MDP approval from Day 0.
-**Effort:** 3 weeks. This phase must be excellent, not fast.
-**Risks:** MDP approval blocking; LinkedIn dev-tier rate limits; URN edge cases for Company Pages vs. Showcase Pages. This is the phase you'll be tempted to cut corners on — don't.
-**NOT in scope:** Carousels beyond image-multi, polls, events, analytics, comment threads, DMs.
-
-## Phase 7 — Minimal Dashboard (Operator Surface Only) - DONE
-
-**Goal:** Get out of curl-only. Ship exactly what onboarding + debugging need — nothing else.
-
-**Ships:** `apps/dashboard` Next.js App Router with better-auth session, shadcn component system, Commit Mono + Instrument Serif wordmark + paper/forest-green theme matching the landing, framer-motion blur+y transitions across page changes, list staggers, and accordion expansions. TanStack Table renders the Post Log; TanStack Query owns client-side data fetching. Screens shipped:
-- **Sign-in / sign-up** with org creation in the same flow; sign-up failure paths fall through to /onboarding rather than stranding the user.
-- **/onboarding** — silent recovery for sessions without an active org. No form: picks the first existing org, else creates one named after the user, then bounces. Only flashes a "Setting up workspace…" line if the redirect takes >250ms.
-- **Dashboard home** — first-run accordion checklist (Copy your API key → Connect a platform → Send your first post) with auto-advance, step locking until the prior step completes, and per-step bodies that include a real curl preview, brand-icon platform grid, and a live "Send test post" button. Once every step is done, the checklist fades out and the count cards (accounts / API keys / webhooks) fade in.
-- **Inline platform connect** — brand-icon grid (Bluesky, LinkedIn, Pinterest, X) with grayscale → color hover. OAuth platforms full-page-redirect to the provider's authorize URL; credentials platforms swap the grid for a dynamic field form (descriptor-driven). Both pass `profileId` so the resulting account lands in the right workspace.
-- **Sidebar** — brand mark + org switcher (with shadcn dialog for new-org), profile switcher ("Working in: …") with localStorage-keyed-per-org persistence, full nav (Dashboard / Logs / Accounts / Profiles / API keys / Webhooks), avatar footer with sign-out.
-- **/profiles** — CRUD with auto-derived slug preview, rename dialog, delete confirm that surfaces the API's 409 not-empty rule.
-- **Account list** — per-profile, with token-expiry timestamps and confirm-on-disconnect.
-- **/accounts/new** — same descriptor-driven flow as the inline onboarding connect, with profile picker.
-- **API Keys** — list / create / revoke. Create form has Name + Environment (live/test) + Scope (org-wide / per-profile). Each row shows env, scope, prefix, last-4. Plaintext shown once in a modal; "Copy" + "Done" buttons.
-- **Webhook endpoints** — create / filter events (chip multi-select bound to `WEBHOOK_EVENT_TYPES`) / delete. Signing secret shown once. **Send Test** button per row opens a dialog with event-type select + editable JSON payload (per-type defaults that swap intelligently when the user picks a new type without overwriting their edits) + delivery result panel showing HTTP status, latency, response body — fires `POST /v1/webhook-endpoints/:id/test` synchronously.
-- **Post Log** — the operator's "where did my post go" screen. TanStack Table with columns (When | Platform | Status | Account | Text | Error code | →). Server-side filters: **profile × platform × status × error-code × time-range** (Last 24h / 7d / 30d / All / Custom range dialog). Manual Refresh button + automatic refetch on tab focus. Keyset pagination via opaque cursor. Detail view renders the full `ErrorResponse` contract inline — code, rule, platform, platform_version, platform_response, remediation — plus the attempts timeline and a copy-as-curl reproducer that pre-fills `${prefix}…${last4}` from the user's actual keys (key picker), inlines `mediaRefs` + `scheduledAt`, and uses `$(uuidgen)` for the Idempotency-Key.
-
-Destructive actions (disconnect account, revoke key, delete endpoint, delete profile) all confirm via shadcn modals.
-
-**Problems solved:** 1 (visibility of failure is the whole Post Log).
-**Principles served:** 7.
-**Depends on:** Phases 1–5.5, 6.
-**Effort:** Done.
-**NOT in scope:** Billing, analytics dashboards, team invites beyond single-org, whitelabel, theming switcher, mobile-first layout, API call log (request-level, as opposed to post-level), webhook delivery log (deferred — needs a backend ticket to expose BullMQ delivery history; today only the synchronous test-deliver round-trip is visible).
-
-## Phase 7.5 — Media Upload Service + Bluesky/Pinterest hardening — DONE
-
-**Status (May 2026):** All ship items landed. `POST /v1/media` live with S3-backed storage; `MediaInput` schema accepts `mediaId` / `url` / `bytesBase64`; shared resolver in `apps/api/src/platforms/_shared/media.ts`; Bluesky carousel + alt text + video service auth flow; Pinterest publish path rewritten off the metadata bag. Bluesky video routes through `app.bsky.video.uploadVideo` (service auth + getJobStatus poll, NOT `com.atproto.repo.uploadBlob` — the canonical naive-implementation gotcha caught at preflight via `bluesky.video.quota_exhausted` and friends).
-
-**Goal:** Per-post media as a first-class concept across every publisher, plus the foundation that lets Pinterest, YouTube, and any future video platform actually publish without per-platform carve-outs. Then lock Bluesky and Pinterest to "perfect" against the live API before we resume new-platform work.
-
-**Why now:** Pinterest's publish path today reads `boardId / destinationUrl / imageUrl` from `platform_account.tokenMetadata` — a documented hack from when media wasn't a real concept. The `lmp-test` script exposed the gap end-to-end. YouTube long-form videos and Bluesky video both need the same plumbing. Doing this once unblocks three platforms.
-
-**Ships:**
-
-*Media upload service:*
-- New `POST /v1/media` — multipart, streams direct to S3 via `@aws-sdk/lib-storage`'s `Upload` (handles 100 MB+ video uploads without buffering server-side). Returns `{ id, url, contentType, sizeBytes, sha256 }`.
-- New `media` table — `(id, organizationId, profileId?, contentType, sizeBytes, sha256, s3Key, createdAt)`. No automatic deletion in v1; bucket grows forever (lifecycle policy is a follow-up if cost demands).
-- S3 bucket `letmepost-media` in `us-east-1` (same region as Railway), single bucket with `${env}/${orgId}/${mediaId}.${ext}` keys, **public-read via bucket policy** on `s3:GetObject` (Block Public Access OFF on the bucket; object ACLs stay disabled — Object Ownership = "Bucket owner enforced"). Keys carry ~131 bits of entropy (`med_` + 22 base62), so security rests on key unguessability rather than a closed bucket.
-- New env: `AWS_REGION=us-east-1`, `S3_BUCKET=letmepost-media`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `MEDIA_PUBLIC_BASE_URL` (e.g. `https://letmepost-media.s3.us-east-1.amazonaws.com`), `MEDIA_ENV_PREFIX` (`prod` / `dev`). `.env.example` updated; Railway's `apps/api` service gets the secrets.
-- **Future: signed URLs / CloudFront.** v1 deliberately ships public objects with unguessable keys — simplest, robust to Pinterest/Meta re-fetches, and the migration to private + signed URLs (or CloudFront signed cookies) is a one-env-var swap of `MEDIA_PUBLIC_BASE_URL` plus a small change to URL construction. Revisit when (a) a real bandwidth bill shows up, (b) we need byte-range / CDN behavior, or (c) a customer requires private media. Owner: whoever is on call for the first cost spike.
-- `MediaInput` schema in `packages/schemas` gets a third variant: `{ kind, mediaId }` referencing a `/v1/media` upload. The existing `{ url }` and `{ bytesBase64 }` variants stay (URL passthrough is still useful for callers who already have a CDN; bytes-inline stays for tiny images).
-- Shared `apps/api/src/platforms/_shared/media.ts` resolver — every publisher calls `resolveMedia(item)` to get the bytes-or-URL it needs. Three branches: `mediaId` → fetch row, derive S3 URL; `url` → passthrough; `bytesBase64` → decode.
-
-*Bluesky hardening (already publishes text):*
-- Single + multi-image carousel (max 4) via the new media plumbing
-- Alt text round-trip end-to-end (preflight + publish)
-- Video posts (Bluesky added these in 2024; ~100 MB MP4) via the same `mediaId` flow
-- Tighten preflight: image count, mime allowlist, exact size limits (1 MB images / 100 MB video), alt-text grapheme cap (2,000)
-- Confirm `post.queued → post.validated → post.published` webhook chain fires for every variant
-- `POST /v1/posts/validate` works for Bluesky (preflight-only)
-- `lmp-test` script grows: text post (today), single-image post, multi-image carousel, video post, alt-text echo, validation-only run
-
-*Pinterest rewrite:*
-- At OAuth-complete, fetch the user's boards via `GET /v5/boards` and store `defaultBoardId` on the account
-- Drop the `tokenMetadata.boardId/destinationUrl/imageUrl` carve-out entirely (delete the dispatch.ts code, gut the publisher's metadata reader)
-- Publisher reads `media[0]` (URL or `mediaId`), `text` as description, board from `account.defaultBoardId`
-- Per-post override extension: `pinterest: { boardId?, destinationUrl?, title? }` on the post body — the documented escape hatch for callers who want something other than the default board
-- Dashboard surfaces a "Default board" picker on the Pinterest account row (small select, fed by `GET /v5/boards`)
-- Image preflight: dimensions + aspect + size + URL reachability (the existing rules), now wired to the resolver instead of the metadata bag
-- `lmp-test` Pinterest test sends `media: [{ kind: "image", url }]` and expects a real publish
-
-**Problems solved:** 3 (opaque media rejections — Pinterest specifically gets the proper preflight; foundation for IG Reels / YouTube same shape).
-**Principles served:** 1 (preflight is the wedge), 2 (transparent errors continue), 4 (one media abstraction across N platforms).
-**Depends on:** Phases 1–7. The dashboard's connect drawer is reused as-is; only the post-publish path changes.
-**Effort:** ~1 week — media service (2 days) + Bluesky hardening (1–2 days) + Pinterest rewrite (2–3 days).
-**Risks:** S3 IAM policy footguns (public-read object ACLs disabled by default on new buckets — set bucket policy + Object Ownership = "Bucket owner enforced"); `@aws-sdk/lib-storage` chunk size tuning for slow uploaders.
-**NOT in scope:** S3 lifecycle deletion, CloudFront, byte-range serving, image transformation (resize / re-encode), video transcoding, signed-URL upload flow (callers go through our multipart endpoint; presigned PUT is a future option once we hit bandwidth pain).
-
-## Phase 8 — Meta Trio (IG + FB + Threads) — CODE DONE, AWAITING APP REVIEW
-
-**Status (May 2026):** All publishers shipped: Facebook (text, single photo, multi-photo, video), Instagram (single image, single video / Reels, 2–10 mixed-media carousel), Threads (text, image, video, 2–20 mixed carousel, replies). FBLB OAuth fan-out — one consent grants Pages + linked IG Business rows in a single `completeConnect`. Error mappers for `OAuthException 2207052` (IG URL-not-publicly-fetchable) + IG rate-limit code 4. Async media-publish polling (we await + surface; never silently-success). Awaiting Meta App Review approval (demo videos pending for some scopes); same-day deploy on approval.
-
-**Order rationale (April 2026):** moved ahead of X/Twitter because Meta is buildable today against the developer's own account + Tester accounts in Dev Mode (same Graph API endpoints, approval only lifts the testers-only restriction), while X requires a paid-tier signup decision that hasn't happened. Meta's gate is calendar (App Review submitted), X's is commercial — calendar moves whether we work or not, so we pick the platform we can ship code for in parallel.
-
-**Ready-to-build gate:** Meta developer app exists; App Review submitted (post-approval just flips Dev Mode → Live Mode, no new endpoints).
-
-**Ships:** Facebook Login for Business flow covering Pages + IG Business + Threads scopes; publishers per platform — IG (Feed single, carousel, Reels, Stories), FB (Page post, photo, video, link share), Threads (text, media, reply); preflight validator suites per platform — Reels (9:16 aspect, codec + duration + size, cover-frame), Threads (500-char + reply constraints), FB link preview (OG reachability), IG URL source (publicly reachable CDN preflight — direct answer to the Google-Drive-URL failure pattern); error mappers for `OAuthException 2207052`, rate-limit code 4, IG media-publish async status polling (we await and surface, not silently-success); business-account-type preflight. The `media: [{ kind, mediaId }]` resolver path from Phase 7.5 covers IG/FB image + video sourcing — no per-platform CDN carve-out.
-
-**Problems solved:** 1, 3, 4.
-**Principles served:** 1, 2, 3.
-**Depends on:** Phases 1–6, 7.5 (the media service is the source for IG / FB / Reels uploads).
-**Effort:** 3 weeks of code + Meta App Review wait time. Build progresses on Tester accounts during the wait; approval is a same-day deploy.
-**Risks:** Biggest external blocker in the plan. Keep engineering ready-to-ship so you deploy same-day on approval. IG's async media-publish polling is the publish-path edge case most likely to bite (silently-success patterns are the original wedge — don't reintroduce them here).
-**NOT in scope:** Shopping tags, collab posts, branded content, ads, Threads DM.
-
-## Phase 9 — Twitter/X — CODE DONE, AWAITING PAY-PER-USE DECISION
-
-**Status (May 2026):** All publisher code shipped. v2 OAuth 2.0 PKCE; up to 4 images per tweet; alt-text via v1.1 metadata endpoint (best-effort — tweet still publishes if alt-text fails, the v1.1 endpoint is on a separate deprecation track from /2/tweets); reply chains via `twitter.replyToTweetId`; quote tweets via `twitter.quoteTweetId` (mutually exclusive — preflight rejects both); image/video exclusivity preflight; `twitter.media.count_max` (replaced obsolete `twitter.media.single_only`); chunked video upload via INIT/APPEND/FINALIZE/STATUS poll with `twitter.media.video_processing_failed` + `twitter.media.processing_timeout` mapped; t.co-aware grapheme counter (URLs always count as 23 chars). PKCE codeVerifier embedded in signed OAuth state token so it survives the dashboard's full-page redirect to X (was the production blocker — fixed). Awaits commercial decision on X Pay Per Use signup.
-
-**Goal:** Third commercial platform; the framework's already proven generic by then (Bluesky + LinkedIn + Pinterest + Meta), so the slice is about platform-specific quirks, not framework validation.
-
-**Ships:** X OAuth 2.0 PKCE, refresh-token lifecycle; `POST /v1/posts` with `platform: "x"` including threads (reply-chain sequencing), polls, quote-tweets, single/multi-media, alt-text; preflight (280-grapheme / 25,000 for premium, media count + mime + size, thread reply-chain well-formedness, URL-shortening-aware counting); X-specific error mapper (duplicate-tweet, tweet-length, media format); paid-tier rate-limit surfacing (we tell users how close to ceiling they are — a small differentiator).
-
-**Problems solved:** 1, 3.
-**Principles served:** 1, 2, 3.
-**Depends on:** Phases 1–6, 7.5; X paid-tier signup.
-**Effort:** 2 weeks.
-**Risks:** X API policy changes (Feb 2026 pricing flip is the latest reminder that this platform isn't stable to plan against); pay-per-use budget visibility for the team.
-**NOT in scope:** Spaces, Community posts, ads.
-
-## Phase 10 — YouTube
-
-**Ready-to-build gate:** Google Cloud project with YouTube Data API v3 enabled. Verification (CASA) runs in parallel with build — unverified-app cap of 100 users is fine for staged rollout while the assessment clears.
-
-**Ships:** YouTube OAuth 2.0 with offline access + refresh-token lifecycle (Google's refresh tokens are long-lived but revoke on inactivity / scope changes); `POST /v1/posts` with `platform: "youtube"` — resumable upload to `videos.insert` with status `private` / `unlisted` / `public`; preflight validator suite (video container + codec — H.264 / H.265 / AV1 / VP9; audio codec — AAC / Opus; max file size — 256 GB / 12 hours; aspect ratio + resolution — Shorts vs. long-form; title ≤ 100 chars; description ≤ 5000 chars; ≤ 500 tags totaling ≤ 500 chars; categoryId in the per-region allowlist; thumbnail dimensions when supplied); resumable upload chunking with retry on transient 5xx; quota-cost surfacing (Data API spends 1600 units per upload against a default 10k/day project budget — we tell users how much budget remains, a small differentiator); error mapper for `quotaExceeded`, `forbidden`, `videoChunkTooBig`, `uploadLimitExceeded`, `mediaBodyRequired`. `POST /v1/posts/validate` runs the preflight without uploading.
-
-**Problems solved:** 1, 3, 4.
-**Principles served:** 1, 2, 3.
-**Depends on:** Phases 1–6; YouTube verification (parallelizable).
-**Effort:** 2.5–3 weeks (resumable upload + ffprobe-based preflight; both proven patterns we already need elsewhere).
-**Risks:** Verification timeline (CASA cost + scheduling); per-project quota cap on burst uploads — surface clearly, document raising it.
-**NOT in scope:** Live streams, community tab posts, comment moderation, Shorts-specific Reels-cross-posting, Studio analytics.
-
-## Phase 11 — Pinterest extras (post-7.5) — VIDEO DONE
-
-**Status (May 2026):** Video pin support shipped — `POST /v5/media` registers a slot, multipart-uploads bytes to the presigned S3 endpoint Pinterest hands back, polls `GET /v5/media/{id}` until status flips to `succeeded`, then `POST /v5/pins` with `media_source: { source_type: "video_id", media_id, cover_image_url }`. `pinterest.video.cover_required` preflight catches the most common gotcha (Pinterest mandates a still-frame URL on every video pin) before the upload runs. Mime + size + transcode-failed + transcode-timeout + register-failed + upload-failed all mapped as preflight rules. Image pin path unchanged.
-
-**Still on the plate:**
-- Rich pins (article / product) — schema.org markup + URL preflight
-- Board ownership preflight (verify the user can pin to `boardId` before hitting Pinterest's API)
-- Pinterest-specific error mapper polish — duplicate-pin, board-deleted, content-policy
-- Standard Access submission (the demo-video gate)
-
-**Depends on:** Phase 7.5.
-**Effort:** 2–3 days plus Standard Access wait.
-**Risks:** Low — image MVP + video pins are proven by 7.5.
-**NOT in scope:** Catalog/feed sync, ads, idea pins.
-
-## Phase 12 — OpenAPI Pipeline, TS SDK, Autogen'd Python + Go
-
-**Goal:** Three SDKs ready to publish.
-
-**Ships:** `packages/openapi` — Zod → OpenAPI 3.1 generation wired into CI; `packages/sdk-ts` — hand-rolled thin fetch wrapper with typed clients per resource, idempotency-key helper, webhook signature verifier, typed error classes per error code, retry/backoff, streaming helpers for media; Changesets → `@letmepost/sdk` on npm; `sdk-sync.yml` GitHub Action regenerates Python (`openapi-python-client` / `datamodel-code-generator` + httpx) and Go (`oapi-codegen`) into sibling repos on OpenAPI change; both generated SDKs get a thin hand-written façade layer so the public API feels designed, not generated; smoke tests in all three SDKs hit a mock server.
-
-**Problems solved:** Enabling (ships DX).
-**Principles served:** 6, 7.
-**Depends on:** Phase 6 minimum — API shape stable enough to freeze.
-**Effort:** 2 weeks TS + 1 week Py/Go generators = 2.5–3 weeks combined. Py/Go can lag v1 if scope demands.
-**Risks:** Autogen façade is where quality dies. Budget naming-polish time.
-**NOT in scope:** CLI, MCP adapter, LangGraph / CrewAI adapters.
-
-## Phase 13 — Marketing + Docs Site — STRUCTURE DONE, CONTENT DRIPPING
-
-**Status (May 2026):** Docs pivoted from the originally-planned Astro-Starlight-Scalar single-deploy to **Mintlify at `docs.letmepost.dev`** (custom looked amateur — Mintlify ships Stripe-tier defaults). Marketing landing stays on `apps/web` (Astro). Live today:
-
-- **Mintlify docs**: ~120 MDX pages — auth / API keys / idempotency / errors / webhooks / OAuth lifecycle / per-platform guides / **one page per error code** (11/11) / **one page per preflight rule** (~80) / API reference rendered from `docs/api-reference/openapi.json` (Zod-derived). Maple theme, navbar with Docs/Product tabs.
-- **Astro landing** at `letmepost.dev`: hero, "fails loudly" pitch, request + error sample, three-step how-it-works, four principles, endpoint list, platform-status list, FAQ, final CTA. Borderless chrome. Container 820px (was 720). Navbar at 1100px with Docs + Product two-column dropdown.
-- **Per-platform marketing pages** at `/platforms/[slug]` × 8 — hero with status badge, code sample, content-type chips, demo placeholder, three-step how-it-works, features grid, gotcha callouts (Trial Access for Pinterest, MDP for LinkedIn, Pay Per Use for X, FBLB-not-/instagram for Instagram, etc.).
-- **Per-API marketing pages** at `/api/[slug]` × 3 — Publishing API, Media API, Webhooks. Hero, code sample (TS for publishing/webhooks, bash for media), feature grid.
-- **`/pricing`**: TBD content, four commitment principles, three-card tier preview (Free / Pro=TBD / Self-host), 5 FAQs.
-- **`/blog`**: scaffolded — `@astrojs/mdx` integration, content collection at `src/content/blog/` with strict Zod frontmatter (title, description, pubDate, updatedDate?, author, tags, heroImage?, draft, canonicalUrl?), `/blog` index sorts by pubDate desc and hides drafts in prod, `/blog/[...slug]` post page with Article JSON-LD + BreadcrumbList, `/rss.xml` auto-discovered feed. Sample seed post (`draft: true`) explains the publishing flow.
-- **Full SEO suite**: sitemap at `/sitemap-index.xml` with per-route priority/changefreq/lastmod (home 1.0 weekly; product 0.9 weekly; pricing 0.85 monthly; legal 0.3 yearly); `/sitemap.xml` convention alias; JSON-LD on every page (Organization + WebSite default, FAQPage on home, BreadcrumbList + SoftwareApplication on platform pages, BreadcrumbList on API pages, BlogPosting on posts); `twitter:site` + `twitter:creator` set to `@letmepostdotdev`; `og:type` per-page (`product` on platform/API pages, `article` on posts); robots.txt explicitly allows GPTBot, ChatGPT-User, OAI-SearchBot, ClaudeBot, Claude-Web, PerplexityBot, Perplexity-User, Google-Extended, anthropic-ai, cohere-ai, Applebot-Extended, Bytespider.
-
-**Still on the plate:**
-- **Blog content** — write the launch series. Targets: LinkedIn version-churn flagship; "fails loudly" thesis; OAuth lifecycle deep-dive; idempotency-keys vs retry-storms.
-- **Live preflight-failure demo** on the home page (currently the platform pages have "demo coming soon" placeholders).
-- **Per-platform live-connect demo** in the playground card on each platform page (the placeholder structure is there).
-- **Migration guides** from Ayrshare / Postiz / Buffer (drafts pending).
-- **Public API Version Tracker** UI rendering `GET /v1/platform-versions` (the API exists; the docs landing for it doesn't).
-- **Lighthouse 100** verification across all marketing + docs pages in CI.
-- **Per-page OG images** (currently all pages share `/og-image.png` — fine for v1, sharper for launch).
-
-**Problems solved:** All indirectly (this is where the narrative lives).
-**Principles served:** 5, 6, 7.
-**Effort spent:** ~2 weeks; remaining content + polish ~1 week.
-**Risks:** Writing quality is the bottleneck. Do not outsource. Pull content from the existing research corpus.
-**NOT in scope:** Community forum, multilingual, interactive sandbox beyond the preflight + per-platform demos.
-
-## Phase 14 — Observability, Security, Launch Prep, Pricing Decision
-
-**Goal:** Don't get embarrassed on HN day.
-
-**Ships:** Sentry + Axiom dashboards with saved queries for the top 10 operational questions; structured audit log for account-connect and key events; secret-scanning in CI (gitleaks); Dependabot; SBOM; `RateLimit-*` response headers per RFC; status page (simple — Statuspage or self-rolled Astro page reading a check endpoint); k6 load test against staging to establish baseline and tune BullMQ concurrency; security review of token-encryption + webhook-signature paths (ideally a second pair of eyes); Terms / Privacy / Apache-2.0 LICENSE / CONTRIBUTING / SECURITY.md; self-host Docker Compose story working end-to-end (same API, same code); **n8n community node** scaffolded; **pricing decision locked** (flat tier shape, free tier size, overage model).
-
-**Problems solved:** 1 (observability), 5 (pricing resolution), enabling.
-**Principles served:** 5, 7.
-**Depends on:** Everything prior.
-**Effort:** 1.5 weeks.
-**Risks:** Self-host Docker tends to have one surprise (Redis URL format, cert trust). Leave a day. Pricing decision should not drag — decide even imperfectly rather than delay launch.
-**NOT in scope:** SOC 2, HIPAA, BAAs.
-
-## Phase 15 — v1 Public Launch
-
-**Goal:** Ship.
-
-**Ships:** Announcement (HN, Bluesky, LinkedIn, Twitter/X); launch blog post (LinkedIn version-churn piece as hook); Show HN; DM outreach to n8n / Make / Zapier community-node maintainers; Product Hunt scheduled +7 days; n8n community node published.
-
-**Depends on:** Phases 1–14.
-**Effort:** 1 week.
-**Risks:** Comment response load on launch day.
-
----
-
-## Parallelism Map
-
-| Week | Primary track | Background |
+| Platform | State | Notes |
 |---|---|---|
-| Day 0 | — | Submit: Meta, YouTube CASA, X, LinkedIn MDP, Pinterest |
-| 1–2 | Phase 1: Persistence | External reviews in queue |
-| 3–4 | Phase 2: Auth + API keys | Docs narrative drafts begin (continuous from here) |
-| 5–6 | Phase 3: Idempotency + errors + obs wiring | Error-code registry docs drafts |
-| 7–8 | Phase 4: Queue + webhooks | — |
-| 9–10 | Phase 5: OAuth framework + Bluesky migration | LinkedIn preflight rule docs authored |
-| 11 | **Phase 5.5: Profiles (retrofit)** | — |
-| 12–14 | **Phase 6: LinkedIn (3 wks)** | TS SDK skeleton stubbed in week 14 |
-| 15–16 | Phase 7: Dashboard | TS SDK continues |
-| 17 | **Phase 7.5: Media + S3 + Bluesky/Pinterest hardening — DONE** | — |
-| 18–20 | **Phase 8: Meta trio — CODE DONE** (awaiting App Review for Live Mode) | Py/Go generators; same-day deploy on approval |
-| 21–22 | **Phase 9: X/Twitter — CODE DONE** (awaiting Pay Per Use decision; PKCE state-embedding fix shipped) | — |
-| 23–25 | Phase 10: YouTube (build during CASA verification — not yet started) | — |
-| 26 | **Phase 11: Pinterest video pin — DONE.** Extras (rich pins, board ACL preflight) outstanding. Standard Access demo video pending. | — |
-| 27–29 | **Phase 13: Site + docs — STRUCTURE DONE** (Mintlify pivoted; landing redesigned; blog scaffolded; full SEO; per-platform/API pages; pricing). Content + Lighthouse 100 verification outstanding. | Contract test cron stabilization |
-| 30 | Phase 14: Obs + security + launch prep + pricing | — |
-| 31 | Phase 15: Launch | — |
+| Bluesky | **live** | Text, single image, multi-image (4-up carousel), video via `app.bsky.video.uploadVideo` service flow + job poll. Alt-text round-trip. |
+| Pinterest | **live** | Image pins, video pins (`POST /v5/media` → S3 multipart → poll → `createPin` with `source_type: video_id`), board picker, default-board setting. Standard Access cleared. |
+| Twitter / X | **live** | OAuth 2.0 PKCE (codeVerifier embedded in signed state), up to 4 images per tweet, alt-text via v1.1, chunked video upload (INIT/APPEND/FINALIZE/STATUS), reply chains, quote tweets, t.co-aware grapheme counter, 50-billable-posts-per-account-per-30d launch cap. |
+| LinkedIn | **live** | Personal + organization posting via the AccountProvider framework. 3,000-grapheme emoji-aware preflight, URN validation, `LinkedIn-Version` pinning, ACL preflight for org posts. MDP cleared. |
+| Facebook | **live** | Text, single photo, multi-photo, video. FBLB OAuth fan-out grants Pages + linked IG Business + Threads in one consent. App Review cleared. |
+| Instagram | **live** | Single image, single video / Reels, 2–10 mixed-media carousel. URL-source preflight (direct answer to the Google-Drive-URL failure pattern), `OAuthException 2207052` mapped. Async media-publish polling — we await and surface. App Review cleared. |
+| Threads | **live** | Text, image, video, 2–20 mixed carousel, replies. App Review cleared. |
+| TikTok | **pending** | Publisher fully built: OAuth 2.0 PKCE, `push_by_file` upload to inbox, status-poll worker with bucketed backoff (5s → 30s → 120s up to 30 min). State flips on App Review approval — code is ready, no further work needed there. Posts go to inbox with `privacy=SELF_ONLY` until Direct Post (`video.publish`) audit clears. |
 
-Note: weeks 26–28 count as the *polish* window for docs, assuming the continuous-drip rule worked. If not, add 1–2 weeks. Realistic ship window: **7–8 months from Day 0**, accounting for Meta App Review + YouTube CASA verification variance.
-
-**Strictly sequential:** 1 → 2 → 3 → 4 → 5 → 5.5 → 6 → 7 → 7.5.
-**Can parallelize:** Phase 7 (dashboard) with Phase 9 (X) and Phase 12 (SDKs); Phase 8 Meta build runs concurrently with App Review since Tester-account publishes work in Dev Mode.
-**Calendar-gated:** 8 (Meta App Review — build proceeds against Tester accounts in Dev Mode, deploy flips to Live on approval), 10 (YouTube CASA verification).
-**Always-background:** Docs narrative (Phase 13).
+**Deferred to v2+:** YouTube (CASA verification path; deprioritized vs TikTok in the April 2026 scope update), Reddit, Telegram, Discord, Snapchat, Google Business, WhatsApp.
 
 ---
 
-## Added to plate (after the original plan)
+## What's shipped
 
-Tracked here so the work doesn't disappear into a phase that's marked done.
+### Core API
 
-**Code (small, mostly carried from session-end TODOs):**
+- **`POST /v1/posts`** — single endpoint, accepts text + media + scheduling + per-platform overrides + idempotency key. Dual auth: Bearer API key *or* dashboard session cookie.
+- **`POST /v1/posts/validate`** — preflight only, no publish. Useful for CI integration.
+- **`PATCH /v1/posts/:id`** — reschedule a queued post. Atomic (remove BullMQ job → re-enqueue at new delay → persist time). Window-gated to `status=queued AND scheduledAt > now`.
+- **`DELETE /v1/posts/:id`** — cancel a queued post. Same window. Transitions row to terminal `canceled` status. Worker race-safe: queued→publishing transition is a conditional `UPDATE … WHERE status IN ('queued','validated')` so a `DELETE` landing mid-flight matches zero rows and the worker bails cleanly.
+- **`POST /v1/posts` mediaRefs persisted** on scheduled inserts so the worker publishes the same media the caller submitted.
+- **`POST /v1/media`** — multipart upload, streamed direct to S3 via `@aws-sdk/lib-storage`'s `Upload`. Returns `{ id, url, contentType, sizeBytes, sha256 }`. Public-read via bucket policy on `s3:GetObject`; security rests on ~131-bit key entropy (`med_` + 22 base62).
+- **`POST /v1/accounts/connect/:platform`** — returns OAuth URL or app-password form. Accepts validated `returnTo` (against `DASHBOARD_URL` + `TRUSTED_ORIGINS`) so the marketing-site demo and dashboard can both use it.
+- **`GET /v1/accounts/oauth/:platform/callback`** — generic callback router.
+- **`/v1/accounts`**, **`/v1/api-keys`**, **`/v1/webhook-endpoints`**, **`/v1/profiles`** — CRUD with org + profile scoping.
+- **`/v1/billing/checkout`**, **`/v1/billing/portal`**, **`/v1/lemonsqueezy/webhook`** — Lemon Squeezy integration.
+- **`/v1/oauth-exchange`** — trades a verified OAuth JWT for a plaintext API key. CLI's `lmp login` flow.
+- **`/v1/resend/webhook`** — svix-signed delivery + complaint events from Resend.
+- **`/.well-known/oauth-authorization-server`** + **`/.well-known/oauth-protected-resource`** — RFC 8414 + RFC 9728, with `/api/auth` and `/mcp` suffixed variants.
+- **`/v1/platform-versions`** — public version tracker endpoint (LinkedIn-Version, X API tier, IG Graph version, …).
+- **`/v1/data-deletion`** — Meta-required deauth + data-deletion callback.
+
+### Reliability + contracts
+
+- **Idempotency-Key** on all writes — 24h replay window, stored response fingerprint, body-hash conflict detection.
+- **Canonical `ErrorResponse`** — `code`, `rule`, `platform`, `platform_version`, `platform_response`, `remediation`, `request_id`, `trace_id`.
+- **Error code registry** — one docs page per code (11/11). Codes: `unauthenticated`, `unauthorized`, `validation_failed`, `preflight_failed`, `platform_rejected`, `platform_auth_failed`, `platform_unavailable`, `platform_not_enabled`, `rate_limited`, `idempotency_conflict`, `not_found`, `internal_error`.
+- **Per-platform preflight rule pages** — ~95 individual preflight rule pages on docs (Bluesky, Pinterest, Twitter, LinkedIn, Meta trio, TikTok + cross-platform).
+- **`@upstash/ratelimit`** — per-key quota + per-IP floor + per-platform connect-attempt floor.
+- **AES-256-GCM envelope encryption** for OAuth token blobs (DEK per token, KEK in env, rotation-ready).
+- **OAuth state HMAC-signed** with 10-min TTL; X PKCE `codeVerifier` rides the same envelope so dashboard full-page redirects don't lose it.
+- **Twitter launch cap** — 50 billable posts (`published`/`rejected`/`failed`) per account per rolling 30 days, enforced via the `PublishContext` gate pattern in `_shared/dispatch.ts`. Returns `rate_limited` 429 with `Retry-After` from the oldest billable post.
+- **Pre-publish gate pattern** — gates throw `LetmepostError`, live in `platforms/<name>/<gate>.ts`, called from `_shared/dispatch.ts`. Required-not-optional `db` on `PublishContext`. Documented in `CONTRIBUTING.md` §3.5.
+
+### Queue + webhooks
+
+- **BullMQ on Upstash Redis** — queues: `publish`, `validate`, `refresh-token`, `webhook-deliver`, `onboarding-email`, `tiktok-publish-status-poll`, `billing-dunning`, `log-retention`.
+- **Stable BullMQ jobIds** — `publish:<postId>` so cancel/reschedule can find and replace by post id.
+- **18 webhook event types** — `post.queued`, `post.validated`, `post.published`, `post.rejected`, `post.failed`, `post.canceled`, `post.rescheduled`, `token.expiring`, `token.revoked`, `version.deprecated`, `subscription.activated`, `subscription.cancelled`, `subscription.tier_changed`, `quota.warning`, `quota.exceeded`, `billing.payment_failed`, `billing.delinquent`, `billing.recovered`.
+- **HMAC-SHA256 webhook signing**, exponential backoff, dead-letter queue, per-endpoint event filter, **Send Test** button in the dashboard fires a synchronous test delivery with per-type editable JSON payload.
+
+### Billing (Lemon Squeezy)
+
+- **Three tiers** locked: Free (50 posts/mo), Pro ($79/mo for 5,000), Business ($299/mo for 25,000). Self-host is unlimited. Enterprise dropped from the ladder until a sales path exists.
+- **Body-hash event id** — Lemon Squeezy has no `X-Event-Id` header.
+- **Checkouts API** (not legacy `/buy/` URL).
+- **Fail-soft invoices** so dashboard always renders.
+- **CSRF-hardened webhook**, status-aware (respects LS subscription state).
+- **Quota gate on `POST /v1/posts`** — idempotent replays skip the counter (idempotency middleware short-circuits before the handler). Infinity-quota tiers (self_host) bypass the cap.
+- **Dunning + retention jobs** — hourly past_due → delinquent sweep; nightly per-org log cleanup respecting tier retention windows (Free 14d / Pro 30d / Business 180d).
+- **`BILLING_ENABLED` env gate** for self-host.
+
+### Profiles (free org-structure primitive)
+
+- `profiles` table; `platform_accounts.profile_id` NOT NULL with a "Default" profile auto-created per org.
+- `api_keys.scope` accepts optional `profile_id` (empty scope = org-wide).
+- `/v1/profiles` CRUD; `/v1/accounts` and `/v1/posts` enforce scope.
+- Profile-scoped query keys + `?profileId=` filter on the dashboard; post + webhook lifecycle events carry `profileId`.
+- **Cross-profile keys 404, not 403** — avoids leaking existence.
+
+### Media service
+
+- S3 bucket `letmepost-media`, Object Ownership = "Bucket owner enforced", keys `${env}/${orgId}/${mediaId}.${ext}`.
+- `MediaInput` variants: `{ kind, mediaId }` (preferred), `{ kind, url }` (passthrough for callers with their own CDN), `{ kind, bytesBase64 }` (tiny images).
+- Shared `apps/api/src/platforms/_shared/media.ts` resolver — every publisher calls `resolveMedia(item)`.
+
+### SDKs + agent tooling
+
+- **`@letmepost/sdk`** — hand-written TypeScript client mirroring every `/v1/*` endpoint. Idempotency-key helper, webhook signature verifier, typed error classes, retry/backoff.
+- **Python (`letmepost`) + Go (`github.com/letmepost/letmepost-go`)** — generated from OpenAPI 3.1 (down-converted to 3.0 for Go's `oneOf` codegen).
+- **`@letmepost/mcp`** — stdio MCP server. `npx @letmepost/mcp@latest`. 21 tools generated from the OpenAPI spec.
+- **`@letmepost/cli`** — `npm i -g @letmepost/cli` → `lmp` binary. Commands: `login`, `logout`, `whoami`, `version`, `accounts`, `posts`, `post`, `profiles`. Config at `~/.letmepost/config.json`.
+- **Hosted MCP** at `api.letmepost.dev/mcp` — streamable HTTP, stateless. Accepts API keys *or* OAuth 2.1 bearer tokens.
+
+### OAuth 2.1 provider
+
+- **Dynamic Client Registration** (RFC 7591) — MCP clients self-register at install.
+- **PKCE-only flow** — no client secrets in fat clients.
+- **RFC 8707 resource indicators** — `aud` claim is the MCP endpoint URL, validated per-tool-call.
+- **Path-suffixed well-known** endpoints (RFC 8414, RFC 9728).
+- **`WWW-Authenticate: Bearer resource_metadata="..."` on `/mcp`** so MCP clients discover the OAuth surface from a single header.
+- **Hosted login + consent screens** on the dashboard.
+- **`/mcp` accepts both shapes** — API keys (`lmp_live_` / `lmp_test_` prefix) pass through; JWTs are JWKS-verified and mint a per-user `letmepost-mcp` API key on first use, cached by `sub`.
+
+### Dashboard (`apps/dashboard`)
+
+Next.js App Router, better-auth session, shadcn, Commit Mono + Instrument Serif wordmark, framer-motion blur+y transitions.
+
+- **Sign-in / sign-up** with email/password + Google + GitHub. Sign-up handles unverified-email path via a `/verify-email` polling screen that forwards to `/onboarding` once the session arrives. Org name typed at signup is stashed and recreated post-verify.
+- **`/onboarding`** — silent recovery for sessions without an active org. Picks the first existing org, else creates one named after the user.
+- **`/`** — first-run accordion checklist (Copy your API key → Connect a platform → Send your first post) with per-step bodies (curl preview, brand-icon platform grid, live "Send test post"). Fades to count cards when complete.
+- **`/posts`** — primary compose surface (renamed from old `/posts` which is now `/logs`). Grid + list + calendar subroutes. Create Post sheet modeled on Zernio's two-column shape (content left, profile + accounts + Schedule / Now / Queue / Draft tabs right). shadcn calendar + popover for scheduler input. Calendar month view with chips per day, day-sheet on `+N more`.
+- **`/logs`** — TanStack Table post log. Server-side filters: profile × platform × status × error-code × time-range. Detail view: full ErrorResponse contract, attempts timeline, copy-as-curl with pre-filled key prefix and `mediaRefs` + `scheduledAt`.
+- **`/calendar`** — month grid; click a chip → side drawer with reschedule (shadcn calendar) + cancel buttons wired to the `PATCH`/`DELETE` endpoints.
+- **`/accounts`** — list + connect + descriptor-driven dynamic field form for credential platforms. Per-profile filter.
+- **`/profiles`** — CRUD with auto-derived slug, delete-blocked-when-non-empty surfaced as a 409 toast.
+- **`/api-keys`** — list / create (Name + Environment + Scope) / revoke. Plaintext shown once with auto-copy on creation.
+- **`/webhooks`** — CRUD + Send Test dialog (event-type select + editable JSON + delivery result panel).
+- **`/billing`** — plan card, animated usage meter (polled every 60s), upgrade flow, invoices list, eager-written cancel + reactivate state.
+- **`/settings`** — Usage / Profile / Danger Zone tabs.
+- **`/media`** — upload + library.
+- **`/analytics`** — placeholder with `feature.requested` vote button.
+- **Sidebar** — brand mark, sectioned nav, org dropdown with `switch-organization` submenu, theme icon in header, billing in account dropdown.
+
+### Marketing site (`apps/web`)
+
+Astro, receipt-themed visual identity, brand mark + wordmark synced to dashboard + docs.
+
+- **`/`** — hero, "fails loudly" pitch, code-block tabs (curl / TS / Python), itemized `WHAT YOU GET`, platform status strip, error envelope sample, MCP teaser, tariff sheet, fine-print FAQ, final centered CTA. Latest-writing strip pulls from `/blog`.
+- **`/platforms/[slug]` × 8** — hero with status badge, code sample, content-type chips, demo placeholder, how-it-works, features grid, gotcha callouts.
+- **`/api/[slug]` × 3** — Publishing API, Media API, Webhooks. Hero, code sample, feature grid.
+- **`/pricing`** — Three-card tier (Free / Pro $79 / Business $299), Business+ enquiry block, billing FAQ.
+- **`/agents`** — MCP-first landing. OAuth 2.1 + DCR, stdio binary, hosted streamable-HTTP. Agent-builder FAQ.
+- **`/about`** — solo, open source, built in public.
+- **`/blog`** — Notion-backed via daily Vercel cron rebuild. Reading-view design, single column, large type, syntax-highlighted code, breadcrumbs, alt-text on cover images, self-hosted fonts for FCP.
+- **`/status`** — service-health stub.
+- **`/terms`**, **`/privacy`**, **`/data-deletion`**, **`/contact`** — legal + Meta-required.
+- **`/llms.txt`** — concise spec for LLM crawlers.
+- **`/rss.xml`** — feed for `/blog`.
+- **Full SEO suite** — sitemap with priority/changefreq/lastmod, JSON-LD on every page (Organization + WebSite + FAQPage + BreadcrumbList + SoftwareApplication + Product + BlogPosting), `twitter:site`/`creator`, AI-crawler robots.txt directives (GPTBot, ChatGPT-User, OAI-SearchBot, ClaudeBot, Claude-Web, PerplexityBot, Google-Extended, anthropic-ai, cohere-ai, Applebot-Extended, Bytespider).
+- **PostHog product analytics** — typed `track()` helper, ~30 events covering marketing CTAs, signup → first-publish funnel, OAuth lifecycle, post lifecycle, api-keys, webhooks, theme/org. Person identification via better-auth session with active org as a PostHog group. Conventions in `CONTRIBUTING.md` §11.
+
+### Documentation (`docs/`, Mintlify Maple)
+
+~120 MDX pages at `docs.letmepost.dev`. Tabs: Quickstart / Platforms / Webhooks / API Reference / Errors / Preflight.
+
+- **Quickstart**: quickstart, authentication, idempotency, errors index, preflight index.
+- **Agents**: MCP, CLI.
+- **Guides**: connect-account, publish-post, schedule-post, upload-media, migrate-from-{postiz, ayrshare, buffer}.
+- **Self-host**: quick-start, environment, platform-credentials, deploying, troubleshooting.
+- **Platforms** (one per platform × 8): caps, scopes, gotchas, code samples.
+- **Errors** (one per code × 11).
+- **Preflight** (one per rule × ~95, grouped by platform).
+- **API Reference** — auto-rendered from `docs/api-reference/openapi.json` (Zod-derived).
+- **Webhooks** — one page per event type.
+- **Changelog** + **Pricing** + **SDKs** (TS / Python / Go).
+- Navbar: Dashboard CTA, GitHub link, X link, llms.txt, OpenAPI download.
+- Contextual menu enabled (Copy / View / ChatGPT / Claude).
+
+### Observability + ops
+
+- **Sentry** on api + worker + dashboard. Node services via separate `instrument.mjs` loaded with `node --import` for ESM-compatible OpenTelemetry auto-instrumentation. Dashboard via `@sentry/nextjs`. Production Dockerfile copies `instrument.mjs` into the image.
+- **Axiom** OTel exporter for logs + traces.
+- **PostHog** product analytics across web + dashboard.
+
+### Email (Resend)
+
+- **Founder-voice onboarding sequence** — D0 welcome, D1 first-post nudge, D3 stuck-check, D5 webhooks nudge, D7 Sean Ellis PMF question. Gated on email verification. Each email is a pure function of the user's state; D1/D3/D5 skip themselves when their gating condition is already met. Signed `kamal`.
+- **`Idempotency-Key` deduplication** at the Resend layer.
+- **Svix-signed webhook** for delivery + complaint events.
+- **Suppression list** — hard bounces and complaints write to `email_suppressions` (PK on lowercased email). Onboarding worker checks before sending. Best-effort cancellation of queued onboarding jobs for newly-suppressed addresses.
+- **RFC 2369 `List-Unsubscribe`** mailto header on every transactional email. RFC 8058 one-click skipped pending the HTTPS endpoint.
+
+---
+
+## Approvals — open
+
+- **TikTok App Review** — submitted. Publisher is fully built; state flips from `pending` → `live` the day approval clears. Sandbox / audit accounts post to inbox with `privacy=SELF_ONLY` until then.
+- **Pinterest Standard Access** — cleared.
+- **Meta App Review** (IG + FB + Threads) — cleared.
+- **LinkedIn MDP / Community Management API** — cleared.
+- **X Pay Per Use** — signup complete; launch cap (50 billable posts / account / 30d) in place as the cost backstop.
+- **YouTube CASA verification** — not started. Deprioritized; YouTube is currently a v2 candidate.
+
+---
+
+## Pre-launch — what's left
+
+The remaining work is content, demos, and one-off polish.
+
+### Content
+
+- **First 2–3 blog posts** in the launch series. Candidates: LinkedIn version-churn flagship; "fails loudly" thesis; OAuth lifecycle deep-dive; idempotency vs retry-storms. Notion is the source for `/blog`.
+- **Migration guides** (`/migrate/[from]` or `docs/guides/migrate-from-*`): Ayrshare drafts polished, Postiz + Buffer flesh-out.
+- **Per-platform live-connect demo** in the playground card on each `/platforms/[slug]` page (placeholder structure exists; backend `returnTo` carve-out works — just needs UI wiring).
+- **Live preflight-failure demo** on the home page (currently a static error sample).
+- **Public API Version Tracker UI** rendering `GET /v1/platform-versions` (API exists; docs landing for it doesn't).
+
+### Code TODOs
 
 - `apps/api/src/platforms/twitter/provider.ts` — call `GET /2/users/me` on `completeConnect` to replace the synthetic `twitter-${uuid}` `platformAccountId` with the real X user id. One TODO marker; ~30 LOC.
-- `apps/api/src/routes/posts.ts` — `POST /v1/posts/validate` endpoint (preflight without publishing). Mentioned on the docs / preflight index page as "when it ships." Useful for CI integration patterns by users.
-- `apps/api/src/platforms/_shared/media.ts` — eviction / lifecycle policy for the S3 bucket once we have a real bandwidth bill. Not v1.
-- **Scheduled-post per-platform overrides not persisted.** Worker now wires `mediaRefs` through to publishers (fixed alongside the X launch cap), but Pinterest `boardId` / Threads `replyToId` / Twitter `replyToTweetId,quoteTweetId` aren't stored on the `posts` row — scheduled posts degrade to platform defaults. Adding columns + back-fill is a phase-7.5-followup.
-- Test brittleness: 5 pre-existing failures in `tests/accounts.test.ts` + `tests/post-log.test.ts` (session-auth path). Not caused by recent work — pre-existing on baseline. Worth a focused fix slice when there's spare cycles. Tests for the new `assertPlatformEnabled` + X launch-cap paths are also pending — preflight-style, no real DB; should land before public launch.
+- **Scheduled-post per-platform overrides** — `mediaRefs` is persisted on schedule; Pinterest `boardId` / Threads `replyToId` / Twitter `replyToTweetId,quoteTweetId` are not. Worker degrades to platform defaults for those. Add columns + back-fill before the launch.
+- **Eviction / lifecycle policy** for the S3 media bucket. Not v1 unless a real bandwidth bill shows up.
+- **Test brittleness** — 5 pre-existing failures in `tests/accounts.test.ts` + `tests/post-log.test.ts` (session-auth path). Worth a focused fix slice before launch. Tests for `assertPlatformEnabled` + X launch-cap paths are also pending — preflight-style, no real DB; should land before public launch.
 
-**Marketing site (`apps/web`):**
+### Pre-flight on the launch gate
 
-- Live preflight-failure demo on home page (currently a static error sample).
-- Per-platform live-connect demo in the playground card on each `/platforms/[slug]` page (placeholder structure exists; backend endpoint needs a "demo connect" carve-out).
-- `/blog` content: launch series (LinkedIn version-churn flagship; "fails loudly" thesis; OAuth lifecycle; idempotency vs retry-storms).
-- Migration guides from Ayrshare / Postiz / Buffer (in `apps/web` blog or separate `/migrate/[from]` pages).
-- `/platform-versions` UI rendering `GET /v1/platform-versions`.
-- Per-page OG images (currently shared).
-- Lighthouse 100 enforcement in CI.
+- **Smoke-test the platform-state gate in production-like env**: connect drawer should grey out `pending` tiles, `tiktok` should 403 with `platform_not_enabled` on POST `/v1/accounts/connect/tiktok`.
+- **End-to-end smoke for all 7 live platforms** — connect, publish, idempotency replay, webhook delivery, error contract surfacing.
+- **Self-host** — `docker compose up` against fresh Postgres + Redis. Same API responses as hosted.
+- **Lighthouse 100** on all marketing + docs pages (mobile + desktop). Add to CI.
+- **k6 load test** against staging — establish baseline, tune BullMQ concurrency.
+- **Security review** of token-encryption + webhook-signature paths.
 
-**Mintlify docs (`docs/`):**
+### Launch artifacts
 
-- Optional preflight pages for the transport-failure rules left undocumented (`bluesky.video.upload_failed`, `bluesky.video.job_status_unavailable`, `pinterest.media.status_unavailable`, `pinterest.video.upload_unreachable`, `twitter.media.upload_unreachable`). Currently surfaced via `remediation` on the API response only. Low priority.
-- `/v1/media` upload-route validation rules (`media.content_type`, `media.empty_body`, `media.missing_file`, `media.parse_failed`, `media.single_file`, `media.size_max`) — better documented inline on the upload-media guide than as separate pages. Currently OK.
-
-**Approvals + deploys:**
-
-- Meta demo videos for App Review submission (per-scope).
-- Pinterest Standard Access demo video.
-- X Pay Per Use signup decision.
-- YouTube CASA verification kickoff.
-- **PostHog project keys** in Vercel for prod web + dashboard (`PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_KEY`). Same project key recommended across both apps for funnel stitching; separate dev/preview project if you want to keep preview traffic out of prod analytics.
-- **Smoke-test the launch gate in production-like env** — connect drawer should grey out pending tiles + badge Pinterest/X as trial; a curl against `POST /v1/accounts/connect/linkedin` should 403 with `platform_not_enabled`.
-- Verify Twitter PKCE fix on Railway production once Pay Per Use signup completes (the codeVerifier-in-state fix was deployed; needs a real auth round-trip to confirm).
+- HN launch post + comment-response staffing for day one.
+- Bluesky + LinkedIn + X announcement threads (each platform's account auto-publishes via letmepost).
+- Show HN.
+- n8n community node — scaffold + publish.
+- Product Hunt scheduled +7 days from HN.
+- Outreach DM templates for n8n / Make / Zapier community-node maintainers.
 
 ---
 
-## Explicitly deferred to v2+ (scope lock)
+## Verification — when v1 is shippable
 
-The following will be asked for. The answer is "not in v1":
+1. All "live" platforms publish a real post end-to-end through the hosted API with idempotency + webhooks + error mapping verified.
+2. Contract tests green on cron (real API, not MSW) for every live platform for 7 consecutive days.
+3. **Profile isolation verified** — a profile-scoped API key cannot read, publish from, or modify accounts in a sibling profile. Cross-profile access 404s. Org-wide keys keep working against any profile.
+4. **Post Log renders the full error contract** for every failure class (`preflight_failed`, `platform_rejected`, `platform_auth_failed`, `platform_unavailable`, `validation_failed`, `internal_error`, `idempotency_conflict`, `rate_limited`), with raw platform response visible and copy-as-curl on every row.
+5. **Docs parity** — every error code has a page; every preflight rule has a page with upstream citation; every endpoint has runnable examples in TS / Python / Go / cURL.
+6. **SDK parity** — TS, Python, Go on their respective registries; smoke tests green.
+7. **Self-host parity** — `docker compose up` works against fresh Postgres + Redis.
+8. **Lighthouse 100** on all marketing + docs pages.
+9. **Load test** — API handles 500 req/s sustained on a single Railway instance with p95 < 250ms (excluding upstream platform latency).
+10. **Pricing live** with committed tier shape (Free / $79 / $299 / self-host unlimited).
+11. **n8n community node published** and linked in docs.
 
-- **Inbox surfaces** — comments, DMs, reviews, comment-to-DM automations. Entire product line for v2.
-- **Ads manager** across Meta/Google/YouTube/TikTok/LinkedIn/Pinterest/X. Separate product line.
+---
+
+## Scope contract — what's explicitly v2+
+
+The answer is "not in v1" for the following, in priority-of-being-asked order:
+
+- **Inbox surfaces** — DMs, comments, comment replies, review replies, comment-to-DM automations. Entire product line.
+- **Analytics dashboards** beyond post-log + error-log. Vote button captures demand.
+- **Ads manager** across Meta/Google/YouTube/LinkedIn/Pinterest/X. Separate product line.
 - **WhatsApp Business** (templates, flows, phone numbers, groups). Separate product line.
 - **CRM-ish features** — contacts, sequences, broadcasts.
-- **TikTok** — deferred to v2. The Content Posting API has two separate audits (Upload + Direct Post), each on a 4–10-week manual review with frequent rejections, and the SELF_ONLY constraint complicates the public demo path. Will revisit once v1 is shipped and the platform churn rate is understood. Schemas + DB enum keep `tiktok` reserved so the v2 add is additive, not a migration.
-- **Reddit, Telegram, Discord, Snapchat, Google Business**
+- **YouTube** — deprioritized vs TikTok in the April 2026 scope update. CASA verification path is real but slow; revisit post-launch.
+- **Reddit, Telegram, Discord, Snapchat, Google Business** — long tail, <1k accounts each in the 90-day Zernio dataset.
 - **Advanced media ops** — image editing, video trimming, auto-captioning, thumbnail generation.
 - **Team-management UI** beyond single-org multi-member.
-- **Analytics dashboards** beyond post-log + error-log.
 - **Whitelabel / agency tier UI.**
-- **Per-profile / per-seat pricing** — actively rejected, not just deferred. Profiles exist in v1 as a free org-structure primitive. Pricing stays flat at the org level. Revisiting this is a PRODUCT.md-level decision, not a roadmap one.
-- **Per-profile custom branding, per-profile webhook endpoints, cross-profile account sharing** — explicitly out of the Phase 5.5 profiles slice; revisit only if a paying customer asks.
-- **MCP server, LangGraph adapter, CrewAI adapter** — identified as differentiators but not v1. Could slot in as Phase 15.5.
-- **Ayrshare SDK drop-in adapter** — migration lever, but not v1.
+- **Per-profile / per-seat pricing** — *actively rejected*, not just deferred. Profiles are free in v1 as an org-structure primitive. Revisiting this is a `PRODUCT.md`-level decision.
+- **Per-profile custom branding, per-profile webhook endpoints, cross-profile account sharing** — explicitly out of the Phase 5.5 profiles slice. Revisit only if a paying customer asks.
+- **Ayrshare SDK drop-in adapter** — migration lever, not v1.
 - **SOC 2, HIPAA, BAAs** — when a customer pays for them.
 
 ---
 
-## Critical files for implementation
+## Critical files
 
-- `apps/api/src` — Hono app root. Every endpoint, middleware, and platform publisher wires here. Phases 2–11 all touch it.
-- `packages/schemas/src` — Zod source of truth. Every phase adds to it. Feeds OpenAPI in Phase 12 and docs in Phase 13.
-- `TECH.md` — stack contract. Any deviation must be justified against it.
-- `PRODUCT.md` — principles contract. Every phase's "principles served" line maps back here.
-- `turbo.json` — pipeline root. Needs updates as `apps/dashboard`, `apps/web`, `packages/openapi`, `packages/sdk-ts`, `packages/ui` land.
-
----
-
-## Verification
-
-The v1 launch is shippable when:
-
-1. All phases' "Ships" items are green (1, 2, 3, 4, 5, 5.5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15).
-2. **End-to-end smoke test passes for all 8 platforms:** Bluesky, LinkedIn, Twitter/X, Instagram, Facebook, Threads, YouTube, Pinterest — each publishes a real post through the hosted API with idempotency + webhooks + error mapping verified.
-3. **Contract tests green on cron** for every platform (real API, not MSW) for 7 consecutive days.
-4. **Profile isolation verified:** an API key scoped to Profile A cannot read, publish from, or modify accounts in Profile B within the same org. Cross-profile access 404s (not 403) to avoid leaking existence. Org-wide keys keep working against any profile.
-5. **Post Log renders the full error contract** for every failure class (`preflight_failed`, `platform_rejected`, `platform_auth_failed`, `platform_unavailable`, `validation_failed`, `internal_error`), with the raw platform response visible and copy-as-curl on every row.
-6. **Docs parity check:** every error code in `packages/schemas` has a docs page; every preflight rule has a docs page with upstream citation; every endpoint has runnable examples in all 4 language tabs.
-7. **SDK parity:** TS SDK published, Py/Go SDKs generated and published to PyPI + pkg.go.dev; smoke tests green in each.
-8. **Self-host parity:** `docker compose up` works end-to-end against a fresh Postgres + Redis; same API responses as hosted.
-9. **Lighthouse 100** on all marketing + docs pages (mobile + desktop).
-10. **Load test:** API handles 500 req/s sustained on a single Railway instance with p95 < 250ms (excluding upstream platform latency).
-11. **Pricing page live** with committed tier shape — flat at org level, profiles free.
-12. **n8n community node published** and linked in docs.
+- `apps/api/src` — Hono app root. Every endpoint, middleware, platform publisher.
+- `packages/schemas/src` — Zod source of truth. Feeds OpenAPI + docs.
+- `packages/schemas/src/platform-state.ts` — canonical platform launch state.
+- `apps/api/src/platforms/_shared/dispatch.ts` — the dispatcher every publisher hangs off, and where pre-publish gates run.
+- `apps/api/src/db/schema/` — Drizzle schemas (17 tables today).
+- `apps/web/src/data/platforms.ts` — marketing-site source of truth, reads from `platform-state`.
+- `docs/docs.json` — Mintlify nav.
+- `PRODUCT.md` — principles contract.
+- `TECH.md` — stack contract.
+- `CONTRIBUTING.md` — conventions (gate pattern §3.5, PostHog conventions §11).

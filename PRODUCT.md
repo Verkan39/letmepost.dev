@@ -8,9 +8,11 @@ Internal product description. Source of truth for positioning, ICP, scope, and p
 
 ## What letmepost.dev is
 
-A developer-grade HTTP API for publishing to social media platforms. A single endpoint contract (`POST /posts`) that routes to Bluesky, LinkedIn, Twitter/X, Instagram, Facebook, Threads, YouTube, and Pinterest, with **preflight validation, transparent errors, stable API versioning, and idempotency keys** as first-class contracts.
+A developer-grade HTTP API for publishing to social media platforms. A single endpoint contract (`POST /v1/posts`) that routes to Bluesky, LinkedIn, Twitter/X, Instagram, Facebook, Threads, Pinterest, and TikTok, with **preflight validation, transparent errors, stable API versioning, and idempotency keys** as first-class contracts.
 
-Open-source core (Apache-2.0-ish, TBD), hosted SaaS as the primary commercial offering, self-host as a first-class community option. Same code, same API, no feature gate between the two.
+Apache 2.0 core, hosted SaaS as the primary commercial offering, self-host as a first-class community option. Same code, same API, no feature gate between the two.
+
+Also shipped as an **MCP server** (hosted at `api.letmepost.dev/mcp` and as a stdio binary on npm) and a **CLI** (`npm i -g @letmepost/cli`). Agent-builder ergonomics are a first-class concern, not a port.
 
 ## Who it's for
 
@@ -30,7 +32,7 @@ From the 2025-2026 research corpus (150+ citations across GitHub, Trustpilot, Ca
 
 2. **LinkedIn API version churn is a serial killer of automations.** LinkedIn sunset five API versions in six months (20240401, 20241001, 20241101, 20250101, 20250401), each time simultaneously breaking n8n Cloud, Zapier, Make, Pabbly, and Postiz. The fix in every case was a single HTTP header.
 
-3. **Media upload validation failures are asynchronous and opaque.** Instagram Reels reject Google Drive URLs. YouTube `videos.insert` returns a generic `forbidden` for restricted-scope mismatches. Threads throws cryptic `OAuthException 2207052`. (Historical: TikTok's `file_format_check_failed` was the same shape — TikTok now deferred to v2.) Every one of these is catchable with client-side validation *before* the API call.
+3. **Media upload validation failures are asynchronous and opaque.** Instagram Reels reject Google Drive URLs. Threads throws cryptic `OAuthException 2207052`. TikTok's `file_format_check_failed` and post-upload status-polling failures look identical to the caller until you decode them. Every one of these is catchable with client-side validation *before* the API call.
 
 4. **OAuth token lifecycle is a production liability.** LinkedIn tokens expire every 60 days and require full re-auth. Meta Instagram: 60 days. Google Business Profile: needs daily refresh. Bluesky access JWTs: minutes.
 
@@ -44,11 +46,13 @@ The consistent signal across the corpus: **developers aren't complaining about s
 
 At a high level, letmepost.dev exposes a small, opinionated API surface:
 
-- **`POST /posts`** — create or schedule a post across one or many platforms in a single call. Accepts an `Idempotency-Key` header.
-- **`POST /posts/validate`** — run preflight validation without sending. Returns the specific rules that would fail, so automations can self-check in CI or before queueing.
-- **`POST /accounts/connect/:platform`** — OAuth-backed account connection, including token refresh lifecycle management.
-- **Webhooks** — structured events: `post.queued`, `post.validated`, `post.published`, `post.rejected`, `token.expiring`, `version.deprecated`.
-- **Public API-version tracker** — a dashboard showing which upstream platform API versions each connected account is pinned to, and upcoming sunsets.
+- **`POST /v1/posts`** — create or schedule a post across one or many platforms in a single call. Accepts an `Idempotency-Key` header.
+- **`POST /v1/posts/validate`** — run preflight validation without sending. Returns the specific rules that would fail, so automations can self-check in CI or before queueing.
+- **`PATCH /v1/posts/:id`** + **`DELETE /v1/posts/:id`** — reschedule or cancel a queued post atomically before the worker picks it up.
+- **`POST /v1/media`** — multipart upload streamed to S3; resulting `mediaId` is referenceable from every publisher.
+- **`POST /v1/accounts/connect/:platform`** — OAuth-backed account connection, including token refresh lifecycle management.
+- **Webhooks** — 18 structured event types covering post lifecycle (`post.queued / validated / published / rejected / failed / canceled / rescheduled`), token lifecycle (`token.expiring / revoked`), platform churn (`version.deprecated`), and billing (`subscription.* / quota.* / billing.*`).
+- **Public API-version tracker** — endpoint + page showing which upstream platform API versions each connected account is pinned to, and upcoming sunsets.
 
 Every post submission flows through: **preflight validator → idempotent execution layer → transparent error contract**. The contract always tells the caller what rule failed and attaches the raw platform response.
 
@@ -58,7 +62,7 @@ These are non-negotiable. If a feature breaks one of these, the feature loses.
 
 ### 1. Preflight over postflight
 
-Every platform's documented constraints are checked *before* the platform API call. Character counts (LinkedIn's 3000 emoji-aware, Threads' 500, X's 280), media formats, URL reachability, YouTube container/codec/duration limits + per-project quota awareness, URN patterns, business-account requirements, OAuth scopes — all validated client-side. Async rejections from the platform are always treated as *our* failure to preflight, not the user's failure to read docs.
+Every platform's documented constraints are checked *before* the platform API call. Character counts (LinkedIn's 3000 emoji-aware, Threads' 500, X's 280 / 25k for premium), media formats, URL reachability, video container/codec/duration limits, TikTok upload+publish status polling, URN patterns, business-account requirements, OAuth scopes — all validated client-side. ~95 documented preflight rules across 8 platforms today, each with its own docs page and upstream-source citation. Async rejections from the platform are always treated as *our* failure to preflight, not the user's failure to read docs.
 
 ### 2. Transparent errors
 
@@ -93,59 +97,78 @@ The API contract, the SDK ergonomics, the error messages, the dashboard, the doc
 
 ## Distribution model
 
-**Hosted SaaS** — primary commercial offering. Managed OAuth, token refresh, infrastructure, webhook delivery, version-pin upgrades. Pricing TBD (see open questions).
+**Hosted SaaS** — primary commercial offering. Managed OAuth (publish through our reviewed Meta / LinkedIn / X / TikTok apps, no per-customer App Review), token refresh, infrastructure, webhook delivery, version-pin upgrades. Three tiers, one metered thing — *posts published*:
 
-**Self-host** — first-class community option. Docker Compose, bring-your-own-credentials, identical API surface. This is how we out-trust Zernio (closed) and out-ship Postiz (unreliable) at the same time.
+- **Free** — 50 posts/mo, full API surface, all platforms, no credit card. Indefinite.
+- **Pro** — $79/mo for 5,000 posts/mo, 30-day publish logs, all webhook events.
+- **Business** — $299/mo for 25,000 posts/mo, white-label OAuth, 99.9% SLA, 180-day publish logs.
+- **Business+** — enquiry-driven for volume / SSO / SCIM / custom SLA / white-labelling / DPA.
+
+Profiles are free at every tier. Per-profile and per-seat pricing are *rejected*, not deferred — they are the antithesis of the wedge.
+
+**Self-host** — first-class community option. Docker Compose, bring-your-own-credentials, identical API surface, unlimited posts. `BILLING_ENABLED=false` skips the billing surface entirely. This is how we out-trust Zernio (closed) and out-ship Postiz (unreliable) at the same time.
 
 ## Platform scope — v1 is the Publisher
 
-**In scope for v1:** posting, scheduling, queueing, media upload, platform-native variants (e.g., IG Reels vs. feed, LinkedIn org vs. personal).
+**In scope for v1:** posting, scheduling (queue + cancel + reschedule), media upload, platform-native variants (e.g., IG Reels vs. feed, LinkedIn org vs. personal, X reply chains + quote tweets, Bluesky video service flow, TikTok inbox vs. Direct Post).
 
 **Out of scope for v1** (future bets, not this product yet):
 
 - Inbox: DMs, comments, comment replies, review replies
-- Ads manager across Meta/Google/YouTube/TikTok/LinkedIn/Pinterest/X
+- Analytics dashboards beyond post-log + error-log
+- Ads manager across Meta/Google/LinkedIn/Pinterest/X
 - WhatsApp Business (templates, flows, phone numbers — a standalone product)
 - CRM-ish features (contacts, sequences, broadcasts)
 - Comment-to-DM automations
+- YouTube (deferred to v2 in the April 2026 scope update — CASA verification path is real but slow; revisit post-launch)
 
-### Platform list and build order
+### Platform list and ship state
 
-Decided from the 90-day Zernio dataset (2026-01-24 → 2026-04-23, 2.78M posts across 15 platforms):
+| Platform | State | Why it's here |
+|---|---|---|
+| **Bluesky** | live | First to ship — simple AT protocol, no app review, minutes-long JWT lifecycle was a good forcing function for the token-refresh architecture. |
+| **LinkedIn** | live | The wedge platform. #1 complaint volume in the research corpus. Cleanest API of the majors (4.7% fail rate in the Zernio data). Where preflight + version-pinning shows its teeth. |
+| **Twitter / X** | live | Table-stakes for the automation-builder ICP. Most-quirky publisher (chunked video upload, t.co counter, reply chains, quote tweets, alt-text on a separate v1.1 endpoint). |
+| **Instagram + Facebook + Threads** | live | Meta Graph trio, built together because they share auth. ~51% of post volume and 54k accounts in the Zernio data. App Review cleared. |
+| **Pinterest** | live | Fastest-growing platform in the Zernio dataset (+1369% over 90 days), lowest fail rate (3%). Image + video pins with the same media plumbing as Meta. Standard Access cleared. |
+| **TikTok** | pending review | Replaced YouTube in the April 2026 scope update. Publisher fully built — OAuth 2.0 PKCE, `push_by_file` inbox upload, status-poll worker. State flips to `live` the moment App Review approves. |
 
-1. **Bluesky** — **first to ship.** Simple AT protocol, no app review, minutes-long JWT lifecycle is a good forcing function for our token-refresh architecture. Small TAM (962 accounts in the data) but proves the end-to-end stack with zero external gating.
-2. **LinkedIn** — the wedge platform. #1 complaint volume in the research corpus, cleanest API of the major platforms (4.7% fail rate), no brutal approval gauntlet, 11.6k accounts in the data. Demonstrates preflight + version pinning as a concrete pitch.
-3. **Twitter/X** — table-stakes for the automation-builder ICP. 8.1k accounts.
-4. **Instagram + Facebook + Threads** — Meta Graph trio, built together because they share auth. Meta app review **must begin day 0** of the project, in parallel with Bluesky and LinkedIn work. Combined ~51% of post volume and 54k accounts.
-5. **YouTube** — Data API v3 with `videos.insert` resumable upload. Bounded gating cost: a one-time CASA verification (3–6 weeks first cycle, annual renewal) instead of TikTok's two separate review tracks with frequent rejections. Replaces TikTok in v1 scope.
-6. **Pinterest** — cheapest integration, fastest-growing platform in the Zernio dataset (+1369% over 90 days), lowest failure rate (3%). Easy win and a cheap differentiator.
-
-**Deliberately cut from v1:** TikTok (audit complexity — see roadmap deferral note), Reddit (67% fail rate, hostile API), Telegram / Discord / Snapchat / Google Business / WhatsApp (long tail, <1k accounts each in the data).
+**Deliberately cut from v1:** YouTube (deferred), Reddit (67% fail rate, hostile API), Telegram / Discord / Snapchat / Google Business / WhatsApp (long tail, <1k accounts each in the data).
 
 ## How we're different
 
 | vs. | Their weakness | Our wedge |
 |---|---|---|
-| **Zernio** (closed, positioning-only) | No community trust, closed source, new brand (rebranded from "Late") | Open source, public code, transparent roadmap |
-| **Postiz** (26.9k-star OSS benchmark) | Silent failures, double-posting loops, single-tenant architecture blocks SaaS use | Idempotency keys, preflight validation, multi-tenant from day one |
-| **Ayrshare** (category leader) | Per-profile pricing, opaque error 138s, broad OAuth scopes | Flat pricing (TBD), rule-specific errors, scoped OAuth |
+| **Zernio** (closed, positioning-only) | No community trust, closed source, new brand (rebranded from "Late") | Apache 2.0, public code, transparent roadmap |
+| **Postiz** (OSS benchmark) | Silent failures, double-posting loops, single-tenant architecture blocks SaaS use | Idempotency keys, preflight validation, multi-tenant from day one |
+| **Ayrshare** (category leader) | Per-profile pricing, opaque error 138s, broad OAuth scopes | Flat per-org pricing (Free 50/mo, Pro $79 / 5k, Business $299 / 25k), rule-specific errors, scoped OAuth |
 | **Buffer / Publer / Hypefury** (creator tools) | Creator-focused dashboards, no real API, per-channel pricing | API-first primitive, no dashboard tax |
 | **Hootsuite / Sprout / Later** (enterprise) | Contract lock-in, per-seat pricing, auto-renewal abuse | No contracts, no seat tax, no lock-in |
 
-**Open-source alone does not win** — Postiz proves it. The winning combination is open source + preflight + transparent errors + idempotency + stable versions, positioned to the automation-builder and AI-agent-builder cohort first. Creators come later, via UI partners.
+**Open-source alone does not win** — Postiz proves it. The winning combination is open source + preflight + transparent errors + idempotency + stable versions + native MCP, positioned to the automation-builder and AI-agent-builder cohort first. Creators come later, via UI partners.
 
-## Open questions
+## Resolved questions
 
-Things not yet decided. Future Claude sessions should flag these before assuming.
+What was open in the original draft and is now locked in:
 
-- **Pricing model.** Flat tier is the research-indicated answer. Shape is TBD — flat + post volume overage, BYO-tokens vs. hosted-tokens, free tier size, self-host always free.
-- **MCP / LangGraph / CrewAI adapters.** Research suggests shipping these from day one leapfrogs Zernio on AI-agent ergonomics. Not yet committed to v1.
-- **Ayrshare SDK drop-in adapter.** Zernio claims 34/51 methods. A higher-coverage open-source adapter would be a migration lever. Not yet committed.
-- **License.** Apache-2.0 is the default assumption; not locked in.
-- **Name / tagline.** `letmepost.dev` is the domain. No distinct product brand or tagline committed.
+- **Pricing.** Three tiers, flat per-org, metered on *posts published*: Free (50/mo), Pro ($79 / 5k), Business ($299 / 25k), self-host unlimited. Hard cap, no overages — quota.warning fires at 80%, quota.exceeded at 100%, and the post queues rather than publishing. Locked May 2026. Profiles free at every tier.
+- **License.** Apache 2.0. Same image self-host vs. hosted.
+- **MCP server.** Shipped — hosted (`api.letmepost.dev/mcp`, streamable HTTP, stateless, OAuth 2.1 + DCR) and stdio (`@letmepost/mcp` on npm). 21 tools generated from the OpenAPI spec at startup.
+- **CLI.** Shipped — `@letmepost/cli`, `lmp` binary.
+- **SDKs.** Shipped — TypeScript (`@letmepost/sdk`, hand-written), Python (`letmepost` on PyPI, generated), Go (`github.com/letmepost/letmepost-go`, generated).
+
+## Still open
+
+- **LangGraph / CrewAI adapters.** Not committed. The native MCP server handles most of the agent-builder ask; framework-specific adapters are demand-driven.
+- **Ayrshare SDK drop-in adapter.** Migration lever, not v1 — revisit if outbound to Ayrshare's user base finds heat.
+- **TikTok Direct Post (`video.publish`) audit.** Current state — inbox push with `privacy=SELF_ONLY` works in sandbox. Direct Post requires a second audit. Decision to push for it depends on TikTok being a meaningful share of post volume post-launch.
 
 ## Related files in this repo
 
-- `initial-exploration.md` — earlier exploration notes (pre-dating this doc)
-- `zernio-openapi.yaml`, `zernio-llms.txt` — Zernio's full API surface, for competitive reference
-- `zernio-platforms.json`, `zernio-accounts.json`, `zernio-analytics.json`, `zernio-errors.json` — 90-day public Zernio data used for platform-priority decisions
+- `plan.md` — what's shipped, what's pending external approval, pre-launch checklist
+- `TECH.md` — stack contract
+- `CONTRIBUTING.md` — conventions (gate pattern §3.5, PostHog conventions §11)
+- `DEPLOY.md` — Railway + Vercel + Mintlify deploy notes
+- `docker-compose.dev.yml` — local Postgres + Redis
+- `apps/api/src/openapi.json` + `docs/api-reference/openapi.json` — generated OpenAPI surface
+- `packages/schemas/src/platform-state.ts` — canonical platform launch state (the connect drawer, marketing site, and backend connect gate all read from here)

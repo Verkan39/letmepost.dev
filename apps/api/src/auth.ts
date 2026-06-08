@@ -62,6 +62,7 @@ const trustedOrigins = [
  */
 export const baseAuthUrl =
   process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
+const dashboardUrl = process.env.DASHBOARD_URL ?? "http://localhost:3001";
 // MCP clients (Claude Code, Cursor, Claude Desktop) walk RFC 8707 — they
 // pass `resource=https://api.letmepost.dev/mcp` on the token request,
 // which becomes the JWT `aud`. So the resource URLs MUST also be in
@@ -188,6 +189,16 @@ export const auth = betterAuth({
     // unverified user. better-auth handles the token + redirect; we
     // only own the actual transport.
     sendOnSignIn: true,
+    // Where to land after the verify-email handler runs. Without this,
+    // better-auth redirects to its own `baseURL` (the API origin), so
+    // users would end up at api.letmepost.dev/. We send them to the
+    // dashboard's /onboarding screen, which picks up the
+    // `letmepost:pending-org` localStorage entry the signup form stashed
+    // and creates the org with a live session.
+    callbackURL: `${dashboardUrl}/onboarding`,
+    // Auto-create a session at the moment of verification so the user
+    // doesn't have to sign in again after clicking the link.
+    autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
       const firstName = pickFirstName((user as { name?: string }).name);
       const replyTo = process.env.EMAIL_REPLY_TO ?? process.env.EMAIL_FROM;
@@ -269,8 +280,8 @@ Kamal`,
       // dev) so these MUST be absolute URLs — better-auth appends `?...signed
       // query...` and the user lands directly on the dashboard route.
       // DASHBOARD_URL is the configurable base; default keeps dev working.
-      loginPage: `${process.env.DASHBOARD_URL ?? "http://localhost:3001"}/sign-in`,
-      consentPage: `${process.env.DASHBOARD_URL ?? "http://localhost:3001"}/consent`,
+      loginPage: `${dashboardUrl}/sign-in`,
+      consentPage: `${dashboardUrl}/consent`,
       validAudiences,
       // Custom OAuth scopes:
       // - openid / profile / offline_access — standard OIDC bits the plugin

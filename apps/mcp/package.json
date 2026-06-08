@@ -1,6 +1,7 @@
 {
   "name": "@letmepost/mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
+  "mcpName": "io.github.rosekamallove/letmepost",
   "description": "MCP server for letmepost.dev. Autogenerates a tool per OpenAPI operation so agents can drive the entire publishing API — posts, media, accounts, webhooks, API keys — without bespoke wrappers.",
   "type": "module",
   "main": "./dist/autogen.js",

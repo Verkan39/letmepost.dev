@@ -183,7 +183,7 @@ const bluesky: PlatformContent = {
   playground: {
     steps: ["Connect", "Configure", "Execute"],
     body: "Generate an <b>app password</b> in Bluesky → Settings → Privacy &amp; Security → App passwords. Paste into our dashboard. Post immediately.",
-    cta: { href: "https://dashboard.letmepost.dev/connect", label: "CONNECT BLUESKY →" },
+    cta: { href: "https://dashboard.letmepost.dev/accounts/new", label: "CONNECT BLUESKY →" },
     result: "Live in ~12 seconds.",
     resultCaption: "NO OAUTH DANCE",
   },
@@ -371,7 +371,7 @@ const x: PlatformContent = {
   playground: {
     steps: ["Connect", "Configure", "Execute"],
     body: "OAuth 2.0 PKCE handled in the browser. Click connect, authorize on x.com, you're back in the dashboard with a working account.",
-    cta: { href: "https://dashboard.letmepost.dev/connect", label: "CONNECT X →" },
+    cta: { href: "https://dashboard.letmepost.dev/accounts/new", label: "CONNECT X →" },
     result: "Posting in ~30 seconds.",
     resultCaption: "PKCE HANDLED",
   },
@@ -549,7 +549,7 @@ const pinterest: PlatformContent = {
   playground: {
     steps: ["Connect", "Configure", "Execute"],
     body: "OAuth on pinterest.com, select boards, you're back in the dashboard. Sandbox accounts work for testing; Standard Access for production.",
-    cta: { href: "https://dashboard.letmepost.dev/connect", label: "CONNECT PINTEREST →" },
+    cta: { href: "https://dashboard.letmepost.dev/accounts/new", label: "CONNECT PINTEREST →" },
     result: "First pin in ~45 seconds.",
     resultCaption: "BOARDS LOADED",
   },
@@ -733,7 +733,7 @@ const linkedin: PlatformContent = {
   playground: {
     steps: ["Connect", "Configure", "Execute"],
     body: "OAuth on linkedin.com. Personal posts work today (in review). Org posts unlock once our MDP review clears — self-host users can BYO MDP entry today.",
-    cta: { href: "https://dashboard.letmepost.dev/connect", label: "CONNECT LINKEDIN →" },
+    cta: { href: "https://dashboard.letmepost.dev/accounts/new", label: "CONNECT LINKEDIN →" },
     result: "Approval-gated.",
     resultCaption: "MDP IN REVIEW · DAY 12 / ~84",
   },
@@ -899,7 +899,7 @@ const threads: PlatformContent = {
   playground: {
     steps: ["Connect", "Configure", "Execute"],
     body: "Threads OAuth on threads.net. Standalone, not bundled with Facebook. Live the day Meta App Review clears for this surface.",
-    cta: { href: "https://dashboard.letmepost.dev/connect", label: "CONNECT THREADS →" },
+    cta: { href: "https://dashboard.letmepost.dev/accounts/new", label: "CONNECT THREADS →" },
     result: "Approval-gated.",
     resultCaption: "META REVIEW · DAY 24 / ~56",
   },
@@ -1069,7 +1069,7 @@ const instagram: PlatformContent = {
   playground: {
     steps: ["Connect", "Configure", "Execute"],
     body: "Facebook Login for Business. <b>One consent grants Pages + IG Business + Threads access.</b> Live the day Meta approval clears for hosted users.",
-    cta: { href: "https://dashboard.letmepost.dev/connect", label: "CONNECT META →" },
+    cta: { href: "https://dashboard.letmepost.dev/accounts/new", label: "CONNECT META →" },
     result: "Approval-gated.",
     resultCaption: "META REVIEW · DAY 24 / ~56",
   },
@@ -1246,7 +1246,7 @@ const facebook: PlatformContent = {
   playground: {
     steps: ["Connect", "Configure", "Execute"],
     body: "Facebook Login for Business. Pick the Pages your app should post to. Page Access Tokens exchanged and stored encrypted.",
-    cta: { href: "https://dashboard.letmepost.dev/connect", label: "CONNECT META →" },
+    cta: { href: "https://dashboard.letmepost.dev/accounts/new", label: "CONNECT META →" },
     result: "Approval-gated.",
     resultCaption: "META REVIEW · DAY 24 / ~56",
   },
@@ -1374,90 +1374,89 @@ const result = await lmp.posts.create({
 
 const tiktok: PlatformContent = {
   heroH1: { before: "Ship Your", after: "Integration", emphasize: "In Minutes, Not Weeks." },
-  heroSub: "Content Posting API. v2 scope.",
+  heroSub: "Content Posting API. OAuth 2.0 PKCE.",
   heroLede:
-    "TikTok's Content Posting API + creator OAuth flow, gated by a CASA-style security audit. <b>letmepost</b> has the publisher in build. Flip-the-switch is one config change once the audit clears. Self-hosters with their own TikTok developer app + audit cert can use it today.",
+    "TikTok's Content Posting API + creator OAuth flow, gated by TikTok's two-track app review (Upload + Direct Post). <b>letmepost</b> has the publisher shipped — push_by_file inbox upload with chunked status polling. Hosted users wait on review; self-hosters with their own TikTok developer app can publish today.",
   reassurance:
-    'Planned · Content Posting API · <a href="https://docs.letmepost.dev/platforms/tiktok">read the docs →</a>',
+    'In review · Content Posting API · <a href="https://docs.letmepost.dev/platforms/tiktok">read the docs →</a>',
   miniCode: `{
-  "targets": [{ "platform": "tiktok" }],
-  "accountId": "acc_tt_xyz",
+  "targets": [{ "platform": "tiktok", "accountId": "acc_tt_xyz" }],
   "text": "Posted via letmepost.",
-  "options": { "privacyLevel": "PUBLIC_TO_EVERYONE" }
+  "media": [{ "type": "video", "mediaId": "med_video_xyz" }],
+  "options": { "tiktok": { "privacyLevel": "PUBLIC_TO_EVERYONE" } }
 }`,
 
   vsHead: "Why letmepost vs Content Posting API direct?",
   vsDirect: [
-    { body: "You complete TikTok audit verification (6–12 weeks)" },
-    { body: "You implement resumable upload across multiple requests" },
-    { body: "You manage daily quota cost across all endpoints" },
-    { body: "You handle restricted-scope vs unrestricted-scope errors" },
-    { body: "You parse the Creator vs Business-account distinction" },
-    { body: "You track Google's quota deductions per call type" },
+    { body: "You complete TikTok app review (4–10 weeks per scope)" },
+    { body: "You implement push_by_file with chunked status polling" },
+    { body: "You manage the SELF_ONLY → PUBLIC_TO_EVERYONE upgrade path" },
+    { body: "You handle two-audit gating (Upload vs Direct Post)" },
+    { body: "You write OAuth 2.0 PKCE + refresh-token lifecycle" },
+    { body: "You parse TikTok's status-poll responses + timeouts" },
   ],
   vsLetmepost: [
-    { body: "Our reviewed Google project covers hosted users (when CASA clears)" },
-    { body: "Resumable upload abstracted; one POST + a mediaId" },
-    { body: "Quota cost surfaced per-call in the response envelope" },
-    { body: 'Scope errors mapped to <code>tiktok_scope_mismatch</code>' },
-    { body: "Creator vs Business handled at connect time" },
-    { body: "Daily quota tracked + surfaced via <code>quota.warning</code> webhook" },
+    { body: "Our reviewed TikTok app covers hosted users (when review clears)" },
+    { body: "push_by_file abstracted; one POST + a mediaId" },
+    { body: "Privacy level surfaced per-call; SELF_ONLY in sandbox, public after audit" },
+    { body: "Inbox upload works today; Direct Post flips when its audit clears" },
+    { body: "OAuth 2.0 PKCE + refresh handled — no token rot" },
+    { body: 'Upload + finalize timing surfaced via <code>post.published</code> webhook' },
   ],
 
   highlight: {
     tone: "warn",
-    title: "⚠  the security audit gates production",
-    body: "TikTok's Data API write access goes through Google's CASA security audit. <b>6–12 weeks typical.</b> letmepost has the publisher shipped and is sitting in the queue. Self-host users with their own Google project + CASA cert can use it today.",
+    title: "⚠  TikTok's review gates production",
+    body: "TikTok runs <b>two separate audits</b> — Upload (push_by_file → inbox, SELF_ONLY) and Direct Post (video.publish → public). letmepost has the publisher built for both. Hosted users wait on review; self-host users with their own TikTok app can publish today.",
   },
 
   playground: {
     steps: ["Connect", "Configure", "Execute"],
-    body: "Google OAuth + Channel pick. Self-host with your own Google project + CASA cert to use it today.",
-    cta: { href: "https://dashboard.letmepost.dev/connect", label: "CONNECT YOUTUBE →" },
+    body: "TikTok OAuth 2.0 PKCE + account pick. Audit-gated for hosted users; self-host today with your own TikTok developer app.",
+    cta: { href: "https://dashboard.letmepost.dev/accounts/new", label: "CONNECT TIKTOK →" },
     result: "Approval-gated.",
-    resultCaption: "CASA REVIEW · IN FLIGHT",
+    resultCaption: "APP REVIEW · IN FLIGHT",
   },
 
   contentTypes: [
-    { label: "Title", icon: "text-aa", note: "100 chars" },
-    { label: "Description", icon: "text-aa", note: "5,000 chars" },
-    { label: "Video", icon: "video-camera", note: "MP4 ≤ 256GB" },
-    { label: "Thumbnail", icon: "image", note: "verified channels" },
+    { label: "Caption", icon: "text-aa", note: "150 chars" },
+    { label: "Video", icon: "video-camera", note: "MP4/MOV ≤ 287MB" },
+    { label: "Privacy levels", icon: "shield", note: "4 modes" },
     { label: "Scheduled", icon: "clock" },
   ],
 
   steps: [
     { title: "Get your API key", body: "Sign up at <code>dashboard.letmepost.dev</code>." },
     {
-      title: "Connect a TikTok channel",
-      body: "Google OAuth. Pick the channel. Creator vs Business-account distinction handled.",
+      title: "Connect a TikTok account",
+      body: "OAuth 2.0 PKCE. Pick the account. Required scopes (<code>user.info.basic</code>, <code>video.upload</code>, <code>video.publish</code>) resolved at connect time.",
     },
     {
       title: "Upload a video",
-      body: 'One <code>POST /v1/posts</code> with the video <code>mediaId</code>. We handle resumable upload, fire <code>post.published</code> when TikTok finalizes.',
+      body: 'One <code>POST /v1/posts</code> with the video <code>mediaId</code>. We handle push_by_file + chunked status polling, fire <code>post.published</code> when TikTok finalizes.',
     },
   ],
 
   features: [
     {
       icon: "shield-check",
-      title: "CASA-aware",
-      body: "Hosted users wait on our review; self-host users plug their own Google project + CASA cert.",
+      title: "Audit-aware",
+      body: "Hosted users wait on our TikTok review; self-host users plug their own TikTok developer app and use it today. Same publisher code, your audit record.",
     },
     {
       icon: "cloud-arrow-up",
-      title: "Resumable upload abstracted",
-      body: "Multi-MB videos use Google's resumable upload protocol. We handle init + chunks + finalize as one SDK call.",
+      title: "push_by_file abstracted",
+      body: "Init the upload, chunk the bytes, poll status (5s → 30s → 120s backoff up to 30min). We handle the whole flow as one SDK call.",
     },
     {
-      icon: "gauge",
-      title: "Quota cost surfaced",
-      body: 'Every endpoint costs quota units. We surface the unit cost per call and fire <code>quota.warning</code> when you approach the daily cap.',
+      icon: "swap",
+      title: "SELF_ONLY → public path",
+      body: 'In sandbox, posts land with <code>privacyLevel: "SELF_ONLY"</code>; once the Direct Post audit clears, the same call publishes <code>PUBLIC_TO_EVERYONE</code>. No code change.',
     },
     {
       icon: "video-camera",
-      title: "MP4 first, ≤ 256GB / 12h",
-      body: "Standard h.264 MP4 path. Per-channel daily upload limits enforced via Google's documented thresholds.",
+      title: "MP4 / MOV, ≤ 287MB",
+      body: "Standard TikTok push_by_file limits. Preflight rejects oversize or unsupported codecs before the upload starts.",
     },
   ],
 
@@ -1468,14 +1467,12 @@ const tiktok: PlatformContent = {
 const lmp = new Letmepost({ apiKey: process.env.LMP_API_KEY });
 
 const result = await lmp.posts.create({
-  targets: [{ platform: 'tiktok', accountId: 'acc_yt_xyz' }],
+  targets: [{ platform: 'tiktok', accountId: 'acc_tt_xyz' }],
   text: 'A demo of letmepost. Posted via the API.',
   media: [{ type: 'video', mediaId: 'med_video_xyz' }],
   options: {
     tiktok: {
-      title: 'letmepost demo',
-      privacyStatus: 'unlisted',
-      categoryId: '28', // Science & Technology
+      privacyLevel: 'SELF_ONLY', // PUBLIC_TO_EVERYONE once Direct Post audit clears
     },
   },
 });`,
@@ -1485,60 +1482,60 @@ const result = await lmp.posts.create({
   faqs: [
     {
       q: "When does TikTok go live?",
-      a: "Hosted users wait on TikTok audit verification (6–12 weeks). Self-host with your own Google project + CASA cert today.",
+      a: "Hosted users wait on TikTok app review (4–10 weeks per scope). Self-host with your own TikTok developer app today — same publisher code, your audit record.",
     },
     {
-      q: "What's CASA?",
-      a: "Cloud Application Security Assessment. Google's audit for apps requesting restricted scopes like TikTok write. Annual recertification required.",
+      q: "What audits does TikTok require?",
+      a: 'Two separate audits. <b>Upload</b> (<code>push_by_file</code> → inbox, SELF_ONLY only) is the first; <b>Direct Post</b> (<code>video.publish</code> → public) is the second. letmepost has the publisher shipped for both.',
     },
     {
       q: "How big can videos be?",
-      a: "≤ 256GB or 12h, whichever first. Standard h.264 MP4. Resumable upload handled.",
+      a: '≤ 287MB and ≤ 10 minutes per <code>push_by_file</code> upload. MP4 or MOV. Larger files go through TikTok\'s <code>pull_by_url</code> path (planned).',
     },
     {
-      q: "Quota cost?",
-      a: 'Uploads cost ~1,600 units, list calls cost 1, comments cost 50. Daily cap is 10,000 units default. We surface unit cost per call + fire <code>quota.warning</code> approaching the cap. <a href="https://docs.letmepost.dev/tools/tiktok-quota-cost-calculator">Calculator tool</a>.',
+      q: "What privacy levels are supported?",
+      a: '<code>PUBLIC_TO_EVERYONE</code>, <code>MUTUAL_FOLLOW_FRIENDS</code>, <code>FOLLOWER_OF_CREATOR</code>, <code>SELF_ONLY</code>. Sandbox forces SELF_ONLY until Direct Post audit clears.',
     },
     {
-      q: "Shorts vs full videos?",
-      a: 'Both upload through the same endpoint. <code>privacyStatus</code>, <code>categoryId</code>, and <code>tags</code> map to the standard Content Posting API fields.',
+      q: "Sandbox vs production behavior?",
+      a: 'In sandbox: posts land in the user\'s TikTok inbox with <code>privacy=SELF_ONLY</code>; the user confirms publish in the TikTok app. In production (Direct Post audited): the same call publishes directly to the user\'s feed.',
     },
   ],
 
-  finalCtaH2: "READY FOR YOUTUBE?",
+  finalCtaH2: "READY FOR TIKTOK?",
   finalCtaLede:
-    "Self-host today with your own Google project + CASA cert. Hosted users queue up; live when CASA clears. <b>Same publisher either way.</b>",
+    "Self-host today with your own TikTok developer app. Hosted users queue up; live when TikTok app review clears. <b>Same publisher either way.</b>",
   finalCtaPrimaryLabel: "START FREE →",
   finalCtaSecondaryLabel: "READ DOCS",
   finalCtaSecondaryHref: "https://docs.letmepost.dev/platforms/tiktok",
 
-  closeoutThanks: "* * * DATA API v3 · CASA · IN BUILD * * *",
-  closeoutCodeLine: "PLAT · YOUTUBE · PLANNED",
+  closeoutThanks: "* * * CONTENT POSTING API · IN REVIEW * * *",
+  closeoutCodeLine: "PLAT · TIKTOK · IN REVIEW",
 
   marg: [
     {
-      tag: "CASA",
-      body: "Cloud Application Security Assessment. 6–12 weeks. Annual recertification. Self-host with your own audit to skip ours.",
+      tag: "Review",
+      body: "Two-track app review — Upload (<code>push_by_file</code> → inbox) + Direct Post (<code>video.publish</code> → public). 4–10 weeks per scope.",
     },
     {
       tag: "Limits",
-      body: "100-char title. 5,000-char description. Video ≤ 256GB or 12h. Standard MP4 (h.264).",
+      body: "150-char caption. Video ≤ 287MB or 10 min via push_by_file. MP4 or MOV.",
     },
     {
-      tag: "Quota",
-      body: 'Upload 1,600 units, list 1, comment 50. Daily cap 10,000 default. <a href="https://docs.letmepost.dev/tools/tiktok-quota-cost-calculator">Calculator</a>.',
+      tag: "Privacy",
+      body: "<code>PUBLIC_TO_EVERYONE</code>, <code>MUTUAL_FOLLOW_FRIENDS</code>, <code>FOLLOWER_OF_CREATOR</code>, <code>SELF_ONLY</code>. Sandbox forces SELF_ONLY until Direct Post clears.",
     },
     {
       tag: "Self-host",
-      body: "BYO Google project + CASA cert and use it today. Same publisher code, your audit record.",
+      body: "BYO TikTok developer app and use it today. Same publisher code, your audit record.",
     },
     {
       tag: "Webhook timing",
-      body: "<code>post.published</code> fires when TikTok finishes processing. Varies <b>30s–5min</b> depending on video length.",
+      body: "<code>post.published</code> fires when TikTok finalizes processing. Status-poll backoff is <b>5s → 30s → 120s</b> up to a 30-min deadline.",
     },
   ],
 
-  colophon: "<b>Content Posting API.</b> CASA-gated. Self-host today, hosted when audit clears.",
+  colophon: "<b>Content Posting API.</b> TikTok-review-gated. Self-host today, hosted when review clears.",
 };
 
 export const PLATFORM_CONTENT: Record<string, PlatformContent> = {

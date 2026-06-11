@@ -335,7 +335,7 @@ for (const r of result.targets) {
     "Mint an API key. Send your first request.",
   finalCtaPrimaryLabel: "GET AN API KEY →",
   finalCtaSecondaryLabel: "READ THE REFERENCE",
-  finalCtaSecondaryHref: "https://docs.letmepost.dev/api-reference/posts/create",
+  finalCtaSecondaryHref: "https://docs.letmepost.dev/api-reference",
 
   closeoutThanks: "* * * POST · ABSTRACTED · DONE * * *",
   closeoutCodeLine: "SURFACE · PUBLISHING · /v1/posts",
@@ -379,7 +379,7 @@ const media: SurfaceContent = {
   heroLede:
     "Upload bytes once via <b>POST /v1/media</b>. Reference the returned <code>mediaId</code> from every post that uses it. Bytes move once, posts move many times. Required for video on every platform; recommended for any image you'll post more than once.",
   reassurance:
-    'Multipart form-data · 8 MB images · 500 MB video · <a href="https://docs.letmepost.dev/api-reference/media/upload">API reference →</a>',
+    'Multipart form-data · 8 MB images · 500 MB video · <a href="https://docs.letmepost.dev/api-reference">API reference →</a>',
   miniCodeLang: "bash",
   miniCode: `curl -X POST https://api.letmepost.dev/v1/media \\
   -H "Authorization: Bearer $LMP_KEY" \\
@@ -555,7 +555,7 @@ const result = await lmp.posts.create({
     "Bytes once. Posts many. <b>Free uploads</b>, unlimited references, 30-day retention on the free tier.",
   finalCtaPrimaryLabel: "GET AN API KEY →",
   finalCtaSecondaryLabel: "READ THE REFERENCE",
-  finalCtaSecondaryHref: "https://docs.letmepost.dev/api-reference/media/upload",
+  finalCtaSecondaryHref: "https://docs.letmepost.dev/api-reference",
 
   closeoutThanks: "* * * BYTES ONCE · POSTS MANY * * *",
   closeoutCodeLine: "SURFACE · MEDIA · /v1/media",
@@ -598,7 +598,7 @@ const webhooks: SurfaceContent = {
   heroLede:
     "Subscribe to <b>8 lifecycle events</b> with one POST. Webhooks land on your endpoint within median 800ms of each transition. <b>HMAC-SHA256 signatures</b> with per-endpoint secrets. <b>Replay-safe</b> with explicit retry budget and a dead-letter queue. Same envelope shape as the HTTP API.",
   reassurance:
-    '8 event types · HMAC-SHA256 · exponential retry · <a href="https://docs.letmepost.dev/api-reference/webhook-endpoints/create">API reference →</a>',
+    '8 event types · HMAC-SHA256 · exponential retry · <a href="https://docs.letmepost.dev/api-reference">API reference →</a>',
   miniCodeLang: "json",
   miniCode: `{
   "url": "https://your-app.example/lmp-webhook",
@@ -750,7 +750,7 @@ app.post('/lmp-webhook', (req, res) => {
   errorRef: {
     title: "Webhook delivery reference",
     body: "Every event payload schema, every header, every retry rule. Plus the verify-helper source.",
-    href: "https://docs.letmepost.dev/api-reference/webhook-endpoints",
+    href: "https://docs.letmepost.dev/api-reference",
   },
 
   faqSubtitle: "about webhook delivery",
@@ -791,7 +791,7 @@ app.post('/lmp-webhook', (req, res) => {
   finalCtaPrimaryLabel: "GET AN API KEY →",
   finalCtaSecondaryLabel: "READ THE REFERENCE",
   finalCtaSecondaryHref:
-    "https://docs.letmepost.dev/api-reference/webhook-endpoints/create",
+    "https://docs.letmepost.dev/api-reference",
 
   closeoutThanks: "* * * PUSH · NOT POLL * * *",
   closeoutCodeLine: "SURFACE · WEBHOOKS · /v1/webhook-endpoints",

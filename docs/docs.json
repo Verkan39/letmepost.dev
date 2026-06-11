@@ -193,7 +193,9 @@
                   "preflight/instagram-media-image_size_max",
                   "preflight/instagram-media-video_size_max",
                   "preflight/instagram-media-reachable",
-                  "preflight/instagram-media-aspect_ratio"
+                  "preflight/instagram-media-aspect_ratio",
+                  "preflight/instagram-container-expired",
+                  "preflight/instagram-account_type-requires_professional"
                 ]
               },
               {
@@ -263,7 +265,8 @@
                   "preflight/twitter-media-gif_size_max",
                   "preflight/twitter-media-video_size_max",
                   "preflight/twitter-media-video_processing_failed",
-                  "preflight/twitter-media-processing_timeout"
+                  "preflight/twitter-media-processing_timeout",
+                  "preflight/twitter-launch_cap-per_account"
                 ]
               },
               {

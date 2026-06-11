@@ -102,7 +102,7 @@ The publisher creates each child container (`is_carousel_item=true`), polls each
 ## Wisdom (platform-specific things that bite)
 
 <Tip>
-- **JPEG only** for images. PNG, WebP, HEIC, and GIF will be rejected with `code 100, error_subcode 2207003`. Preflight catches this locally so you don't lose a roundtrip — re-encode to JPEG via your image pipeline (or upload via [`POST /v1/media`](/api-reference/media/create) which preserves the source mime).
+- **JPEG only** for images. PNG, WebP, HEIC, and GIF will be rejected with `code 100, error_subcode 2207003`. Preflight catches this locally so you don't lose a roundtrip — re-encode to JPEG via your image pipeline (or upload via [`POST /v1/media`](/api-reference) which preserves the source mime).
 - Media URLs **must be publicly reachable** by Meta's CDN — anonymous HTTPS, no auth, no Drive links, no signed S3 URLs that expire before the container finishes. Unreachable URLs surface as `OAuthException 2207052`, the canonical opaque-rejection.
 - The first **125 characters** of the caption show before the "more" fold in feed. Front-load anything important.
 - Container expiry: Instagram's media containers live for **24 hours** after creation. The publisher creates + publishes in one synchronous flow so this rarely matters, but a scheduled post that ages out triggers `instagram.container.expired`.
@@ -136,6 +136,6 @@ The publisher creates each child container (`is_carousel_item=true`), polls each
 
 ## API reference
 
-- [`POST /v1/posts`](/api-reference/posts/create) — primary publish.
-- [`POST /v1/media`](/api-reference/media/create) — upload images/videos for `mediaId` references.
-- [`POST /v1/accounts/connect/instagram`](/api-reference/accounts/connect-instagram) — start an Instagram OAuth flow.
+- [`POST /v1/posts`](/api-reference) — primary publish.
+- [`POST /v1/media`](/api-reference) — upload images/videos for `mediaId` references.
+- [`POST /v1/accounts/connect/instagram`](/api-reference) — start an Instagram OAuth flow.

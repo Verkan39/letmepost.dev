@@ -1,0 +1,21 @@
+---
+title: twitter.launch_cap.per_account
+description: The per-account X launch cap of 50 billable posts per rolling 30 days is exhausted.
+---
+
+To keep cost predictable during the X Pay Per Use launch window, letmepost enforces a soft cap of **50 billable posts** (`published` + `rejected` + `failed`) per connected X account per rolling 30 days. When the cap is hit, further `POST /v1/posts` calls for that account return `rate_limited` (HTTP 429) with a `Retry-After` header derived from the oldest billable post in the window.
+
+## How to fix
+
+- **Wait for the cap window to roll over.** The `Retry-After` header tells you how many seconds until the oldest billable post falls out of the 30-day window.
+- **Reduce volume** if you're hitting the cap by accident — every retry on a transient failure still counts as billable.
+- **Lift the cap.** Self-host instances can bump `TWITTER_LAUNCH_CAP_PER_ACCOUNT` via env. Hosted users on the Business tier with sustained X volume should reach out; the cap is a launch backstop, not a permanent policy.
+
+## Why we cap
+
+X's pay-per-use pricing kicked in for new developers in Feb 2026 — every API call burns budget from the first request. The launch cap is a safety net so a runaway loop on one account doesn't drain the hosted X budget before we have signal on real usage patterns.
+
+## Related
+
+- [X / Twitter platform docs](/platforms/twitter)
+- [Preflight overview](/preflight)

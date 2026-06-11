@@ -261,7 +261,7 @@ for (const r of result.targets) {
   errorRef: {
     title: "Bluesky API error reference",
     body: "AT Proto error codes mapped to letmepost's stable envelope. Plus the 12 Bluesky-specific preflight rules.",
-    href: "https://docs.letmepost.dev/errors/platforms/bluesky",
+    href: "https://docs.letmepost.dev/platforms/bluesky",
   },
 
   faqSubtitle: "about publishing to bluesky",
@@ -272,7 +272,7 @@ for (const r of result.targets) {
     },
     {
       q: "What about Bluesky's grapheme + byte limits?",
-      a: 'Both enforced locally. 300 graphemes max, 3,000 UTF-8 bytes max. Whichever caps first wins. A wall of emoji can blow the byte limit before the grapheme limit. Use our <a href="https://docs.letmepost.dev/tools/bluesky-grapheme-counter">grapheme counter</a> to check.',
+      a: 'Both enforced locally. 300 graphemes max, 3,000 UTF-8 bytes max. Whichever caps first wins. A wall of emoji can blow the byte limit before the grapheme limit. Use our grapheme counter to check.',
     },
     {
       q: "Can I post to a custom Bluesky PDS?",
@@ -446,7 +446,7 @@ for (const r of result.targets) {
   errorRef: {
     title: "X API error reference",
     body: "X v2 error codes mapped to letmepost's stable envelope. Plus the 14 X-specific preflight rules (weighted chars, media counts, audit states).",
-    href: "https://docs.letmepost.dev/errors/platforms/twitter",
+    href: "https://docs.letmepost.dev/platforms/twitter",
   },
 
   faqSubtitle: "code-review questions about X posting",
@@ -461,7 +461,7 @@ for (const r of result.targets) {
     },
     {
       q: "What about the weighted character count?",
-      a: 'X uses a range-table formula where CJK = 2, emoji = 2, URLs = 23 chars (t.co length). We ship the actual <code>twitter-text</code> library, so our counter agrees with X server-side. <a href="https://docs.letmepost.dev/tools/x-character-counter">Counter tool here</a>.',
+      a: 'X uses a range-table formula where CJK = 2, emoji = 2, URLs = 23 chars (t.co length). We ship the actual <code>twitter-text</code> library, so our counter agrees with X server-side. See the docs for the counter formula.',
     },
     {
       q: "Can I post threads?",
@@ -848,7 +848,7 @@ const result = await lmp.posts.create({
     },
     {
       tag: "URN encoding",
-      body: 'LinkedIn IDs require percent-encoded URNs. We handle this; <a href="https://docs.letmepost.dev/tools/linkedin-urn-encoder-decoder">tool also available</a>.',
+      body: 'LinkedIn IDs require percent-encoded URNs. We handle this; handled server-side.',
     },
     {
       tag: "Self-host",
@@ -1139,7 +1139,7 @@ const result = await lmp.posts.create({
   errorRef: {
     title: "Meta Graph error reference",
     body: "Every OAuthException + Graph error code mapped to letmepost's stable envelope. Plus 18 IG-specific preflight rules.",
-    href: "https://docs.letmepost.dev/errors/platforms/instagram",
+    href: "https://docs.letmepost.dev/platforms/instagram",
   },
 
   faqSubtitle: "about meta app review &amp; ig publishing",

@@ -108,6 +108,31 @@ function stripOutrankAttribution(markdown: string): string {
   );
 }
 
+/**
+ * Notion's `heading_1` block converts straight to a markdown `#` (H1),
+ * which renders as a second H1 alongside the post's title — SEO crawlers
+ * flag every blog post as "multiple H1 tags." Demote every body heading
+ * by one level so the page's `<h1>` (from the post title) is the only H1,
+ * Notion H1s become section H2s (and surface in the TOC), and so on.
+ * H6 → H7 isn't valid markdown but Notion only emits heading_1/2/3, so
+ * we cap at H4 in practice. Code fences are skipped so `# comment` inside
+ * a fenced block isn't accidentally demoted.
+ */
+function demoteHeadings(markdown: string): string {
+  let inFence = false;
+  return markdown
+    .split("\n")
+    .map((line) => {
+      if (/^\s*```/.test(line)) {
+        inFence = !inFence;
+        return line;
+      }
+      if (inFence) return line;
+      return line.replace(/^(#{1,5})(\s+)/, "#$1$2");
+    })
+    .join("\n");
+}
+
 export function notionBlogLoader(opts: NotionBlogLoaderOptions): Loader {
   return {
     name: "notion-blog",
@@ -191,7 +216,8 @@ export function notionBlogLoader(opts: NotionBlogLoaderOptions): Loader {
         const mdResult = n2m.toMarkdownString(mdBlocks);
         const cleaned = stripInlineToc(mdResult.parent ?? "");
         const noAttribution = stripOutrankAttribution(cleaned);
-        const body = addImageAlts(noAttribution, title);
+        const demoted = demoteHeadings(noAttribution);
+        const body = addImageAlts(demoted, title);
         if (!body.trim()) {
           logger.warn(`Skipping ${slug}: empty body`);
           continue;

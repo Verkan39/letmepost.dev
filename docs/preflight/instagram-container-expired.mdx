@@ -1,0 +1,21 @@
+---
+title: instagram.container.expired
+description: An IG media container aged past Instagram's 24-hour window before publish.
+---
+
+Instagram's Graph API requires a two-step publish: create a media container, then publish it. The container stays valid for **24 hours**. If the publish step happens after that window, Instagram rejects with `code 100, error_subcode 2207003` and the container is unrecoverable — you have to start over.
+
+## Why this happens
+
+- A scheduled post was queued more than 24 h after creation.
+- The publish job retried so many times that the cumulative delay exceeded 24 h.
+- An idempotency replay landed against a stale container.
+
+## How to fix
+
+Re-create the container and publish in one flow. letmepost.dev does this automatically on retry — the worker rebuilds the container if the previous one is older than 24 h, so the only time you see `instagram.container.expired` surfaced to your app is when the post body itself is unrecoverable (e.g., the source media URL is now 404).
+
+## Related
+
+- [Instagram platform docs](/platforms/instagram)
+- [Preflight overview](/preflight)

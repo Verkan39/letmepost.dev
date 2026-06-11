@@ -1,0 +1,22 @@
+---
+title: instagram.account_type.requires_professional
+description: Connect attempted with a PERSONAL Instagram account. Instagram's Graph API requires Business or Creator.
+---
+
+Instagram's Graph publishing API only accepts **Business** or **Creator** accounts. A **Personal** account cannot be used for API posting — Meta returns `OAuthException` with a sub-code indicating the account type mismatch the moment our connect callback inspects the account.
+
+## How to fix
+
+The user needs to switch their Instagram account from Personal to Business or Creator, then reconnect:
+
+1. Open the Instagram app on mobile.
+2. **Settings → Account → Switch to Professional Account**.
+3. Pick **Business** or **Creator**.
+4. Return to the dashboard and re-run the Instagram connect flow.
+
+Personal accounts cannot publish via API — there's no workaround on the platform side.
+
+## Related
+
+- [Instagram platform docs](/platforms/instagram)
+- [Preflight overview](/preflight)

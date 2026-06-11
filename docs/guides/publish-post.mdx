@@ -141,7 +141,7 @@ See [schedule a post](/guides/schedule-post) for the full lifecycle and the v1 t
 
 ## What to subscribe to
 
-Webhooks fire **per target**, not per batch. A successful immediate publish on three targets fires three `post.published` events. A scheduled batch fires `post.queued` per target on accept, then `post.published` / `post.rejected` / `post.failed` per target when the worker runs. Subscribe via [`POST /v1/webhook-endpoints`](/api-reference/webhooks/create) and verify signatures per [webhooks](/webhooks).
+Webhooks fire **per target**, not per batch. A successful immediate publish on three targets fires three `post.published` events. A scheduled batch fires `post.queued` per target on accept, then `post.published` / `post.rejected` / `post.failed` per target when the worker runs. Subscribe via [`POST /v1/webhook-endpoints`](/api-reference) and verify signatures per [webhooks](/webhooks).
 
 ## Idempotency
 

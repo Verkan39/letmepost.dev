@@ -183,7 +183,7 @@ const bluesky: PlatformContent = {
   playground: {
     steps: ["Connect", "Configure", "Execute"],
     body: "Generate an <b>app password</b> in Bluesky → Settings → Privacy &amp; Security → App passwords. Paste into our dashboard. Post immediately.",
-    cta: { href: "https://dashboard.letmepost.dev/accounts/new", label: "CONNECT BLUESKY →" },
+    cta: { href: "https://dashboard.letmepost.dev/accounts?connect=1", label: "CONNECT BLUESKY →" },
     result: "Live in ~12 seconds.",
     resultCaption: "NO OAUTH DANCE",
   },
@@ -371,7 +371,7 @@ const x: PlatformContent = {
   playground: {
     steps: ["Connect", "Configure", "Execute"],
     body: "OAuth 2.0 PKCE handled in the browser. Click connect, authorize on x.com, you're back in the dashboard with a working account.",
-    cta: { href: "https://dashboard.letmepost.dev/accounts/new", label: "CONNECT X →" },
+    cta: { href: "https://dashboard.letmepost.dev/accounts?connect=1", label: "CONNECT X →" },
     result: "Posting in ~30 seconds.",
     resultCaption: "PKCE HANDLED",
   },
@@ -549,7 +549,7 @@ const pinterest: PlatformContent = {
   playground: {
     steps: ["Connect", "Configure", "Execute"],
     body: "OAuth on pinterest.com, select boards, you're back in the dashboard. Sandbox accounts work for testing; Standard Access for production.",
-    cta: { href: "https://dashboard.letmepost.dev/accounts/new", label: "CONNECT PINTEREST →" },
+    cta: { href: "https://dashboard.letmepost.dev/accounts?connect=1", label: "CONNECT PINTEREST →" },
     result: "First pin in ~45 seconds.",
     resultCaption: "BOARDS LOADED",
   },
@@ -733,7 +733,7 @@ const linkedin: PlatformContent = {
   playground: {
     steps: ["Connect", "Configure", "Execute"],
     body: "OAuth on linkedin.com. Personal posts work today (in review). Org posts unlock once our MDP review clears — self-host users can BYO MDP entry today.",
-    cta: { href: "https://dashboard.letmepost.dev/accounts/new", label: "CONNECT LINKEDIN →" },
+    cta: { href: "https://dashboard.letmepost.dev/accounts?connect=1", label: "CONNECT LINKEDIN →" },
     result: "Approval-gated.",
     resultCaption: "MDP IN REVIEW · DAY 12 / ~84",
   },
@@ -899,7 +899,7 @@ const threads: PlatformContent = {
   playground: {
     steps: ["Connect", "Configure", "Execute"],
     body: "Threads OAuth on threads.net. Standalone, not bundled with Facebook. Live the day Meta App Review clears for this surface.",
-    cta: { href: "https://dashboard.letmepost.dev/accounts/new", label: "CONNECT THREADS →" },
+    cta: { href: "https://dashboard.letmepost.dev/accounts?connect=1", label: "CONNECT THREADS →" },
     result: "Approval-gated.",
     resultCaption: "META REVIEW · DAY 24 / ~56",
   },
@@ -1069,7 +1069,7 @@ const instagram: PlatformContent = {
   playground: {
     steps: ["Connect", "Configure", "Execute"],
     body: "Facebook Login for Business. <b>One consent grants Pages + IG Business + Threads access.</b> Live the day Meta approval clears for hosted users.",
-    cta: { href: "https://dashboard.letmepost.dev/accounts/new", label: "CONNECT META →" },
+    cta: { href: "https://dashboard.letmepost.dev/accounts?connect=1", label: "CONNECT META →" },
     result: "Approval-gated.",
     resultCaption: "META REVIEW · DAY 24 / ~56",
   },
@@ -1246,7 +1246,7 @@ const facebook: PlatformContent = {
   playground: {
     steps: ["Connect", "Configure", "Execute"],
     body: "Facebook Login for Business. Pick the Pages your app should post to. Page Access Tokens exchanged and stored encrypted.",
-    cta: { href: "https://dashboard.letmepost.dev/accounts/new", label: "CONNECT META →" },
+    cta: { href: "https://dashboard.letmepost.dev/accounts?connect=1", label: "CONNECT META →" },
     result: "Approval-gated.",
     resultCaption: "META REVIEW · DAY 24 / ~56",
   },
@@ -1413,7 +1413,7 @@ const tiktok: PlatformContent = {
   playground: {
     steps: ["Connect", "Configure", "Execute"],
     body: "TikTok OAuth 2.0 PKCE + account pick. Audit-gated for hosted users; self-host today with your own TikTok developer app.",
-    cta: { href: "https://dashboard.letmepost.dev/accounts/new", label: "CONNECT TIKTOK →" },
+    cta: { href: "https://dashboard.letmepost.dev/accounts?connect=1", label: "CONNECT TIKTOK →" },
     result: "Approval-gated.",
     resultCaption: "APP REVIEW · IN FLIGHT",
   },

@@ -20,6 +20,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { ConnectAccountDrawer } from "@/components/app/connect-account-drawer";
+import { OnboardingConnect } from "@/components/app/onboarding-connect";
 import { FadeIn, StaggerList, StaggerItem } from "@/components/app/motion";
 import { PinterestDefaultBoard } from "@/components/app/pinterest-default-board";
 import { PLATFORM_BRANDS } from "@/components/app/platform-icons";
@@ -49,6 +50,17 @@ export default function AccountsListPage() {
   // and clean the query so a refresh doesn't re-fire it. Invalidate by the
   // top-level "accounts" prefix so every profile-scoped variant refetches —
   // we don't know which profile the OAuth state row carried.
+  // `?connect=1` is the entry point from marketing site CTAs and from
+  // the old `/accounts/new` redirect. Auto-open the drawer so the user
+  // lands directly in the platform picker instead of needing one more
+  // click to find the button.
+  useEffect(() => {
+    if (searchParams.get("connect") === "1") {
+      setConnectOpen(true);
+      router.replace("/accounts", { scroll: false });
+    }
+  }, [searchParams, router]);
+
   useEffect(() => {
     const connected = searchParams.get("connected");
     const error = searchParams.get("connect_error");
@@ -202,23 +214,18 @@ export default function AccountsListPage() {
                 : "No accounts yet"}
             </CardTitle>
             <CardDescription>
-              {activeProfile
-                ? `${activeProfile.name} doesn't have a social account wired up yet. Connect one and you can start publishing under this profile — accounts are scoped per profile.`
-                : "Connect your first platform — Bluesky takes about thirty seconds with an app password, the others run through OAuth. We hold the tokens, encrypted, and refresh on the right schedule."}
+              Pick a platform to connect. Bluesky uses an app password; the
+              rest go through OAuth. We hold the tokens, encrypted, and
+              refresh on the right schedule.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button
-              onClick={() => {
-                track({
-                  name: "connect.drawer_opened",
-                  properties: { entry_point: "empty-state" },
-                });
-                setConnectOpen(true);
+            <OnboardingConnect
+              size="large"
+              onConnected={() => {
+                queryClient.invalidateQueries({ queryKey: ["accounts"] });
               }}
-            >
-              Connect account
-            </Button>
+            />
           </CardContent>
         </Card>
       ) : (

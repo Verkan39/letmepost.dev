@@ -794,7 +794,7 @@ function QuickActionsStrip() {
     {
       icon: Plug,
       label: "Connect platform",
-      href: "/accounts/new",
+      href: "/accounts?connect=1",
       detail: "Add another account",
     },
     {

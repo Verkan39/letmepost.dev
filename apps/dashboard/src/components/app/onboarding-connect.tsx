@@ -45,8 +45,15 @@ const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
  */
 export function OnboardingConnect({
   onConnected,
+  size = "default",
 }: {
   onConnected: () => void;
+  /**
+   * Visual scale for the platform grid. `default` is the onboarding
+   * accordion variant (40px icons, 2×4 tight grid). `large` is the
+   * standalone /accounts/new variant (64px icons, taller tiles).
+   */
+  size?: "default" | "large";
 }) {
   const { profiles, activeProfile } = useActiveProfile();
   const [profileId, setProfileId] = useState<string | null>(null);
@@ -286,7 +293,12 @@ export function OnboardingConnect({
               transition: { duration: 0.18, ease: EASE_OUT },
             }}
             transition={{ duration: 0.28, ease: EASE_OUT }}
-            className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+            className={cn(
+              "grid gap-3",
+              size === "large"
+                ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
+                : "grid-cols-2 sm:grid-cols-4 gap-2",
+            )}
           >
             {PLATFORM_BRANDS.map((b) => {
               const state: PlatformState = PLATFORM_STATE[b.id] ?? "pending";
@@ -307,7 +319,8 @@ export function OnboardingConnect({
                       : undefined
                   }
                   className={cn(
-                    "group relative flex flex-col items-center gap-2 px-3 py-5 ring-1 ring-foreground/10 bg-card transition-[box-shadow,opacity] duration-200",
+                    "group relative flex flex-col items-center ring-1 ring-foreground/10 bg-card transition-[box-shadow,opacity] duration-200",
+                    size === "large" ? "gap-3 px-4 py-8" : "gap-2 px-3 py-5",
                     !busy && !pending && "hover:ring-foreground/40 hover:bg-muted/40",
                     active && "ring-primary",
                     dim && "opacity-40 pointer-events-none",
@@ -324,7 +337,8 @@ export function OnboardingConnect({
                   ) : null}
                   <span
                     className={cn(
-                      "size-10 transition-[filter,opacity] duration-200",
+                      "transition-[filter,opacity] duration-200",
+                      size === "large" ? "size-16" : "size-10",
                       "grayscale opacity-55",
                       !pending && "group-hover:grayscale-0 group-hover:opacity-100",
                       active && "grayscale-0 opacity-100",
@@ -336,7 +350,8 @@ export function OnboardingConnect({
                   </span>
                   <span
                     className={cn(
-                      "text-xs font-medium text-muted-foreground transition-colors",
+                      "font-medium text-muted-foreground transition-colors",
+                      size === "large" ? "text-sm" : "text-xs",
                       !pending && "group-hover:text-foreground",
                       active && "text-foreground",
                     )}

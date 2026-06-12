@@ -49,7 +49,17 @@ jobs:
       - name: Test
         run: pnpm test
         env:
-          # DB-backed tests are gated by `canRunDbTests` — they self-skip when
-          # POSTGRES_TEST_URL is unset. Keep CI fast on the default path; add
-          # a service container later if we need full DB coverage on PRs.
           CI: true
+          # Module-load env vars — `apps/api/src/db/instance.ts` calls
+          # `createDb()` at import time, and `apps/api/src/auth.ts`
+          # validates BETTER_AUTH_SECRET at module load. These placeholders
+          # let imports succeed; no real DB connection is opened because
+          # DB-backed test suites self-skip via `canRunDbTests`, which is
+          # gated by the separate TEST_DATABASE_URL (unset here).
+          # Add a Postgres service container later if we need full DB
+          # coverage on PRs.
+          DATABASE_URL: postgres://ci:ci@localhost:5432/ci
+          BETTER_AUTH_SECRET: ci-throwaway-secret-not-used-anywhere-real
+          # 32-byte base64 throwaway — only needed if a test triggers
+          # `loadKek()` (encryption is lazy elsewhere).
+          KEK_MASTER: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=

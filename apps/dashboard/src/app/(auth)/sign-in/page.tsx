@@ -48,6 +48,7 @@ export default function SignInPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
+      track({ name: "signin.started", properties: { provider: "email" } });
       const { error } = await authClient.signIn.email({ email, password });
       if (error) {
         toast.error(error.message ?? "Sign-in failed.");
@@ -81,6 +82,23 @@ export default function SignInPage() {
       const callbackURL = raw.startsWith("http")
         ? raw
         : `${window.location.origin}${raw}`;
+      track({ name: "signin.started", properties: { provider } });
+      // Stash a pending event so the post-redirect landing page can fire
+      // signin.completed once the session lands — we leave this origin
+      // before the auth call resolves, so we can't fire it inline.
+      try {
+        window.localStorage.setItem(
+          "lmp_pending_auth_event",
+          JSON.stringify({
+            kind: "signin.completed",
+            provider,
+            stashedAt: new Date().toISOString(),
+          }),
+        );
+      } catch {
+        // private mode / disabled storage — accept the gap, the redirect
+        // is more important than the analytics event.
+      }
       const { error } = await authClient.signIn.social({
         provider,
         callbackURL,

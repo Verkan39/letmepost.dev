@@ -162,6 +162,21 @@ export default function SignUpPage() {
         name: "signup.started",
         properties: { provider },
       });
+      // Stash a pending completion event — OAuth full-page-redirects us
+      // off this origin, so the matching `signup.completed` has to fire
+      // from the landing page once the session is back.
+      try {
+        window.localStorage.setItem(
+          "lmp_pending_auth_event",
+          JSON.stringify({
+            kind: "signup.completed",
+            provider,
+            stashedAt: new Date().toISOString(),
+          }),
+        );
+      } catch {
+        // private mode — accept the gap.
+      }
       // Absolute URL — a relative path resolves against the API baseURL.
       const { error } = await authClient.signIn.social({
         provider,

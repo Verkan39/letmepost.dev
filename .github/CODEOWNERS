@@ -1,0 +1,13 @@
+# Default review-routing for letmepost.dev.
+#
+# When a PR is opened, GitHub auto-requests review from the owners
+# matching the touched paths. Patterns later in the file override earlier
+# ones (last match wins).
+
+# Catch-all: every change needs a maintainer pass.
+*                                @rosekamallove
+
+# Add directory-specific owners here when a second maintainer joins.
+# Example:
+#   apps/api/src/platforms/*      @rosekamallove @platform-lead
+#   docs/                         @rosekamallove @docs-lead

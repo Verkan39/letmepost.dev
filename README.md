@@ -5,7 +5,7 @@
 
 An alternative to: **Ayrshare**, **Postiz**, **Buffer**, **Hootsuite**, **Hypefury**.
 
-[![License](https://img.shields.io/badge/License-Apache_2.0-2D7A4D.svg?style=flat-square)](https://opensource.org/license/apache-2-0) [![Stars](https://img.shields.io/github/stars/rosekamallove/letmepost.dev?style=flat-square&color=2D7A4D)](https://github.com/rosekamallove/letmepost.dev/stargazers) [![Issues](https://img.shields.io/github/issues/rosekamallove/letmepost.dev?style=flat-square&color=2D7A4D)](https://github.com/rosekamallove/letmepost.dev/issues) [![Docs](https://img.shields.io/badge/docs-letmepost.dev-2D7A4D.svg?style=flat-square)](https://docs.letmepost.dev)
+[![CI](https://img.shields.io/github/actions/workflow/status/letmepost/letmepost.dev/ci.yml?branch=main&style=flat-square&color=2D7A4D&label=ci)](https://github.com/letmepost/letmepost.dev/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/@letmepost/sdk?style=flat-square&color=2D7A4D&label=%40letmepost%2Fsdk)](https://www.npmjs.com/package/@letmepost/sdk) [![License](https://img.shields.io/badge/License-Apache_2.0-2D7A4D.svg?style=flat-square)](https://opensource.org/license/apache-2-0) [![Stars](https://img.shields.io/github/stars/letmepost/letmepost.dev?style=flat-square&color=2D7A4D)](https://github.com/letmepost/letmepost.dev/stargazers) [![Issues](https://img.shields.io/github/issues/letmepost/letmepost.dev?style=flat-square&color=2D7A4D)](https://github.com/letmepost/letmepost.dev/issues) [![Good first issues](https://img.shields.io/github/issues/letmepost/letmepost.dev/good-first-issue?style=flat-square&color=7057ff&label=good%20first%20issues)](https://github.com/letmepost/letmepost.dev/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue) [![Docs](https://img.shields.io/badge/docs-letmepost.dev-2D7A4D.svg?style=flat-square)](https://docs.letmepost.dev)
 
 **[Website](https://letmepost.dev)** · **[Docs](https://docs.letmepost.dev)** · **[Quickstart](https://docs.letmepost.dev/quickstart)** · **[Dashboard](https://dashboard.letmepost.dev)** · **[API Reference](https://docs.letmepost.dev/api-reference)**
 
@@ -102,6 +102,21 @@ curl -X POST https://api.letmepost.dev/v1/posts \
 
 90-second walkthrough at [docs.letmepost.dev/quickstart](https://docs.letmepost.dev/quickstart).
 
+## Contributing
+
+We build in the open. Outside contributions are how this becomes a primitive for **every** social platform, not just the eight we shipped first.
+
+**Pick a starting point:**
+
+- 🟢 **[Good first issues](https://github.com/letmepost/letmepost.dev/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue)** — scoped, isolated, no DB-migration archeology required.
+- 🆘 **[Help wanted](https://github.com/letmepost/letmepost.dev/issues?q=is%3Aissue+is%3Aopen+label%3Ahelp-wanted)** — medium tasks the maintainers can't get to.
+- 🔌 **[Platform requests](https://github.com/letmepost/letmepost.dev/issues?q=is%3Aissue+is%3Aopen+label%3Atype%3Aplatform)** — Reddit, Mastodon, YouTube, Telegram, Discord, Google Business. Each issue mirrors the same publisher shape (provider + publisher + preflight + client). The walkthrough in [`CONTRIBUTING.md` §3](./CONTRIBUTING.md#3-platform-addition) is the canonical recipe — most additions are < 500 LOC.
+- 🐛 **Found a bug?** Open one via the [bug-report template](https://github.com/letmepost/letmepost.dev/issues/new?template=bug_report.yml) — auto-applies the right labels and asks for the platform + repro + raw error envelope so triage doesn't ping-pong.
+
+**Before you open a PR**, skim [`CONTRIBUTING.md`](./CONTRIBUTING.md) — it documents the layering rules, the error contract, the pre-publish gate pattern, the testing approach (MSW + transaction rollback), and the commit style we follow. It's how new code reviews itself.
+
+[`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md) · [`SECURITY.md`](./SECURITY.md) (vulnerability disclosure) · [`PRODUCT.md`](./PRODUCT.md) (the seven product principles) · [`TECH.md`](./TECH.md) (stack contract) · [`plan.md`](./plan.md) (v1 status + pre-launch checklist).
+
 ## Self-host
 
 Apache 2.0 from day 0. The same code that runs `api.letmepost.dev` runs on your own infra — no feature gate, no open-core trick.
@@ -158,10 +173,6 @@ Landing as the stack grows: `packages/openapi/` (generated 3.1 spec), plus sibli
 Hono · BullMQ · Drizzle · PostgreSQL (Neon) · Redis (Upstash) · better-auth · Zod · Next.js · Astro · TypeScript · Turborepo · pnpm.
 
 API contract details in [`TECH.md`](./TECH.md). Product principles in [`PRODUCT.md`](./PRODUCT.md). Roadmap in [`plan.md`](./plan.md).
-
-## Contributing
-
-Building in the open. [File an issue](https://github.com/rosekamallove/letmepost.dev/issues) when something's weird. Read [`PRODUCT.md`](./PRODUCT.md) before PRs that touch product surface area, [`TECH.md`](./TECH.md) for implementation decisions, and [`CONTRIBUTING.md`](./CONTRIBUTING.md) for layering rules + the error contract.
 
 ## Compliance
 

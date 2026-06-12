@@ -1,0 +1,32 @@
+name: Sync labels
+
+# Lets us edit the repo's label set by editing `.github/labels.yml` in a PR
+# instead of clicking through GitHub's settings UI. The label-sync action
+# adds missing labels, updates color/description drift, and (with
+# `delete-other-labels`) removes any label not in the YAML. Run on push to
+# main so a PR that touches labels.yml lands the change as soon as it
+# merges; also exposes a manual `workflow_dispatch` trigger.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/labels.yml
+      - .github/workflows/sync-labels.yml
+  workflow_dispatch:
+
+jobs:
+  sync:
+    name: Apply .github/labels.yml
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EndBug/label-sync@v2
+        with:
+          config-file: .github/labels.yml
+          # Removes any label on the repo that isn't in labels.yml. Safe
+          # because every issue/PR that uses a label has it applied via
+          # template or by a maintainer — the source of truth is the file.
+          delete-other-labels: true

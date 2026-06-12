@@ -1,0 +1,106 @@
+# Canonical label set for the letmepost.dev repo. Edit here, the
+# sync-labels workflow applies on merge to main.
+#
+# Convention: prefix:noun (kebab-case). Keep families small so triage
+# stays a 30-second exercise, not an essay.
+
+# Type — what kind of work this is. Exactly one per issue.
+- name: type:bug
+  color: d73a4a
+  description: Wrong behavior in shipped code.
+
+- name: type:feature
+  color: a2eeef
+  description: A new capability or API surface.
+
+- name: type:docs
+  color: 0075ca
+  description: Docs, blog, README, comments.
+
+- name: type:platform
+  color: 5319e7
+  description: Add or change a social platform integration.
+
+- name: type:chore
+  color: ededed
+  description: Build, deps, CI, internal refactors.
+
+# Area — where in the monorepo. Multiple allowed if a change spans surfaces.
+- name: area:api
+  color: 0e8a16
+  description: apps/api — HTTP + worker + publishers.
+
+- name: area:dashboard
+  color: 0e8a16
+  description: apps/dashboard — operator UI.
+
+- name: area:web
+  color: 0e8a16
+  description: apps/web — marketing site.
+
+- name: area:docs
+  color: 0e8a16
+  description: docs/ — Mintlify content.
+
+- name: area:sdk
+  color: 0e8a16
+  description: packages/sdk-ts + generated Python/Go SDKs.
+
+- name: area:mcp
+  color: 0e8a16
+  description: apps/mcp — MCP server (stdio + hosted).
+
+- name: area:cli
+  color: 0e8a16
+  description: apps/cli — the `lmp` binary.
+
+# Platform — narrow tag for platform-specific issues.
+- name: platform:bluesky
+  color: 1185fe
+- name: platform:twitter
+  color: '111111'
+- name: platform:linkedin
+  color: 0a66c2
+- name: platform:meta
+  color: 1877f2
+  description: Covers Facebook, Instagram, and Threads (shared Graph auth).
+- name: platform:pinterest
+  color: e60023
+- name: platform:tiktok
+  color: ff0050
+- name: platform:reddit
+  color: ff4500
+- name: platform:mastodon
+  color: 6364ff
+- name: platform:youtube
+  color: ff0000
+
+# Funnel — for surfacing approachable work.
+- name: good-first-issue
+  color: 7057ff
+  description: Scoped, isolated, low context required. New contributors welcome.
+- name: help-wanted
+  color: '008672'
+  description: Maintainer would gladly review a PR for this.
+
+# Status — current state in the triage funnel.
+- name: status:needs-triage
+  color: fbca04
+  description: Awaiting maintainer review.
+- name: status:in-progress
+  color: fef2c0
+  description: Someone is actively working on this.
+- name: status:blocked
+  color: b60205
+  description: Blocked on an external dependency or decision.
+
+# Size — rough effort estimate.
+- name: size:s
+  color: c2e0c6
+  description: ~1 hour.
+- name: size:m
+  color: c2e0c6
+  description: ~half day.
+- name: size:l
+  color: c2e0c6
+  description: ~multi-day.

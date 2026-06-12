@@ -6,6 +6,16 @@
       "schedule": "30 2 * * *"
     }
   ],
+  "rewrites": [
+    {
+      "source": "/_ph/static/:path*",
+      "destination": "https://us-assets.i.posthog.com/static/:path*"
+    },
+    {
+      "source": "/_ph/:path*",
+      "destination": "https://us.i.posthog.com/:path*"
+    }
+  ],
   "redirects": [
     {
       "source": "/docs",

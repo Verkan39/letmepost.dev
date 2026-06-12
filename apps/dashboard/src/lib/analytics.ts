@@ -75,6 +75,7 @@ export type DashboardEvent =
       };
     }
   | { name: "signup.completed"; properties: { provider: AuthProvider } }
+  | { name: "signin.started"; properties: { provider: AuthProvider } }
   | { name: "signin.completed"; properties: { provider: AuthProvider } }
   | { name: "signout.completed"; properties: Record<string, never> }
   | { name: "email.verified"; properties: Record<string, never> }

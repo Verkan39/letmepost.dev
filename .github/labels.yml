@@ -74,6 +74,14 @@
   color: "6364ff"
 - name: platform:youtube
   color: "ff0000"
+- name: platform:telegram
+  color: "26a5e4"
+- name: platform:discord
+  color: "5865f2"
+- name: platform:google-business
+  color: "4285f4"
+  description: Google Business Profile (formerly Google My Business).
+
 # Funnel — for surfacing approachable work.
 - name: good-first-issue
   color: "7057ff"

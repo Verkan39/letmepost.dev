@@ -108,10 +108,10 @@ We build in the open. Outside contributions are how this becomes a primitive for
 
 **Pick a starting point:**
 
-- 🟢 **[Good first issues](https://github.com/letmepost/letmepost.dev/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue)** — scoped, isolated, no DB-migration archeology required.
-- 🆘 **[Help wanted](https://github.com/letmepost/letmepost.dev/issues?q=is%3Aissue+is%3Aopen+label%3Ahelp-wanted)** — medium tasks the maintainers can't get to.
-- 🔌 **[Platform requests](https://github.com/letmepost/letmepost.dev/issues?q=is%3Aissue+is%3Aopen+label%3Atype%3Aplatform)** — Reddit, Mastodon, YouTube, Telegram, Discord, Google Business. Each issue mirrors the same publisher shape (provider + publisher + preflight + client). The walkthrough in [`CONTRIBUTING.md` §3](./CONTRIBUTING.md#3-platform-addition) is the canonical recipe — most additions are < 500 LOC.
-- 🐛 **Found a bug?** Open one via the [bug-report template](https://github.com/letmepost/letmepost.dev/issues/new?template=bug_report.yml) — auto-applies the right labels and asks for the platform + repro + raw error envelope so triage doesn't ping-pong.
+- **[Good first issues](https://github.com/letmepost/letmepost.dev/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue)** — scoped, isolated, no DB-migration archeology required.
+- **[Help wanted](https://github.com/letmepost/letmepost.dev/issues?q=is%3Aissue+is%3Aopen+label%3Ahelp-wanted)** — medium tasks the maintainers can't get to.
+- **[Platform requests](https://github.com/letmepost/letmepost.dev/issues?q=is%3Aissue+is%3Aopen+label%3Atype%3Aplatform)** — Reddit, Mastodon, YouTube, Telegram, Discord, Google Business. Each issue mirrors the same publisher shape (provider + publisher + preflight + client). The walkthrough in [`CONTRIBUTING.md` §3](./CONTRIBUTING.md#3-platform-addition) is the canonical recipe — most additions are < 500 LOC.
+- **Found a bug?** Open one via the [bug-report template](https://github.com/letmepost/letmepost.dev/issues/new?template=bug_report.yml) — auto-applies the right labels and asks for the platform + repro + raw error envelope so triage doesn't ping-pong.
 
 **Before you open a PR**, skim [`CONTRIBUTING.md`](./CONTRIBUTING.md) — it documents the layering rules, the error contract, the pre-publish gate pattern, the testing approach (MSW + transaction rollback), and the commit style we follow. It's how new code reviews itself.
 

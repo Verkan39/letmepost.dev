@@ -1,4 +1,4 @@
-name: 🔌 Platform request
+name: Platform request
 description: Request a new social platform integration (Reddit, Mastodon, YouTube, etc.).
 title: "platform: add <platform-name> publisher"
 labels: ["type:platform", "status:needs-triage", "help-wanted"]

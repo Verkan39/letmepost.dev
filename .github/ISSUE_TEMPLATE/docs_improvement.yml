@@ -1,4 +1,4 @@
-name: 📖 Docs improvement
+name: Docs improvement
 description: Something on docs.letmepost.dev, letmepost.dev, or in this repo is wrong, missing, or unclear.
 title: "docs: <short description>"
 labels: ["type:docs", "area:docs", "status:needs-triage"]

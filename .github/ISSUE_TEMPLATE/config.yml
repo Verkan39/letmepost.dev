@@ -5,12 +5,12 @@
 blank_issues_enabled: false
 
 contact_links:
-  - name: 📖 Documentation
+  - name: Documentation
     url: https://docs.letmepost.dev
     about: API reference, guides, error codes, preflight rules. Most "how do I…" questions are already answered here.
-  - name: 🔒 Security vulnerability
+  - name: Security vulnerability
     url: https://github.com/letmepost/letmepost.dev/security/advisories/new
     about: Report privately via a GitHub security advisory (see SECURITY.md for details). Do NOT open a public issue.
-  - name: ✉️ Email the maintainer
+  - name: Email the maintainer
     url: mailto:kamal@letmepost.dev
     about: For anything that doesn't fit a template — billing, partnerships, custom contracts.

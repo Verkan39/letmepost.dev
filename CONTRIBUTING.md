@@ -9,7 +9,7 @@ This doc captures patterns that are already working. Anything not in here is fai
 > 1. **Find an issue.** Filter by [`good-first-issue`](https://github.com/letmepost/letmepost.dev/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue) or [`help-wanted`](https://github.com/letmepost/letmepost.dev/issues?q=is%3Aissue+is%3Aopen+label%3Ahelp-wanted). Comment on the issue so the maintainer can assign it to you and prevent duplicate effort.
 > 2. **Fork + branch.** `git checkout -b scope/short-desc` (e.g. `dashboard/skeleton-heights`). Branch naming matches the commit scope from §8.
 > 3. **Run the local stack.** `pnpm install` → `docker compose -f docker-compose.dev.yml up -d` → `pnpm dev`. Three terminals max. See [`README.md`](./README.md#running-locally-development) if the dev compose is unfamiliar.
-> 4. **Verify before you push.** `pnpm typecheck && pnpm lint && pnpm test` must all pass — CI runs the same three. Tests use vitest + MSW + transaction rollback (see §5); copy a sibling test for shape.
+> 4. **Verify before you push.** Run `scripts/ci-local.sh` — it replicates the GitHub Actions workflow exactly (same throwaway env vars, no `.env` shadowing) so you catch the "passes locally because my .env is loaded" trap. Use `scripts/ci-local.sh --fast` for typecheck + lint only (~30s, matches the current merge gate). Tests use vitest + MSW + transaction rollback (see §5); copy a sibling test for shape.
 > 5. **Open a PR.** The template asks for: linked issue, test plan, screenshot for UI work. The maintainer auto-assigns via CODEOWNERS. CI must be green before merge.
 >
 > Adding a new platform? Skip to **§3 Platform Addition** — it walks the whole shape end-to-end.

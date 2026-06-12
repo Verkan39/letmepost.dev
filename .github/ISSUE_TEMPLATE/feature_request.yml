@@ -1,4 +1,4 @@
-name: ✨ Feature request
+name: Feature request
 description: Suggest a new capability, endpoint, schema field, dashboard surface, or SDK helper.
 title: "feat: <short description>"
 labels: ["type:feature", "status:needs-triage"]
@@ -12,7 +12,7 @@ body:
         them get closed.
 
         For "add platform X" requests, use the dedicated
-        **🔌 Platform request** template instead.
+        **Platform request** template instead.
 
   - type: textarea
     id: problem

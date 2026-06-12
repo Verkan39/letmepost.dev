@@ -1,4 +1,4 @@
-name: 🐛 Bug report
+name: Bug report
 description: Something in letmepost.dev is misbehaving. Use this for runtime issues, API misbehavior, dashboard bugs, or platform-publish failures.
 title: "bug: <short description>"
 labels: ["type:bug", "status:needs-triage"]

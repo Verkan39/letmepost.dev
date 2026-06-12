@@ -16,6 +16,31 @@ jobs:
     name: typecheck · lint · test
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      # Postgres for the integration test suite. Tests in apps/api/tests/
+      # use `runInTransaction(tx, …)` which rolls back per-test, so a
+      # single fresh DB is shared across the suite without pollution.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: letmepost_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Reused across migrate + test steps. `TEST_DATABASE_URL` unlocks
+      # the `canRunDbTests` flag so `describeIfDb` blocks execute instead
+      # of skip.
+      DATABASE_URL: postgres://ci:ci@localhost:5432/letmepost_ci
+      TEST_DATABASE_URL: postgres://ci:ci@localhost:5432/letmepost_ci
+      BETTER_AUTH_SECRET: ci-throwaway-secret-not-used-anywhere-real
+      KEK_MASTER: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,20 +71,8 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Apply database migrations
+        run: pnpm --filter @letmepost/api db:migrate
+
       - name: Test
         run: pnpm test
-        env:
-          CI: true
-          # Module-load env vars — `apps/api/src/db/instance.ts` calls
-          # `createDb()` at import time, and `apps/api/src/auth.ts`
-          # validates BETTER_AUTH_SECRET at module load. These placeholders
-          # let imports succeed; no real DB connection is opened because
-          # DB-backed test suites self-skip via `canRunDbTests`, which is
-          # gated by the separate TEST_DATABASE_URL (unset here).
-          # Add a Postgres service container later if we need full DB
-          # coverage on PRs.
-          DATABASE_URL: postgres://ci:ci@localhost:5432/ci
-          BETTER_AUTH_SECRET: ci-throwaway-secret-not-used-anywhere-real
-          # 32-byte base64 throwaway — only needed if a test triggers
-          # `loadKek()` (encryption is lazy elsewhere).
-          KEK_MASTER: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=

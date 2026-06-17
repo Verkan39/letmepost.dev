@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowsClockwise,
   Check,
   Clock,
+  MagnifyingGlass,
   WarningCircle,
   X,
 } from "@phosphor-icons/react";
@@ -68,6 +70,10 @@ import { track } from "@/lib/analytics";
  *   - status
  *   - time range (presets + custom)
  *   - error code (multi-select)
+ *   - free-text search on the post body
+ *
+ * Filters round-trip through the URL so a filtered view is a shareable link.
+ * The active-profile snap and pagination cursor stay out of the URL.
  *
  * Pagination via the opaque cursor returned by the API; we keep a stack so
  * "back" works. Refetch fires on tab focus + manual Refresh.
@@ -97,30 +103,110 @@ function presetToAfter(preset: RangePreset): string | undefined {
   }
 }
 
+const DEFAULT_RANGE: RangePreset = "30d";
+
+function parseRange(raw: string | null): RangePreset {
+  return raw && Object.prototype.hasOwnProperty.call(RANGE_PRESET_LABELS, raw)
+    ? (raw as RangePreset)
+    : DEFAULT_RANGE;
+}
+
+/**
+ * The URL stores custom date bounds as absolute ISO timestamps; convert one
+ * back to the local datetime-local input format. Empty or invalid yields "".
+ */
+function toLocalDateTimeInput(raw: string | null): string {
+  if (!raw) return "";
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Decode the comma-joined `errorCode` param, dropping anything unknown. */
+function parseErrorCodes(raw: string | null): Set<PostErrorCode> {
+  const set = new Set<PostErrorCode>();
+  if (!raw) return set;
+  const known = new Set<string>(POST_ERROR_CODES);
+  for (const code of raw.split(",")) {
+    const trimmed = code.trim();
+    if (known.has(trimmed)) set.add(trimmed as PostErrorCode);
+  }
+  return set;
+}
+
 export default function PostsPage() {
   const { profiles, activeProfile } = useActiveProfile();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [platform, setPlatform] = useState<string>("");
-  const [status, setStatus] = useState<string>("");
-  const [profileId, setProfileId] = useState<string>("");
-  const [errorCodes, setErrorCodes] = useState<Set<PostErrorCode>>(new Set());
+  // Hydrate filters from the URL once, so a shared link opens the same view.
+  const [platform, setPlatform] = useState<string>(
+    () => searchParams.get("platform") ?? "",
+  );
+  const [status, setStatus] = useState<string>(
+    () => searchParams.get("status") ?? "",
+  );
+  const [profileId, setProfileId] = useState<string>(() => {
+    const p = searchParams.get("profileId");
+    return p && p !== "all" ? p : "";
+  });
+  const [errorCodes, setErrorCodes] = useState<Set<PostErrorCode>>(() =>
+    parseErrorCodes(searchParams.get("errorCode")),
+  );
 
-  const [range, setRange] = useState<RangePreset>("30d");
-  const [customAfter, setCustomAfter] = useState<string>("");
-  const [customBefore, setCustomBefore] = useState<string>("");
+  const [range, setRange] = useState<RangePreset>(() =>
+    parseRange(searchParams.get("range")),
+  );
+  const [customAfter, setCustomAfter] = useState<string>(
+    () => toLocalDateTimeInput(searchParams.get("after")),
+  );
+  const [customBefore, setCustomBefore] = useState<string>(
+    () => toLocalDateTimeInput(searchParams.get("before")),
+  );
   const [customDialogOpen, setCustomDialogOpen] = useState(false);
+
+  // `search` drives the input; `debouncedSearch` is what hits the API + URL.
+  const [search, setSearch] = useState<string>(
+    () => searchParams.get("q") ?? "",
+  );
+  const [debouncedSearch, setDebouncedSearch] = useState<string>(search);
 
   const [cursorStack, setCursorStack] = useState<(string | undefined)[]>([
     undefined,
   ]);
 
-  // Snap profile filter to the sidebar's active profile until the user
-  // explicitly changes the dropdown.
-  const [profileTouched, setProfileTouched] = useState(false);
+  // Snap to the sidebar's active profile until the dropdown is touched; a
+  // `profileId` in the URL counts as touched so a shared link isn't clobbered.
+  const [profileTouched, setProfileTouched] = useState(() =>
+    searchParams.has("profileId"),
+  );
   useEffect(() => {
     if (profileTouched) return;
     setProfileId(activeProfile?.id ?? "");
   }, [activeProfile?.id, profileTouched]);
+
+  // Debounce the search box. Skip the first run so hydrating from a shared
+  // link doesn't reset the cursor or fire a spurious analytics event.
+  const searchHydrated = useRef(false);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+      if (!searchHydrated.current) {
+        searchHydrated.current = true;
+        return;
+      }
+      setCursorStack([undefined]);
+      const trimmed = search.trim();
+      if (trimmed) {
+        track({
+          name: "post_log.filtered",
+          properties: { filter_field: "search", filter_value: trimmed },
+        });
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const filters = useMemo<ListPostsFilters>(() => {
     const f: ListPostsFilters = { limit: 25 };
@@ -128,6 +214,7 @@ export default function PostsPage() {
     if (status) f.status = [status as PostStatus];
     if (profileId) f.profileId = profileId;
     if (errorCodes.size > 0) f.errorCode = Array.from(errorCodes);
+    if (debouncedSearch.trim()) f.q = debouncedSearch.trim();
     if (range === "custom") {
       if (customAfter) f.after = new Date(customAfter).toISOString();
       if (customBefore) f.before = new Date(customBefore).toISOString();
@@ -143,10 +230,43 @@ export default function PostsPage() {
     status,
     profileId,
     errorCodes,
+    debouncedSearch,
     range,
     customAfter,
     customBefore,
     cursorStack,
+  ]);
+
+  // Mirror filters into the URL. Only non-defaults are written; profile is
+  // serialized only once touched so the active-profile snap stays out of it.
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (profileTouched) params.set("profileId", profileId || "all");
+    if (platform) params.set("platform", platform);
+    if (status) params.set("status", status);
+    if (errorCodes.size > 0) {
+      params.set("errorCode", Array.from(errorCodes).join(","));
+    }
+    if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
+    if (range !== DEFAULT_RANGE) params.set("range", range);
+    if (range === "custom") {
+      if (customAfter) params.set("after", new Date(customAfter).toISOString());
+      if (customBefore)
+        params.set("before", new Date(customBefore).toISOString());
+    }
+    const qs = params.toString();
+    router.replace(qs ? `/logs?${qs}` : "/logs", { scroll: false });
+  }, [
+    profileTouched,
+    profileId,
+    platform,
+    status,
+    errorCodes,
+    debouncedSearch,
+    range,
+    customAfter,
+    customBefore,
+    router,
   ]);
 
   // Filter object goes into the queryKey so each filter combination caches
@@ -177,7 +297,8 @@ export default function PostsPage() {
     setProfileId("");
     setProfileTouched(true);
     setErrorCodes(new Set());
-    setRange("30d");
+    setSearch("");
+    setRange(DEFAULT_RANGE);
     setCustomAfter("");
     setCustomBefore("");
     resetCursor();
@@ -205,7 +326,8 @@ export default function PostsPage() {
     status !== "" ||
     profileId !== "" ||
     errorCodes.size > 0 ||
-    range !== "30d";
+    search.trim() !== "" ||
+    range !== DEFAULT_RANGE;
   const onFirstPage = cursorStack.length === 1;
   const isLoading = query.isLoading && items === null;
 
@@ -229,6 +351,19 @@ export default function PostsPage() {
       </FadeIn>
 
       <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative">
+          <MagnifyingGlass className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search post text"
+            aria-label="Search post text"
+            maxLength={200}
+            className="h-8 w-[200px] pl-8"
+          />
+        </div>
+
         {profiles.length > 0 ? (
           <Select
             value={profileId || "all"}
